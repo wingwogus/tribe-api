@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.trip.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
+import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
 import com.tribe.tribe_api.common.util.service.RedisService
 import com.tribe.tribe_api.member.entity.Member
@@ -175,9 +176,11 @@ class TripServiceIntegrationTest @Autowired constructor(
         )
 
         // when & then: NO_AUTHORITY_TRIP 에러가 발생하는지 검증
-        assertThrows<BusinessException> {
+        val exception = assertThrows<BusinessException> {
             tripService.updateTrip(trip.id!!, request)
         }
+
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
 
     @Test
@@ -226,8 +229,10 @@ class TripServiceIntegrationTest @Autowired constructor(
         val request = TripRequest.Join(token)
 
         // when & then: ALREADY_JOINED_TRIP 에러가 발생하는지 검증
-        assertThrows<BusinessException> {
+        val exception = assertThrows<BusinessException> {
             tripService.joinTrip(request)
         }
+
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.ALREADY_JOINED_TRIP)
     }
 }
