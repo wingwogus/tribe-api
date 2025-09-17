@@ -93,7 +93,7 @@ class TripServiceIntegrationTest @Autowired constructor(
 
     @Test
     @DisplayName("여행 생성 성공")
-    fun `createTrip_Success`() {
+    fun createTrip_Success() {
         // given: '외부인'이 로그인을 했다고 가정
         setAuthentication(nonMember)
 
@@ -115,7 +115,7 @@ class TripServiceIntegrationTest @Autowired constructor(
 
     @Test
     @DisplayName("여행 상세 조회 성공 - 멤버인 경우")
-    fun `getTripDetails_Success_When_UserIsMember`() {
+    fun getTripDetails_Success_When_UserIsMember() {
         // given: '멤버'가 로그인을 했다고 가정
         setAuthentication(member)
         // when: 여행 상세 정보 조회
@@ -141,7 +141,7 @@ class TripServiceIntegrationTest @Autowired constructor(
 
     @Test
     @DisplayName("여행 수정 성공")
-    fun `updateTrip_Success`() {
+    fun updateTrip_Success() {
         // given: 주인이 로그인
         setAuthentication(owner)
 
@@ -163,7 +163,7 @@ class TripServiceIntegrationTest @Autowired constructor(
 
     @Test
     @DisplayName("여행 수정 실패 - 주인이 아닌 경우")
-    fun `updateTrip_Failed_When_UserIsMember`() {
+    fun updateTrip_Failed_When_UserIsMember() {
         // given
         setAuthentication(member)
 
@@ -182,7 +182,7 @@ class TripServiceIntegrationTest @Autowired constructor(
 
     @Test
     @DisplayName("내 여행 목록 조회")
-    fun `getAllTrips_Success`() {
+    fun getAllTrips_Success() {
         // given: '방장'이 로그인을 했다고 가정
         setAuthentication(owner)
         val pageable = PageRequest.of(0, 10)
@@ -197,7 +197,7 @@ class TripServiceIntegrationTest @Autowired constructor(
 
     @Test
     @DisplayName("초대 수락 성공")
-    fun `joinTrip_Success`() {
+    fun joinTrip_Success() {
         // given: '외부인'이 로그인을 했다고 가정
         setAuthentication(nonMember)
 
@@ -217,7 +217,7 @@ class TripServiceIntegrationTest @Autowired constructor(
 
     @Test
     @DisplayName("초대 수락 실패 - 이미 참여한 멤버인 경우")
-    fun `joinTrip_Fail_When_AlreadyMember`() {
+    fun joinTrip_Fail_When_AlreadyMember() {
         // given: 이미 멤버인 '멤버'가 로그인을 했다고 가정
         setAuthentication(member)
 
