@@ -6,11 +6,6 @@ import jakarta.persistence.*
 
 @Entity
 class WishlistItem(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "wishlist_item_id")
-    val id: Long? = null,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id", nullable = false)
     val trip: Trip,
@@ -22,4 +17,9 @@ class WishlistItem(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "adder_id", nullable = false)
     val adder: TripMember
-)
+) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "wishlist_item_id")
+    val id: Long? = null
+}

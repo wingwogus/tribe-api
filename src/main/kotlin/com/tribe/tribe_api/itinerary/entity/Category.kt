@@ -5,11 +5,6 @@ import jakarta.persistence.*
 
 @Entity
 class Category(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "category_id")
-    val id: Long,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id", nullable = false)
     val trip: Trip,
@@ -21,6 +16,11 @@ class Category(
     @Column(name = "category_order")
     var order: Int
 ) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "category_id")
+    val id: Long? = null
+
     @OneToMany(mappedBy = "category", cascade = [CascadeType.ALL], orphanRemoval = true)
     var itineraryItems: MutableList<ItineraryItem> = mutableListOf()
 }

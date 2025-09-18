@@ -7,11 +7,6 @@ import jakarta.persistence.*
 
 @Entity
 class ItineraryItem(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "item_id")
-    val id: Long? = null,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     val category: Category,
@@ -26,6 +21,10 @@ class ItineraryItem(
     @Lob
     var memo: String? = null
 ) : BaseTimeEntity() {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "item_id")
+    val id: Long? = null
 
     @OneToMany(mappedBy = "itineraryItem", cascade = [CascadeType.ALL])
     var expenses: MutableList<Expense> = mutableListOf()

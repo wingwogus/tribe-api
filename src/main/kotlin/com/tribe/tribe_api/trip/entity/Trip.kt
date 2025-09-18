@@ -11,11 +11,6 @@ import java.time.LocalDate
 
 @Entity
 class Trip(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "trip_id")
-    val id: Long? = null,
-
     var title: String,
     var startDate: LocalDate,
     var endDate: LocalDate,
@@ -23,6 +18,10 @@ class Trip(
     @Enumerated(EnumType.STRING)
     var country: Country,
 ) : BaseTimeEntity() {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "trip_id")
+    val id: Long? = null
 
     @BatchSize(size = 10)
     @OneToMany(mappedBy = "trip", cascade = [CascadeType.ALL], orphanRemoval = true)

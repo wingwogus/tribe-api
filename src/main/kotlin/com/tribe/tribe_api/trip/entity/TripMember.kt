@@ -8,12 +8,6 @@ import jakarta.persistence.*
 
 @Entity
 class TripMember(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "trip_member_id")
-    val id: Long? = null,
-
-    // 게스트 기능을 위해 Nullable('?')로 선언
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = true)
     val member: Member?,
@@ -28,6 +22,11 @@ class TripMember(
     @Column(nullable = false)
     var role: TripRole,
 ) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "trip_member_id")
+    val id: Long? = null
+
     @OneToMany(mappedBy = "payer", cascade = [CascadeType.ALL])
     var paidExpenses: MutableList<Expense> = mutableListOf()
 

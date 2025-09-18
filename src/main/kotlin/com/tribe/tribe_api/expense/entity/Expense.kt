@@ -9,11 +9,6 @@ import java.math.BigDecimal
 
 @Entity
 class Expense(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "expense_id")
-    val id: Long? = null,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id", nullable = false)
     val trip: Trip,
@@ -28,9 +23,13 @@ class Expense(
 
     var title: String,
 
-    var totalAmount: BigDecimal,
+    var totalAmount: BigDecimal
+) : BaseTimeEntity() {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "expense_id")
+    val id: Long? = null
 
-    ) : BaseTimeEntity() {
     @OneToMany(mappedBy = "expense", cascade = [CascadeType.ALL], orphanRemoval = true)
     var expenseItems: MutableList<ExpenseItem> = mutableListOf()
 }

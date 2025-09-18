@@ -85,7 +85,6 @@ class AuthServiceIntegrationTest @Autowired constructor(
     fun checkDuplicatedNickname_Fail_WhenNicknameIsDuplicated() {
         // given
         memberRepository.save(Member(
-            1L,
             "test@tribe.com",
             "pw",
             "duplicatedNickname",

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1/members")
 class MemberController(
-    private val memberService: MemberService // 주 생성자를 통한 의존성 주입
+    private val memberService: MemberService
 ) {
 
     @GetMapping("/me")

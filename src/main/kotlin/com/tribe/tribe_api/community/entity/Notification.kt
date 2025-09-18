@@ -6,17 +6,16 @@ import jakarta.persistence.*
 
 @Entity
 class Notification(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "notification_id")
-    val id: Long? = null,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recipient_id", nullable = false)
     val recipient: Member,
 
     val content: String,
 
-    var isRead: Boolean = false,
-
-    ) : BaseTimeEntity()
+    var isRead: Boolean = false
+) : BaseTimeEntity() {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "notification_id")
+    val id: Long? = null
+}
