@@ -4,6 +4,7 @@ import com.tribe.tribe_api.common.util.jwt.JwtAuthenticationFilter
 import com.tribe.tribe_api.common.util.jwt.JwtExceptionFilter
 import com.tribe.tribe_api.common.util.oauth2.CustomOAuth2UserService
 import com.tribe.tribe_api.common.util.oauth2.OAuth2LoginSuccessHandler
+import com.tribe.tribe_api.common.util.security.CustomAuthenticationEntryPoint
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -11,7 +12,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
@@ -21,7 +21,7 @@ class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val jwtExceptionFilter: JwtExceptionFilter,
     private val customOAuth2UserService: CustomOAuth2UserService,
-    private val authenticationEntryPoint: AuthenticationEntryPoint,
+    private val authenticationEntryPoint: CustomAuthenticationEntryPoint,
     private val oAuth2LoginSuccessHandler: OAuth2LoginSuccessHandler
 ) {
 
