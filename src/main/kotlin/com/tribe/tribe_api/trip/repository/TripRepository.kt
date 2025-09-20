@@ -25,4 +25,11 @@ interface TripRepository : JpaRepository<Trip, Long> {
             """)
     fun findTripWithMembersById(@Param("tripId") tripId: Long): Trip?
 
+    @Query("""
+            SELECT t FROM Trip t 
+            LEFT JOIN FETCH t.categories c
+            WHERE t.id = :tripId
+            """)
+    fun findTripWithFullItineraryById(tripId: Long): Trip?
+
 }
