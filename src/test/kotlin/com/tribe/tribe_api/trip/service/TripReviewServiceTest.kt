@@ -177,7 +177,7 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
         val reviewId = savedReview.id!!
 
         // when
-        val reviewDetail = tripReviewService.getReview(reviewId)
+        val reviewDetail = tripReviewService.getReview(trip.id!!, reviewId )
 
         // then
         assertThat(reviewDetail.reviewId).isEqualTo(reviewId)
@@ -193,7 +193,7 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
 
         // when & then: TRIP_REVIEW_NOT_FOUND 에러 발생 검증
         val exception = assertThrows<BusinessException> {
-            tripReviewService.getReview(invalidReviewId)
+            tripReviewService.getReview(trip.id!!, invalidReviewId)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.TRIP_REVIEW_NOT_FOUND)
     }
