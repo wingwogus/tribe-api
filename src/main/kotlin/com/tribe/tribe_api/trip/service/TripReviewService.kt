@@ -52,10 +52,15 @@ class TripReviewService(
             .map { TripReviewResponse.SimpleReviewInfo.from(it) }
     }
 
-    fun getReview(reviewId: Long): TripReviewResponse.ReviewDetail {
-        return (tripReviewRepository.findByIdOrNull(reviewId)
-            ?: throw BusinessException(ErrorCode.TRIP_REVIEW_NOT_FOUND))
-            .let { TripReviewResponse.ReviewDetail.from(it) }
+    fun getReview(tripId: Long, reviewId: Long): TripReviewResponse.ReviewDetail {
+        val review = tripReviewRepository.findByIdOrNull(reviewId)
+            ?: throw BusinessException(ErrorCode.TRIP_REVIEW_NOT_FOUND)
+
+        if (review.trip.id != tripId) {
+            throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+        }
+
+        return TripReviewResponse.ReviewDetail.from(review)
     }
 
     private fun createPromptFromTrip(trip: Trip, concept: String?): String {

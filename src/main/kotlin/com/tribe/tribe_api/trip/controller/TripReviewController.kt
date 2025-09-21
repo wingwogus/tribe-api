@@ -56,7 +56,7 @@ class TripReviewController(
         @PathVariable tripId: Long,
         @PathVariable reviewId: Long,
     ): ResponseEntity<*> {
-        val review = tripReviewService.getReview(reviewId)
+        val review = tripReviewService.getReview(tripId, reviewId)
 
         return ResponseEntity.ok(
             ApiResponse.success(
