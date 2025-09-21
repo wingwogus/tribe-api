@@ -13,6 +13,7 @@ import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.security.SecureRandom
@@ -36,7 +37,7 @@ class TripService(
     fun createTrip(request: TripRequest.Create): TripResponse.TripDetail {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
 
-        val member = memberRepository.findById(currentMemberId).orElse(null)
+        val member = memberRepository.findByIdOrNull(currentMemberId)
             ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
 
         return request.toEntity()
@@ -57,7 +58,7 @@ class TripService(
     fun deleteTrip(tripId: Long) {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
 
-        tripRepository.findById(tripId).orElse(null)
+        tripRepository.findByIdOrNull(tripId)
             ?.also { validateTripOwner(it, currentMemberId) }
             ?.let { tripRepository.delete(it) }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
@@ -91,7 +92,7 @@ class TripService(
         val tripIdString = redisService.getValues("$INVITE_TOKEN_PREFIX${request.token}")
             ?: throw BusinessException(ErrorCode.INVALID_INVITE_TOKEN)
 
-        val member = memberRepository.findById(currentMemberId).orElse(null)
+        val member = memberRepository.findByIdOrNull(currentMemberId)
             ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         val trip = findTripWithMembers(tripIdString.toLong())
 

@@ -2,13 +2,19 @@ package com.tribe.tribe_api.trip.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.trip.dto.TripReviewRequest
 import com.tribe.tribe_api.trip.dto.TripReviewResponse
 import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripReview
+import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripRepository
 import com.tribe.tribe_api.trip.repository.TripReviewRepository
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.repository.findByIdOrNull
+import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -24,17 +30,32 @@ class TripReviewService(
         tripId: Long,
         request: TripReviewRequest.CreateReview
     ): TripReviewResponse.ReviewDetail {
+        val currentMemberId = SecurityUtil.getCurrentMemberId()
+
         val trip = tripRepository.findTripWithFullItineraryById(tripId)
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
+        validateTripOwner(trip, currentMemberId)
 
         val prompt = createPromptFromTrip(trip, request.concept)
         val aiFeedback = geminiApiClient.getFeedback(prompt)
             ?: throw BusinessException(ErrorCode.AI_FEEDBACK_ERROR)
 
-        val review = TripReview(trip, aiFeedback)
+        val review = TripReview(trip, request.concept, aiFeedback)
         tripReviewRepository.save(review)
 
         return TripReviewResponse.ReviewDetail.from(review)
+    }
+
+    fun getAllReviews(tripId: Long, pageable: Pageable): Page<TripReviewResponse.SimpleReviewInfo> {
+        return tripReviewRepository.findTripReviewsByTripId(tripId, pageable)
+            .map { TripReviewResponse.SimpleReviewInfo.from(it) }
+    }
+
+    fun getReview(reviewId: Long): TripReviewResponse.ReviewDetail {
+        return (tripReviewRepository.findByIdOrNull(reviewId)
+            ?: throw BusinessException(ErrorCode.TRIP_REVIEW_NOT_FOUND))
+            .let { TripReviewResponse.ReviewDetail.from(it) }
     }
 
     private fun createPromptFromTrip(trip: Trip, concept: String?): String {
@@ -111,5 +132,15 @@ class TripReviewService(
             """.trimIndent()
         }.joinToString("\n")}
         """.trimIndent()
+    }
+
+    private fun validateTripOwner(trip: Trip, currentMemberId: Long) {
+        val isOwner = trip.members.any {
+            it.member?.id == currentMemberId && it.role == TripRole.OWNER
+        }
+
+        if (!isOwner) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
     }
 }

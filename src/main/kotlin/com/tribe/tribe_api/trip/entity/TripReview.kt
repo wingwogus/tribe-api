@@ -9,6 +9,8 @@ class TripReview(
     @JoinColumn(name = "trip_id", nullable = false)
     val trip: Trip,
 
+    val concept: String?,
+
     @Lob
     var content: String
 ) : BaseTimeEntity() {
