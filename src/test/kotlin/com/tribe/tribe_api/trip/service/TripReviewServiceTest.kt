@@ -16,29 +16,29 @@ import com.tribe.tribe_api.trip.dto.TripReviewRequest
 import com.tribe.tribe_api.trip.entity.*
 import com.tribe.tribe_api.trip.repository.TripRepository
 import com.tribe.tribe_api.trip.repository.TripReviewRepository
+import io.mockk.every
+import io.mockk.impl.annotations.MockK
+import io.mockk.junit5.MockKExtension
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.stub
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.PageRequest
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
+@ExtendWith(MockKExtension::class)
 class TripReviewServiceIntegrationTest @Autowired constructor(
-    private val tripReviewService: TripReviewService,
     private val tripRepository: TripRepository,
     private val tripReviewRepository: TripReviewRepository,
     private val memberRepository: MemberRepository,
@@ -48,8 +48,10 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     private lateinit var placeRepository: PlaceRepository
 
     // Mock 객체 주입
-    @MockitoBean
+    @MockK
     private lateinit var geminiApiClient: GeminiApiClient
+    private lateinit var tripReviewService: TripReviewService
+
 
     private lateinit var owner: Member
     private lateinit var member: Member
@@ -58,6 +60,11 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
 
     @BeforeEach
     fun setUp() {
+        tripReviewService = TripReviewService(
+            tripRepository,
+            tripReviewRepository,
+            geminiApiClient
+        )
         // 1. 사용자 생성
         owner = memberRepository.save(
             Member(
@@ -125,9 +132,8 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
         val request = TripReviewRequest.CreateReview("새로운 럭셔리 여행 컨셉")
         val fakeAiFeedback = "## AI가 생성한 피드백입니다.\n"
 
-        geminiApiClient.stub {
-            on { getFeedback(any()) } doReturn fakeAiFeedback
-        }
+        every {geminiApiClient.getFeedback(any())}.returns(fakeAiFeedback)
+
         // when: 리뷰 생성
         val reviewDetail = tripReviewService.createReview(trip.id!!, request)
 
