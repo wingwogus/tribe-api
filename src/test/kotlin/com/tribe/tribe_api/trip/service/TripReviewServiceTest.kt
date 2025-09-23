@@ -1,8 +1,10 @@
 package com.tribe.tribe_api.trip.service
 
+import com.ninjasquad.springmockk.MockkBean
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
+import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
@@ -17,7 +19,6 @@ import com.tribe.tribe_api.trip.entity.*
 import com.tribe.tribe_api.trip.repository.TripRepository
 import com.tribe.tribe_api.trip.repository.TripReviewRepository
 import io.mockk.every
-import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -39,6 +40,7 @@ import java.time.LocalDate
 @Transactional
 @ExtendWith(MockKExtension::class)
 class TripReviewServiceIntegrationTest @Autowired constructor(
+    private var tripReviewService: TripReviewService,
     private val tripRepository: TripRepository,
     private val tripReviewRepository: TripReviewRepository,
     private val memberRepository: MemberRepository,
@@ -48,10 +50,8 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     private lateinit var placeRepository: PlaceRepository
 
     // Mock 객체 주입
-    @MockK
+    @MockkBean
     private lateinit var geminiApiClient: GeminiApiClient
-    private lateinit var tripReviewService: TripReviewService
-
 
     private lateinit var owner: Member
     private lateinit var member: Member
@@ -60,11 +60,6 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
 
     @BeforeEach
     fun setUp() {
-        tripReviewService = TripReviewService(
-            tripRepository,
-            tripReviewRepository,
-            geminiApiClient
-        )
         // 1. 사용자 생성
         owner = memberRepository.save(
             Member(
@@ -129,10 +124,11 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     fun createReview_Success() {
         // given: 방장 로그인
         setAuthentication(owner)
+
         val request = TripReviewRequest.CreateReview("새로운 럭셔리 여행 컨셉")
         val fakeAiFeedback = "## AI가 생성한 피드백입니다.\n"
 
-        every {geminiApiClient.getFeedback(any())}.returns(fakeAiFeedback)
+        every { geminiApiClient.getFeedback(any()) } returns fakeAiFeedback
 
         // when: 리뷰 생성
         val reviewDetail = tripReviewService.createReview(trip.id!!, request)
