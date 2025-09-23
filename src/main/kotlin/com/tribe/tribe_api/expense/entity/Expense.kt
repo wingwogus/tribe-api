@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.expense.entity
 
 import com.tribe.tribe_api.common.util.BaseTimeEntity
+import com.tribe.tribe_api.expense.enumeration.InputMethod
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripMember
@@ -23,7 +24,12 @@ class Expense(
 
     var title: String,
 
-    var totalAmount: BigDecimal
+    var totalAmount: BigDecimal,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "entry_method", nullable = false)
+    var entryMethod: InputMethod,
+
 ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
