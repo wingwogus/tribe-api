@@ -38,4 +38,9 @@ class Expense(
 
     @OneToMany(mappedBy = "expense", cascade = [CascadeType.ALL], orphanRemoval = true)
     var expenseItems: MutableList<ExpenseItem> = mutableListOf()
+
+    fun addExpenseItem(expenseItem: ExpenseItem) {
+        this.expenseItems.add(expenseItem)
+        expenseItem.expense = this
+    }
 }
