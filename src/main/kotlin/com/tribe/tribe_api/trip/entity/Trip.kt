@@ -23,7 +23,6 @@ class Trip(
     @Column(name = "trip_id")
     val id: Long? = null
 
-    @BatchSize(size = 10)
     @OneToMany(mappedBy = "trip", cascade = [CascadeType.ALL], orphanRemoval = true)
     var members: MutableList<TripMember> = mutableListOf()
 
