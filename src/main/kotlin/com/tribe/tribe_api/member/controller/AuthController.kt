@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/v1/auth")
 class AuthController(
-    private val authService: AuthService // 주 생성자를 통한 의존성 주입
+    private val authService: AuthService
 ) {
 
     @PostMapping("/login")

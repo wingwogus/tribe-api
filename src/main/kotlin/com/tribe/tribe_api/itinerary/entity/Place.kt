@@ -6,11 +6,6 @@ import java.math.BigDecimal
 
 @Entity
 class Place(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "place_id")
-    val id: Long,
-
     val externalPlaceId: String,
 
     val name: String,
@@ -23,6 +18,11 @@ class Place(
     @Column(precision = 10, scale = 7)
     val longitude: BigDecimal
 ) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "place_id")
+    val id: Long? = null
+
     @OneToMany(mappedBy = "place")
     var wishlistItems: MutableList<WishlistItem> = mutableListOf()
 

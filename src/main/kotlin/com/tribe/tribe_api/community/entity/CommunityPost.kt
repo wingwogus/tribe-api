@@ -6,11 +6,6 @@ import jakarta.persistence.*
 
 @Entity
 class CommunityPost(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "post_id")
-    val id: Long? = null,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     val itineraryItem: ItineraryItem,
@@ -28,6 +23,11 @@ class CommunityPost(
     @Column(nullable = false)
     var status: PostStatus = PostStatus.OPEN,
 ) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "post_id")
+    val id: Long? = null
+
     @OneToMany(mappedBy = "communityPost", cascade = [CascadeType.ALL], orphanRemoval = true)
     var offers: MutableList<CommunityOffer> = mutableListOf()
 }

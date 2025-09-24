@@ -5,11 +5,6 @@ import jakarta.persistence.*
 
 @Entity
 class CommunityOffer(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "offer_id")
-    val id: Long? = null,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id", nullable = false)
     val communityPost: CommunityPost,
@@ -24,4 +19,9 @@ class CommunityOffer(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: OfferStatus = OfferStatus.PENDING
-)
+) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "offer_id")
+    val id: Long? = null
+}

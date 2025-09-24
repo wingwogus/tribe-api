@@ -7,11 +7,6 @@ import jakarta.persistence.*
 
 @Entity
 class Member(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "member_id")
-    val id: Long? = null,
-
     @Column(nullable = false, unique = true)
     val email: String,
 
@@ -37,6 +32,11 @@ class Member(
     @Column(nullable = false)
     var isFirstLogin: Boolean,
 ) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "member_id")
+    val id: Long? = null
+
     @OneToMany(mappedBy = "member", cascade = [CascadeType.ALL], orphanRemoval = true)
     var tripMembers: MutableList<TripMember> = mutableListOf()
 
