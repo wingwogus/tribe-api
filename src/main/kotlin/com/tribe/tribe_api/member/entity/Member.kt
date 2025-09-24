@@ -5,7 +5,7 @@ import com.tribe.tribe_api.community.entity.Notification
 import com.tribe.tribe_api.trip.entity.TripMember
 import jakarta.persistence.*
 
-@Entity 
+@Entity
 class Member(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
