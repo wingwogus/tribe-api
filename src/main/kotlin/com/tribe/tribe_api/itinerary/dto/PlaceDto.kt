@@ -7,8 +7,6 @@ object PlaceDto {
         val places: List<Simple>,
         val nextPageToken: String?
     )
-
-    @Builder
     data class Simple(
         val placeId: String,
         val name: String,
