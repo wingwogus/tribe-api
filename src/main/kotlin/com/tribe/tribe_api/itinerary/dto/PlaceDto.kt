@@ -1,11 +1,14 @@
 package com.tribe.tribe_api.itinerary.dto
 
+import lombok.Builder
+
 object PlaceDto {
     data class SearchResponse(
         val places: List<Simple>,
         val nextPageToken: String?
     )
 
+    @Builder
     data class Simple(
         val placeId: String,
         val name: String,
@@ -14,14 +17,13 @@ object PlaceDto {
         val longitude: Double
     ) {
         companion object {
-            // Google API 응답 객체를 우리 DTO로 변환하는 팩토리 메서드
-            fun from(googleResult: GoogleDto.Response.PlaceResult): Simple {
+            fun from(googlePlace: GoogleDto.GoogleApiResponse.PlaceResult): Simple {
                 return Simple(
-                    placeId = googleResult.placeId,
-                    name = googleResult.name,
-                    address = googleResult.formattedAddress,
-                    latitude = googleResult.geometry.location.lat,
-                    longitude = googleResult.geometry.location.lng
+                    placeId = googlePlace.id,
+                    name = googlePlace.displayName?.text ?: "이름 없음",
+                    address = googlePlace.formattedAddress ?: "주소 정보 없음",
+                    latitude = googlePlace.location?.latitude ?: 0.0,
+                    longitude = googlePlace.location?.longitude ?: 0.0
                 )
             }
         }

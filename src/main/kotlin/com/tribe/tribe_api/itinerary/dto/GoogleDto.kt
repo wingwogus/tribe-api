@@ -5,28 +5,24 @@ import com.fasterxml.jackson.annotation.JsonProperty
 
 object GoogleDto {
     @JsonIgnoreProperties(ignoreUnknown = true)
-    data class Response(
-        val results: List<PlaceResult>,
-        val status: String,
-        @JsonProperty("next_page_token")
-        val nextPageToken: String?
+    data class GoogleApiResponse(
+        val places: List<PlaceResult>?,
     ) {
         data class PlaceResult(
-            @JsonProperty("place_id")
-            val placeId: String,
-            val name: String,
-            @JsonProperty("formatted_address")
-            val formattedAddress: String,
-            val geometry: Geometry
-        )
-
-        data class Geometry(
-            val location: Location
+            val id: String,
+            val formattedAddress: String?,
+            val location: Location?,
+            val displayName: DisplayName?,
         )
 
         data class Location(
-            val lat: Double,
-            val lng: Double
+            val latitude: Double,
+            val longitude: Double
+        )
+
+        data class DisplayName(
+            val text: String,
+            val languageCode: String
         )
     }
 }
