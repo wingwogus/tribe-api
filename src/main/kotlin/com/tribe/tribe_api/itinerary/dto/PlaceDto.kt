@@ -9,7 +9,7 @@ object PlaceDto {
     )
     data class Simple(
         val placeId: String,
-        val name: String,
+        val placeName: String,
         val address: String,
         val latitude: Double,
         val longitude: Double
