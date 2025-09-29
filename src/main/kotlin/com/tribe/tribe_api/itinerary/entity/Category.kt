@@ -2,8 +2,13 @@ package com.tribe.tribe_api.itinerary.entity
 
 import com.tribe.tribe_api.trip.entity.Trip
 import jakarta.persistence.*
+import org.springframework.data.annotation.CreatedDate
+import org.springframework.data.annotation.LastModifiedDate
+import org.springframework.data.jpa.domain.support.AuditingEntityListener
+import java.time.LocalDateTime
 
 @Entity
+@EntityListeners(AuditingEntityListener::class)
 class Category(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id", nullable = false)
@@ -20,6 +25,17 @@ class Category(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "category_id")
     val id: Long? = null
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    var createdAt: LocalDateTime = LocalDateTime.now()
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now()
+
+    @Column(columnDefinition = "TEXT")
+    var memo: String? = null
 
     @OneToMany(mappedBy = "category", cascade = [CascadeType.ALL], orphanRemoval = true)
     var itineraryItems: MutableList<ItineraryItem> = mutableListOf()
