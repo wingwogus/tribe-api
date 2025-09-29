@@ -2,11 +2,13 @@ package com.tribe.tribe_api.itinerary.dto
 
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
+import jakarta.validation.constraints.NotBlank
 import java.time.LocalDateTime
 
 object CategoryDto {
 
     data class CreateRequest(
+        @field:NotBlank(message = "카테고리 이름은 비워둘 수 없습니다.")
         val name: String,
         val day: Int,
         val order: Int

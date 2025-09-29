@@ -3,6 +3,7 @@ package com.tribe.tribe_api.itinerary.controller
 import com.tribe.tribe_api.common.util.ApiResponse
 import com.tribe.tribe_api.itinerary.dto.CategoryDto
 import com.tribe.tribe_api.itinerary.service.CategoryService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -18,7 +19,7 @@ class CategoryController(
     @PostMapping
     fun createCategory(
         @PathVariable tripId: Long,
-        @RequestBody request: CategoryDto.CreateRequest
+        @Valid @RequestBody request: CategoryDto.CreateRequest
     ): ResponseEntity<ApiResponse<CategoryDto.CategoryResponse>> {
         val response = categoryService.createCategory(tripId, request)
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response))

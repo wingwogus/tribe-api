@@ -28,7 +28,7 @@ class WishlistService(
         member : Member,
         tripId : Long,
         placeDto : WishlistDto.WishListAddRequest
-        ) {
+        ) : WishlistDto.WishlistItemDto {
 
         val trip = tripRepository.findById(tripId).orElseThrow()
         val tripMember = tripMemberRepository.findByTripAndMember(trip, member).orElseThrow()
@@ -50,7 +50,9 @@ class WishlistService(
             place = placeEntity,
             adder = tripMember
         )
-        wishlistItemRepository.save(wishlistItem)
+        val savedWishlistItem = wishlistItemRepository.save(wishlistItem)
+
+        return WishlistDto.WishlistItemDto.from(savedWishlistItem)
     }
 
     // 위시리스트 내에서 장소 검색
@@ -73,5 +75,9 @@ class WishlistService(
             throw EntityNotFoundException("해당 위시리스트 항목을 찾을 수 없습니다. id: $wishlistItemId")
         }
         wishlistItemRepository.deleteById(wishlistItemId)
+    }
+
+    fun deleteWishlistItems(wishlistItemIds: List<Long>) {
+        wishlistItemRepository.deleteAllByIdInBatch(wishlistItemIds)
     }
 }

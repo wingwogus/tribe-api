@@ -65,7 +65,7 @@ object WishlistDto {
         }
     }
 
-    data class WishListDeleteRequest(
-        val wishlistItemId: Long
+    data class WishlistDeleteRequest(
+        val wishlistItemIds: List<Long>
     )
 }
