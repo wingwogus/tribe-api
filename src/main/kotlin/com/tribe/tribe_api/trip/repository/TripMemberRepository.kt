@@ -8,5 +8,6 @@ import java.util.*
 
 interface TripMemberRepository : JpaRepository<TripMember, Long> {
     fun existsByTripAndMember(trip: Trip, member: Member): Boolean
-    fun findByTripAndMember(trip: Trip, member: Member): Optional<TripMember>
+    fun findByTripAndMember(trip: Trip, member: Member): TripMember?
+    fun existsByTripIdAndMemberId(tripId: Long, memberId: Long): Boolean
 }

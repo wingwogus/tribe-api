@@ -18,4 +18,4 @@ abstract class BaseTimeEntity {
 
     @LastModifiedDate
     lateinit var lastModifiedAt: LocalDateTime
-}
+} // 지금 상속이 안돼

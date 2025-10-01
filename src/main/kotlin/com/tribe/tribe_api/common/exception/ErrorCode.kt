@@ -27,6 +27,11 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     TRIP_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 여행을 찾을 수 없습니다."),
     TRIP_REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 여행의 검토 내역을 찾을 수 없습니다."),
     AUTH_CODE_NOT_FOUND(HttpStatus.NOT_FOUND, "인증코드를 찾을 수 없습니다."),
+    CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 카테고리를 찾을 수 없습니다."),
+    ITINERARY_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 일정을 찾을 수 없습니다."),
+    PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 장소를 찾을 수 없습니다."),
+    NOT_A_TRIP_MEMBER(HttpStatus.NOT_FOUND, "해당 여행에 멤버가 아닙니다."),
+    WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당하는 위시리스트를 찾을 수 없습니다."),
 
     // 409 CONFLICT
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),

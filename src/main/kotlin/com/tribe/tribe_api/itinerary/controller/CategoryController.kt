@@ -1,11 +1,14 @@
 package com.tribe.tribe_api.itinerary.controller
 
 import com.tribe.tribe_api.common.util.ApiResponse
+import com.tribe.tribe_api.common.util.security.CustomUserDetails
+import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.itinerary.dto.CategoryDto
 import com.tribe.tribe_api.itinerary.service.CategoryService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -56,7 +59,8 @@ class CategoryController(
     fun updateCategory(
         @PathVariable tripId: Long,
         @PathVariable categoryId: Long,
-        @RequestBody request: CategoryDto.UpdateRequest
+        @RequestBody request: CategoryDto.UpdateRequest,
+        @AuthenticationPrincipal userDetails: SecurityUtil
     ): ResponseEntity<ApiResponse<CategoryDto.CategoryResponse>> {
         val response = categoryService.updateCategory(categoryId, request)
         return ResponseEntity.ok(ApiResponse.success(response))

@@ -1,5 +1,6 @@
 package com.tribe.tribe_api.itinerary.entity
 
+import com.tribe.tribe_api.common.util.BaseTimeEntity
 import com.tribe.tribe_api.trip.entity.Trip
 import jakarta.persistence.*
 import org.springframework.data.annotation.CreatedDate
@@ -20,19 +21,12 @@ class Category(
 
     @Column(name = "category_order")
     var order: Int
-) {
+): BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "category_id")
     val id: Long? = null
 
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now()
-
-    @LastModifiedDate
-    @Column(name = "updated_at", nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
 
     @Column(columnDefinition = "TEXT")
     var memo: String? = null

@@ -1,6 +1,8 @@
 package com.tribe.tribe_api.itinerary.service
 
 
+import com.tribe.tribe_api.common.exception.BusinessException
+import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.itinerary.dto.WishlistDto
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
@@ -11,6 +13,7 @@ import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.data.domain.Pageable
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -30,8 +33,8 @@ class WishlistService(
         placeDto : WishlistDto.WishListAddRequest
         ) : WishlistDto.WishlistItemDto {
 
-        val trip = tripRepository.findById(tripId).orElseThrow()
-        val tripMember = tripMemberRepository.findByTripAndMember(trip, member).orElseThrow()
+        val trip = tripRepository.findByIdOrNull(tripId) ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+        val tripMember = tripMemberRepository.findByTripAndMember(trip, member) ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
 
         val placeEntity = placeRepository.findByExternalPlaceId(placeDto.placeId)
             ?: run {
@@ -70,14 +73,18 @@ class WishlistService(
     }
 
     // 위시리스트 장소 제거
-    fun deleteWishlistItem(wishlistItemId: Long) {
-        if (!wishlistItemRepository.existsById(wishlistItemId)) {
-            throw EntityNotFoundException("해당 위시리스트 항목을 찾을 수 없습니다. id: $wishlistItemId")
-        }
-        wishlistItemRepository.deleteById(wishlistItemId)
-    }
-
     fun deleteWishlistItems(wishlistItemIds: List<Long>) {
-        wishlistItemRepository.deleteAllByIdInBatch(wishlistItemIds)
+
+        val requestedIds = wishlistItemIds.distinct()
+        if (requestedIds.isEmpty()) return
+
+        val existingIds = wishlistItemRepository.findExistingIds(requestedIds)
+
+        val missingIds = requestedIds.filterNot { it in existingIds }
+
+        if (missingIds.isNotEmpty()) {
+            throw BusinessException(ErrorCode.WISHLIST_ITEM_NOT_FOUND)
+        }
+        wishlistItemRepository.deleteAllByIdInBatch(requestedIds)
     }
 }
