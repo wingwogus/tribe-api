@@ -62,7 +62,7 @@ class CategoryController(
         @RequestBody request: CategoryDto.UpdateRequest,
         @AuthenticationPrincipal userDetails: SecurityUtil
     ): ResponseEntity<ApiResponse<CategoryDto.CategoryResponse>> {
-        val response = categoryService.updateCategory(categoryId, request)
+        val response = categoryService.updateCategory(categoryId, userDetails.getCurrentMemberId(),request)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
