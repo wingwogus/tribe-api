@@ -73,7 +73,7 @@ class CategoryController(
         @PathVariable tripId: Long,
         @PathVariable categoryId: Long
     ): ResponseEntity<ApiResponse<Unit>> {
-        categoryService.deleteCategory(categoryId)
+        categoryService.deleteCategory(tripId ,categoryId)
         return ResponseEntity.ok(ApiResponse.success("카테고리가 삭제되었습니다.", null))
     }
 }

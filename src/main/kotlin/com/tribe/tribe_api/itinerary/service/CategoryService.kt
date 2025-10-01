@@ -71,7 +71,14 @@ class CategoryService (
         return CategoryDto.CategoryResponse.from(category)
     }
 
-    fun deleteCategory(categoryId: Long) {
+    fun deleteCategory(tripId : Long ,categoryId: Long) {
+        val memberId = SecurityUtil.getCurrentMemberId()
+
+        val isTripMember = tripMemberRepository.existsByTripIdAndMemberId(tripId, memberId)
+        if (!isTripMember) {
+            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
+        }
+
         if (!categoryRepository.existsById(categoryId)) {
             throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
         }
