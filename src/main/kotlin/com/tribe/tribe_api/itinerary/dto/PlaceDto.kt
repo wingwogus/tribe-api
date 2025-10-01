@@ -1,7 +1,5 @@
 package com.tribe.tribe_api.itinerary.dto
 
-import lombok.Builder
-
 object PlaceDto {
     data class SearchResponse(
         val places: List<Simple>,
@@ -18,7 +16,7 @@ object PlaceDto {
             fun from(googlePlace: GoogleDto.GoogleApiResponse.PlaceResult): Simple {
                 return Simple(
                     placeId = googlePlace.id,
-                    name = googlePlace.displayName?.text ?: "이름 없음",
+                    placeName = googlePlace.displayName?.text ?: "이름 없음",
                     address = googlePlace.formattedAddress ?: "주소 정보 없음",
                     latitude = googlePlace.location?.latitude ?: 0.0,
                     longitude = googlePlace.location?.longitude ?: 0.0
