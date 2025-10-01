@@ -3,12 +3,14 @@ package com.tribe.tribe_api.itinerary.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.itinerary.dto.WishlistDto
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.itinerary.repository.WishlistItemRepository
 import com.tribe.tribe_api.member.entity.Member
+import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import jakarta.persistence.EntityNotFoundException
@@ -23,16 +25,18 @@ class WishlistService(
     private val wishlistItemRepository: WishlistItemRepository,
     private val placeRepository: PlaceRepository,
     private val tripMemberRepository: TripMemberRepository,
-    private val tripRepository: TripRepository
+    private val tripRepository: TripRepository,
+    private val memberRepository: MemberRepository
 ) {
 
     // 위시리스트에 장소 추가
     fun addWishList(
-        member : Member,
         tripId : Long,
         placeDto : WishlistDto.WishListAddRequest
         ) : WishlistDto.WishlistItemDto {
 
+        val memberId = SecurityUtil.getCurrentMemberId()
+        val member = memberRepository.findByIdOrNull(memberId) ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         val trip = tripRepository.findByIdOrNull(tripId) ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
         val tripMember = tripMemberRepository.findByTripAndMember(trip, member) ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
 

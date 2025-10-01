@@ -20,11 +20,10 @@ class WishlistController(
      */
     @PostMapping
     fun addWishlistItem(
-        @AuthenticationPrincipal userDetails: CustomUserDetails,
         @PathVariable tripId: Long,
         @RequestBody request: WishlistDto.WishListAddRequest
     ): ResponseEntity<ApiResponse<WishlistDto.WishlistItemDto>> {
-        val response = wishlistService.addWishList(userDetails.member, tripId, request)
+        val response = wishlistService.addWishList(tripId, request)
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response))
     }
 
