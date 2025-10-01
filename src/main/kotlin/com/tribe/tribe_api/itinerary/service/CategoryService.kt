@@ -2,6 +2,7 @@ package com.tribe.tribe_api.itinerary.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.itinerary.dto.CategoryDto
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
@@ -48,10 +49,11 @@ class CategoryService (
     }
 
     fun updateCategory(
-        memberId: Long,
         categoryId: Long,
         request: CategoryDto.UpdateRequest
     ): CategoryDto.CategoryResponse {
+
+        val memberId = SecurityUtil.getCurrentMemberId()
 
         val category = categoryRepository.findByIdOrNull(categoryId)
             ?: throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)

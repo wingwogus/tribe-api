@@ -59,10 +59,9 @@ class CategoryController(
     fun updateCategory(
         @PathVariable tripId: Long,
         @PathVariable categoryId: Long,
-        @RequestBody request: CategoryDto.UpdateRequest,
-        @AuthenticationPrincipal userDetails: SecurityUtil
+        @RequestBody request: CategoryDto.UpdateRequest
     ): ResponseEntity<ApiResponse<CategoryDto.CategoryResponse>> {
-        val response = categoryService.updateCategory(categoryId, userDetails.getCurrentMemberId(),request)
+        val response = categoryService.updateCategory(categoryId,request)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
