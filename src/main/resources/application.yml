@@ -64,6 +64,10 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+google:
+  maps:
+    key: ${GOOGLE_KEY}
+
 gemini:
   api:
     key: ${GEMINI_API_KEY} # 환경변수에서 API 키를 가져옵니다.
@@ -75,3 +79,4 @@ server:
 app:
   oauth:
     redirect-url: http://localhost:8081/oauth/callback
+
