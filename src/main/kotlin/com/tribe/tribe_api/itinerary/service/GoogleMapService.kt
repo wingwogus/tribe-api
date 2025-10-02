@@ -16,7 +16,7 @@ import reactor.core.publisher.Mono
 @Service
 class GoogleMapService(
     private val webClient: WebClient,
-    @Value("\${google.key}") private val apiKey: String,
+    @Value("\${google.maps.key}") private val apiKey: String,
     private val redisService: RedisService,
     private val objectMapper: ObjectMapper
 ) {
