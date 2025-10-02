@@ -36,7 +36,7 @@ object CategoryDto {
                     itineraryItems = category.itineraryItems.map { ItineraryItemResponse.from(it) },
                     memo = category.memo,
                     createdAt = category.createdAt,
-                    updatedAt = category.updatedAt
+                    updatedAt = category.lastModifiedAt
                 )
             }
         }
