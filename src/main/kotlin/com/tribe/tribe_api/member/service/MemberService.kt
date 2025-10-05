@@ -28,4 +28,17 @@ class MemberService(
 
         return responseDto
     }
+
+    fun updateNickname(request: MemberDto.UpdateNicknameRequest): MemberDto.Response {
+        val currentMemberId = SecurityUtil.getCurrentMemberId()
+
+        val member = memberRepository.findById(currentMemberId)
+            .orElseThrow({ BusinessException(ErrorCode.MEMBER_NOT_FOUND) })
+
+        member.nickname = request.nickname
+
+        val responseDto = MemberDto.Response.from(member)
+
+        return responseDto
+    }
 }
