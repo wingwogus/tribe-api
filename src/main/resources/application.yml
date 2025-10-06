@@ -13,15 +13,22 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     open-in-view: false
+    show-sql: true
+
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+        format_sql: true
+
 
   security:
     oauth2:
       client:
         registration:
           kakao:
-            client-id: ${KAKAO_KEY} # .env 파일에 설정된 카카오 REST API 키
+            client-id: ${KAKAO_KEY}
             client-secret: ${KAKAO_CLIENT_SECRET}
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             authorization-grant-type: authorization_code
@@ -58,7 +65,13 @@ jwt:
   secret: ${JWT_SECRET}
 
 google:
-  key: ${GOOGLE_KEY}
+  maps:
+    key: ${GOOGLE_KEY}
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY} # 환경변수에서 API 키를 가져옵니다.
+    url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 server:
   port: 8083
@@ -66,3 +79,4 @@ server:
 app:
   oauth:
     redirect-url: http://localhost:8081/oauth/callback
+

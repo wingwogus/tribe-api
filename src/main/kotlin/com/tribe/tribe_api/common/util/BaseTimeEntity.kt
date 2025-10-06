@@ -18,4 +18,4 @@ abstract class BaseTimeEntity {
 
     @LastModifiedDate
     lateinit var lastModifiedAt: LocalDateTime
-}
+} 
