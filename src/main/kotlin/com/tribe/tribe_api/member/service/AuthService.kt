@@ -6,7 +6,7 @@ import com.tribe.tribe_api.common.util.jwt.JwtToken
 import com.tribe.tribe_api.common.util.jwt.JwtTokenProvider
 import com.tribe.tribe_api.common.util.service.MailService
 import com.tribe.tribe_api.common.util.service.RedisService
-import com.tribe.tribe_api.member.dto.MemberDto
+import com.tribe.tribe_api.member.dto.AuthDto
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
 import com.tribe.tribe_api.member.entity.Role
@@ -37,18 +37,18 @@ class AuthService(
         private const val VERIFIED_EMAIL_PREFIX = "VerifiedEmail "
     }
 
-    fun login(request: MemberDto.LoginRequest): JwtToken {
+    fun login(request: AuthDto.LoginRequest): JwtToken {
         val authenticationToken = UsernamePasswordAuthenticationToken(request.email, request.password)
         val authentication = authenticationManagerBuilder.`object`.authenticate(authenticationToken)
         return jwtTokenProvider.generateToken(authentication)
     }
 
-    fun reissue(request: MemberDto.ReissueRequest): JwtToken {
+    fun reissue(request: AuthDto.ReissueRequest): JwtToken {
         jwtTokenProvider.validateToken(request.refreshToken)
         return jwtTokenProvider.reissueToken(request.accessToken, request.refreshToken)
     }
 
-    fun signUp(request: MemberDto.SignUpRequest) {
+    fun signUp(request: AuthDto.SignUpRequest) {
         val isSuccess = redisService.getValues("$VERIFIED_EMAIL_PREFIX${request.email}")
             ?: throw BusinessException(ErrorCode.EMAIL_NOT_VERIFIED)
 
@@ -86,13 +86,13 @@ class AuthService(
         redisService.deleteValues("RT:$email")
     }
 
-    fun checkDuplicatedNickname(request: MemberDto.VerifiedNicknameRequest) {
+    fun checkDuplicatedNickname(request: AuthDto.VerifiedNicknameRequest) {
         if (memberRepository.existsByNickname(request.nickname)) {
             throw BusinessException(ErrorCode.DUPLICATE_NICKNAME)
         }
     }
 
-    fun verifiedCode(request: MemberDto.VerifiedRequest) {
+    fun verifiedCode(request: AuthDto.VerifiedRequest) {
         val (email, authCode) = request // data class의 구조 분해 선언
         checkDuplicatedEmail(email)
         val redisAuthCode = redisService.getValues("$AUTH_CODE_PREFIX$email")
