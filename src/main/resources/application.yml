@@ -77,6 +77,5 @@ server:
   port: 8083
 
 app:
-  oauth:
-    redirect-url: http://tr1be.kro.kr/oauth/callback
+  url: ${APP_URL}
 
