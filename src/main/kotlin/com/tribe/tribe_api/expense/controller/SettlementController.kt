@@ -21,4 +21,12 @@ class SettlementController(
         val dailySettlement = settlementService.getDailySettlement(tripId, date)
         return ResponseEntity.ok(ApiResponse.success("일별 정산 조회 성공", dailySettlement))
     }
+
+    @GetMapping("/total")
+    fun getTotalSettlement(
+        @PathVariable tripId: Long
+    ): ResponseEntity<ApiResponse<SettlementDto.TotalResponse>> {
+        val totalSettlement = settlementService.getTotalSettlement(tripId)
+        return ResponseEntity.ok(ApiResponse.success("전체 정산 조회 성공", totalSettlement))
+    }
 }
