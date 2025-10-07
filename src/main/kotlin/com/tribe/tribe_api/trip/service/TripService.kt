@@ -30,7 +30,7 @@ class TripService(
 ) {
     companion object {
         private const val INVITE_TOKEN_PREFIX = "INVITE:"
-        private const val INVITE_BASE_URL = "http://localhost:8081/invite?token="
+        private const val INVITE_BASE_URL = "http://tr1be.kro.kr/invite?token="
         private val INVITE_EXPIRATION = Duration.ofMinutes(10)
     }
 

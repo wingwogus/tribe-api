@@ -74,9 +74,9 @@ gemini:
     url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 server:
-  port: 8080
+  port: 8083
 
 app:
   oauth:
-    redirect-url: http://localhost:8081/oauth/callback
+    redirect-url: http://tr1be.kro.kr/oauth/callback
 
