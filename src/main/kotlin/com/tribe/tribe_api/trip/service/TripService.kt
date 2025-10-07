@@ -11,6 +11,7 @@ import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
@@ -26,11 +27,12 @@ class TripService(
     private val memberRepository: MemberRepository,
     private val tripRepository: TripRepository,
     private val redisService: RedisService,
-    private val tripMemberRepository: TripMemberRepository
+    private val tripMemberRepository: TripMemberRepository,
+    @Value("\${app.url}") private val appUrl: String
 ) {
     companion object {
         private const val INVITE_TOKEN_PREFIX = "INVITE:"
-        private const val INVITE_BASE_URL = "https://wego.kro.kr/invite?token="
+        private const val INVITE_PATH = "/invite?token="
         private val INVITE_EXPIRATION = Duration.ofMinutes(10)
     }
 
@@ -84,7 +86,7 @@ class TripService(
 
         val token = generateInvitationToken()
         redisService.setValues("$INVITE_TOKEN_PREFIX$token", tripId.toString(), INVITE_EXPIRATION)
-        return TripResponse.Invitation("$INVITE_BASE_URL$token")
+        return TripResponse.Invitation("$appUrl$INVITE_PATH$token")
     }
 
     fun joinTrip(request: TripRequest.Join): TripResponse.TripDetail {
