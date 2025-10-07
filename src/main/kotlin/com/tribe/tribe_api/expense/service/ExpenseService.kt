@@ -1,5 +1,7 @@
 package com.tribe.tribe_api.expense.service
 
+import com.tribe.tribe_api.common.exception.BusinessException
+import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseItem
@@ -9,11 +11,10 @@ import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-
 import jakarta.persistence.EntityNotFoundException
-
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Service
 class ExpenseService(
@@ -27,6 +28,14 @@ class ExpenseService(
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
     fun createExpense(tripId: Long, itineraryItemId: Long, request: ExpenseDto.CreateRequest): ExpenseDto.CreateResponse {
+
+        // --- 👇 [추가] 품목 합계와 총액 비교 검증 로직 ---
+        val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
+        if (request.totalAmount.compareTo(itemsTotal) != 0) {
+            throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
+        }
+        // --- 검증 로직 끝 ---
+
         val trip = tripRepository.findById(tripId)
             .orElseThrow { EntityNotFoundException("Trip not found") }
         val payer = tripMemberRepository.findById(request.payerId)
@@ -110,40 +119,39 @@ class ExpenseService(
                 existingItem.price = request.price
             }
         }
-
-        // 멤버별 배분 정보 등록/수정
-        @Transactional
-        fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
-            val expense = expenseRepository.findById(expenseId)
-                .orElseThrow { EntityNotFoundException("Expense Not Found $expenseId") }
-
-            val expenseItemsById = expense.expenseItems.associateBy { it.id }
-
-            request.items.forEach { itemAssignmentDto ->
-                val itemId = itemAssignmentDto.itemId
-
-                val expenseItem = expenseItemsById[itemId]
-                    ?: throw IllegalArgumentException("지출(ID: $expenseId)에 해당 항목(ID: $itemId)이 존재하지 않습니다.")
-
-                expenseAssignmentRepository.deleteByExpenseItemId(itemId)
-                expenseItem.assignments.clear() // 영속성 컨텍스트의 캐시와 동기화
-
-                val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
-                if (participants.size != itemAssignmentDto.participantIds.size) {
-                    throw EntityNotFoundException("Participant Not Found")
-                }
-
-                participants.forEach { participant ->
-                    val newAssignment = com.tribe.tribe_api.expense.entity.ExpenseAssignment(
-                        expenseItem = expenseItem,
-                        tripMember = participant
-                    )
-                    expenseItem.assignments.add(newAssignment)
-                }
-            }
-
-            return ExpenseDto.DetailResponse.from(expense)
-        }
     }
 
+    // 멤버별 배분 정보 등록/수정
+    @Transactional
+    fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
+        val expense = expenseRepository.findById(expenseId)
+            .orElseThrow { EntityNotFoundException("Expense Not Found $expenseId") }
+
+        val expenseItemsById = expense.expenseItems.associateBy { it.id }
+
+        request.items.forEach { itemAssignmentDto ->
+            val itemId = itemAssignmentDto.itemId
+
+            val expenseItem = expenseItemsById[itemId]
+                ?: throw IllegalArgumentException("지출(ID: $expenseId)에 해당 항목(ID: $itemId)이 존재하지 않습니다.")
+
+            expenseAssignmentRepository.deleteByExpenseItemId(itemId)
+            expenseItem.assignments.clear() // 영속성 컨텍스트의 캐시와 동기화
+
+            val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
+            if (participants.size != itemAssignmentDto.participantIds.size) {
+                throw EntityNotFoundException("Participant Not Found")
+            }
+
+            participants.forEach { participant ->
+                val newAssignment = com.tribe.tribe_api.expense.entity.ExpenseAssignment(
+                    expenseItem = expenseItem,
+                    tripMember = participant
+                )
+                expenseItem.assignments.add(newAssignment)
+            }
+        }
+
+        return ExpenseDto.DetailResponse.from(expense)
+    }
 }

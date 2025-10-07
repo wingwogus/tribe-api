@@ -154,14 +154,11 @@ class InitDataService(
             )
         )
 
-        // 테스트를 위해서 추가했습니다 (일별 정산)
-
+        // 정산 테스트 더미
         val guestSihwan = TripMember(member = null, trip = trip, guestNickname = "시환", role = TripRole.GUEST)
             .apply { tripMemberRepository.save(this) }
         trip.members.add(guestSihwan)
 
-
-        //결제자 테스터 ㅁ
         val expenseForDinner = Expense(
             trip = trip,
             itineraryItem = dinnerItinerary,
@@ -172,16 +169,36 @@ class InitDataService(
             paymentDate = LocalDate.of(2025, 10, 26)
         )
 
-        val item1 = ExpenseItem(expenseForDinner, "라면과 맥주", BigDecimal(25000))
-        val item2 = ExpenseItem(expenseForDinner, "음료수", BigDecimal(5000))
-        expenseForDinner.expenseItems.addAll(listOf(item1, item2))
+        val dinnerItem1 = ExpenseItem(expenseForDinner, "라면과 맥주", BigDecimal(25000))
+        val dinnerItem2 = ExpenseItem(expenseForDinner, "음료수", BigDecimal(5000))
+        expenseForDinner.expenseItems.addAll(listOf(dinnerItem1, dinnerItem2))
 
-        item1.assignments.add(ExpenseAssignment(item1, trip.members.first { it.member?.nickname == "테스터A" }))
-        item1.assignments.add(ExpenseAssignment(item1, trip.members.first { it.member?.nickname == "테스터B" }))
-
-        // 음료수(5000원)는 시환이형이 부담
-        item2.assignments.add(ExpenseAssignment(item2, guestSihwan))
+        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터A" }))
+        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터B" }))
+        dinnerItem2.assignments.add(ExpenseAssignment(dinnerItem2, guestSihwan))
 
         expenseRepository.save(expenseForDinner)
+
+        // 여러명 결제 같은 날에 테스터 B가 편의점 간식을 사고 정산하는 더미
+        val expenseForSnack = Expense(
+            trip = trip,
+            itineraryItem = dinnerItinerary,
+            payer = trip.members.first { it.member?.nickname == "테스터B" },
+            title = "편의점 간식",
+            totalAmount = BigDecimal(10000),
+            entryMethod = InputMethod.HANDWRITE,
+            paymentDate = LocalDate.of(2025, 10, 26)
+        )
+
+        val snackItem1 = ExpenseItem(expenseForSnack, "테스터A 간식", BigDecimal(3333))
+        val snackItem2 = ExpenseItem(expenseForSnack, "테스터B 간식", BigDecimal(3334))
+        val snackItem3 = ExpenseItem(expenseForSnack, "시환 간식", BigDecimal(3333))
+        expenseForSnack.expenseItems.addAll(listOf(snackItem1, snackItem2, snackItem3))
+
+        snackItem1.assignments.add(ExpenseAssignment(snackItem1, trip.members.first { it.member?.nickname == "테스터A" }))
+        snackItem2.assignments.add(ExpenseAssignment(snackItem2, trip.members.first { it.member?.nickname == "테스터B" }))
+        snackItem3.assignments.add(ExpenseAssignment(snackItem3, guestSihwan))
+
+        expenseRepository.save(expenseForSnack)
     }
 }
