@@ -1,5 +1,7 @@
 package com.tribe.tribe_api.common.util.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.tribe.tribe_api.itinerary.dto.GoogleDto
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Component
@@ -10,9 +12,20 @@ import java.util.concurrent.TimeUnit
 @Component
 class RedisService(
     // RedisTemplate의 제네릭 타입을 <String, String>으로 명확히 하여 타입 안정성 확보
-    private val redisTemplate: RedisTemplate<String, String>
+    private val redisTemplate: RedisTemplate<String, String>,
+    private val objectMapper: ObjectMapper
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
+
+    fun setGoogleApiData(searchKey: String, apiResponse: GoogleDto.GoogleApiResponse) {
+        val key = "search_cache:$searchKey"
+
+        val data = objectMapper.writeValueAsString(apiResponse)
+        val duration = Duration.ofDays(7)
+
+        redisTemplate.opsForValue().set(key, data, duration)
+        log.info("Redis에 캐시 저장: key=$key, TTL=${duration.toDays()}일")
+    }
 
     fun setValues(key: String, data: String) {
         redisTemplate.opsForValue().set(key, data)

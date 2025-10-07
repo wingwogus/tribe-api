@@ -15,6 +15,7 @@ class CustomUserDetails(
         return listOf(SimpleGrantedAuthority("ROLE_${member.role.name}"))
     }
 
+
     override fun getPassword(): String? = member.password
     override fun getUsername(): String = member.email
     override fun isAccountNonExpired(): Boolean = true

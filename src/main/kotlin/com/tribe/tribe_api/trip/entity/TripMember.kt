@@ -3,17 +3,12 @@ package com.tribe.tribe_api.trip.entity
 import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
+import com.tribe.tribe_api.itinerary.entity.WishlistItem
 import com.tribe.tribe_api.member.entity.Member
 import jakarta.persistence.*
 
 @Entity
 class TripMember(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "trip_member_id")
-    val id: Long? = null,
-
-    // 게스트 기능을 위해 Nullable('?')로 선언
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = true)
     val member: Member?,
@@ -28,6 +23,14 @@ class TripMember(
     @Column(nullable = false)
     var role: TripRole,
 ) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "trip_member_id")
+    val id: Long? = null
+
+    @OneToMany(mappedBy = "adder", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var wishlistItems: MutableList<WishlistItem> = mutableListOf()
+
     @OneToMany(mappedBy = "payer", cascade = [CascadeType.ALL])
     var paidExpenses: MutableList<Expense> = mutableListOf()
 
