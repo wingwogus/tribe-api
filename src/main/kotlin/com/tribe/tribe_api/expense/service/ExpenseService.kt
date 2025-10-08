@@ -125,44 +125,44 @@ class ExpenseService(
                 existingItem.price = request.price
             }
         }
+    }
 
-        // 멤버별 배분 정보 등록/수정
-        @Transactional
-        fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
-            val expense = expenseRepository.findById(expenseId)
-                .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+    // 멤버별 배분 정보 등록/수정
+    @Transactional
+    fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
+        val expense = expenseRepository.findById(expenseId)
+            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
 
-            expense.trip.id?.let { tripId ->
-                verifyTripIdParticipation(tripId)
-            } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
+        expense.trip.id?.let { tripId ->
+            verifyTripIdParticipation(tripId)
+        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
 
-            val expenseItemsById = expense.expenseItems.associateBy { it.id }
+        val expenseItemsById = expense.expenseItems.associateBy { it.id }
 
-            request.items.forEach { itemAssignmentDto ->
-                val itemId = itemAssignmentDto.itemId
+        request.items.forEach { itemAssignmentDto ->
+            val itemId = itemAssignmentDto.itemId
 
-                val expenseItem = expenseItemsById[itemId]
-                    ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_IN_EXPENSE)
+            val expenseItem = expenseItemsById[itemId]
+                ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_IN_EXPENSE)
 
-                expenseAssignmentRepository.deleteByExpenseItemId(itemId)
-                expenseItem.assignments.clear() // 영속성 컨텍스트의 캐시와 동기화
+            expenseAssignmentRepository.deleteByExpenseItemId(itemId)
+            expenseItem.assignments.clear() // 영속성 컨텍스트의 캐시와 동기화
 
-                val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
-                if (participants.size != itemAssignmentDto.participantIds.size) {
-                    throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
-                }
-
-                participants.forEach { participant ->
-                    val newAssignment = com.tribe.tribe_api.expense.entity.ExpenseAssignment(
-                        expenseItem = expenseItem,
-                        tripMember = participant
-                    )
-                    expenseItem.assignments.add(newAssignment)
-                }
+            val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
+            if (participants.size != itemAssignmentDto.participantIds.size) {
+                throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
             }
 
-            return ExpenseDto.DetailResponse.from(expense)
+            participants.forEach { participant ->
+                val newAssignment = com.tribe.tribe_api.expense.entity.ExpenseAssignment(
+                    expenseItem = expenseItem,
+                    tripMember = participant
+                )
+                expenseItem.assignments.add(newAssignment)
+            }
         }
+
+        return ExpenseDto.DetailResponse.from(expense)
     }
 
 }
