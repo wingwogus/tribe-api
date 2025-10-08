@@ -2,6 +2,9 @@ package com.tribe.tribe_api.expense.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.common.exception.BusinessException
+import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseItem
@@ -25,9 +28,19 @@ class ExpenseService(
     private val itineraryItemRepository: ItineraryItemRepository
 ) {
 
+    private fun verifyTripIdParticipation(tripId: Long){
+        val currentMemberId = SecurityUtil.getCurrentMemberId()
+            ?: throw BusinessException(ErrorCode.UNAUTHORIZED_ACCESS)
+
+        if(!tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)){
+            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
+        }
+    }
+
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
     fun createExpense(tripId: Long, itineraryItemId: Long, request: ExpenseDto.CreateRequest): ExpenseDto.CreateResponse {
+        verifyTripIdParticipation(tripId)
 
         // --- 👇 [추가] 품목 합계와 총액 비교 검증 로직 ---
         val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
@@ -37,11 +50,11 @@ class ExpenseService(
         // --- 검증 로직 끝 ---
 
         val trip = tripRepository.findById(tripId)
-            .orElseThrow { EntityNotFoundException("Trip not found") }
+            .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
         val payer = tripMemberRepository.findById(request.payerId)
-            .orElseThrow { EntityNotFoundException("Member not found") }
+            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
         val itineraryItem = itineraryItemRepository.findById(itineraryItemId)
-            .orElseThrow { EntityNotFoundException("ItineraryItem not found with id: $itineraryItemId") }
+            .orElseThrow { BusinessException(ErrorCode.ITINERARY_ITEM_NOT_FOUND) }
 
         val expense = Expense(
             trip = trip,
@@ -71,7 +84,11 @@ class ExpenseService(
     @Transactional(readOnly = true)
     fun getExpenseDetail(expenseId: Long): ExpenseDto.DetailResponse {
         val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { EntityNotFoundException("Expense Not Found: $expenseId") }
+            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+
+        expense.trip.id?.let { tripId ->
+            verifyTripIdParticipation(tripId)
+        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
 
         return ExpenseDto.DetailResponse.from(expense)
     }
@@ -80,10 +97,14 @@ class ExpenseService(
     @Transactional
     fun updateExpense(expenseId: Long, request: ExpenseDto.UpdateRequest): ExpenseDto.DetailResponse {
         val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { EntityNotFoundException("Expense Not Found: $expenseId") }
+            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+
+        expense.trip.id?.let { tripId ->
+            verifyTripIdParticipation(tripId)
+        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
 
         val payer = tripMemberRepository.findById(request.payerId)
-            .orElseThrow { EntityNotFoundException("Payer Not Found ${request.payerId}") }
+            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
 
         expense.title = request.expenseTitle
         expense.totalAmount = request.totalAmount
@@ -97,7 +118,6 @@ class ExpenseService(
 
     // Item 리스트를 요청 DTO의 상태와 동일하게 업데이트
     private fun updateExpenseItems(expense: Expense, itemUpdateRequests: List<ExpenseDto.ItemUpdate>) {
-
         val requestedItemIds = itemUpdateRequests.mapNotNull { it.itemId }.toSet()
         val itemsToRemove = expense.expenseItems.filter { it.id !in requestedItemIds }
         expense.expenseItems.removeAll(itemsToRemove)
@@ -110,11 +130,9 @@ class ExpenseService(
                     price = request.price
                 )
                 expense.addExpenseItem(newItem)
-
             } else {
                 val existingItem = expense.expenseItems.find { it.id == request.itemId }
-                    ?: throw EntityNotFoundException("Item Not Found: ${request.itemId}")
-
+                    ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_FOUND)
                 existingItem.name = request.itemName
                 existingItem.price = request.price
             }
@@ -125,7 +143,11 @@ class ExpenseService(
     @Transactional
     fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
         val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { EntityNotFoundException("Expense Not Found $expenseId") }
+            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+
+        expense.trip.id?.let { tripId ->
+            verifyTripIdParticipation(tripId)
+        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
 
         val expenseItemsById = expense.expenseItems.associateBy { it.id }
 
@@ -133,14 +155,14 @@ class ExpenseService(
             val itemId = itemAssignmentDto.itemId
 
             val expenseItem = expenseItemsById[itemId]
-                ?: throw IllegalArgumentException("지출(ID: $expenseId)에 해당 항목(ID: $itemId)이 존재하지 않습니다.")
+                ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_IN_EXPENSE)
 
             expenseAssignmentRepository.deleteByExpenseItemId(itemId)
             expenseItem.assignments.clear() // 영속성 컨텍스트의 캐시와 동기화
 
             val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
             if (participants.size != itemAssignmentDto.participantIds.size) {
-                throw EntityNotFoundException("Participant Not Found")
+                throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
             }
 
             participants.forEach { participant ->

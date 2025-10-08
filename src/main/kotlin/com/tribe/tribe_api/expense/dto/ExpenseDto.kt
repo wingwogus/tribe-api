@@ -3,36 +3,71 @@ package com.tribe.tribe_api.expense.dto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseItem
 import com.tribe.tribe_api.trip.entity.TripMember
+import jakarta.validation.Valid
+import jakarta.validation.constraints.*
 import java.math.BigDecimal
 import java.time.LocalDate
 
 object ExpenseDto {
     data class CreateRequest(
+        @field:NotBlank(message = "지출 이름은 필수입니다.")
         val expenseTitle: String,
+
+        @field:NotNull(message = "총액은 필수입니다.")
+        @field:PositiveOrZero(message = "총액은 0 또는 양수여야 합니다.")
         val totalAmount: BigDecimal,
+
         val receiptImageUrl: String?,
+
+        @field:NotNull(message = "결제자 ID는 필수입니다.")
         val payerId: Long,
+
+        @field:NotNull(message = "결제일은 필수입니다.")
         val paymentDate: LocalDate,
+
+        @field:NotBlank(message = "입력 방식은 필수입니다.")
         val inputMethod: String,
+
+        @field:Valid
         val items: List<ItemCreate> = emptyList()
     )
 
     data class ItemCreate(
+        @field:NotBlank(message = "항목 이름은 필수입니다.")
         val itemName: String,
+
+        @field:NotNull(message = "항목 가격은 필수입니다.")
+        @field:PositiveOrZero(message = "항목 가격은 0 또는 양수여야 합니다.")
         val price: BigDecimal
     )
 
     data class UpdateRequest(
+        @field:NotBlank(message = "지출 제목은 필수입니다.")
         val expenseTitle: String,
+
+        @field:NotNull(message = "총액은 필수입니다.")
+        @field:PositiveOrZero(message = "총액은 0 또는 양수여야 합니다.")
         val totalAmount: BigDecimal,
+
+        @field:NotNull(message = "결제일은 필수입니다.")
+        @field:PastOrPresent(message = "결제일은 오늘 또는 과거 날짜여야 합니다.")
         val paymentDate: LocalDate,
+
+        @field:NotNull(message = "결제자 ID는 필수입니다.")
         val payerId: Long,
+
+        @field:Valid
         val items: List<ItemUpdate> = emptyList()
     )
 
     data class ItemUpdate(
         val itemId: Long?,
+
+        @field:NotBlank(message = "항목 이름은 비워둘 수 없습니다.")
         val itemName: String,
+
+        @field:NotNull(message = "항목 가격은 필수입니다.")
+        @field:PositiveOrZero(message = "항목 가격은 0 또는 양수여야 합니다.")
         val price: BigDecimal
     )
 
@@ -41,7 +76,10 @@ object ExpenseDto {
     )
 
     data class ItemAssignment(
+        @field:NotNull(message = "항목 ID는 필수입니다.")
         val itemId: Long,
+
+        @field:NotNull(message = "참여자 목록은 필수입니다.")
         val participantIds: List<Long> = emptyList()
     )
 
