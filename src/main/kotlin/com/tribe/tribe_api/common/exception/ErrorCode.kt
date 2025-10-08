@@ -12,6 +12,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     ALREADY_LOGGED_OUT(HttpStatus.BAD_REQUEST, "이미 로그아웃된 상태입니다."),
     INVALID_INVITE_TOKEN(HttpStatus.BAD_REQUEST, "유효하지 않은 초대 코드입니다."),
     ALREADY_JOINED_TRIP(HttpStatus.BAD_REQUEST, "이미 여행에 참여한 유저입니다."),
+    EXPENSE_ITEM_NOT_IN_EXPENSE(HttpStatus.BAD_REQUEST, "지출 내역에 해당 항목이 존재하지 않습니다."),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),
@@ -32,6 +33,8 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 장소를 찾을 수 없습니다."),
     NOT_A_TRIP_MEMBER(HttpStatus.NOT_FOUND, "해당 여행에 멤버가 아닙니다."),
     WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당하는 위시리스트를 찾을 수 없습니다."),
+    EXPENSE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 지출 내역을 찾을 수 없습니다."),
+    EXPENSE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 지출 항목을 찾을 수 없습니다."),
 
     // 409 CONFLICT
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
