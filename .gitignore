@@ -40,4 +40,4 @@ out/
 .kotlin
 
 .env
-src/main/resources/application.yml
+.yml
