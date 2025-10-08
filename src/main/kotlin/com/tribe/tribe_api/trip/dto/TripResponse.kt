@@ -48,7 +48,7 @@ sealed class TripResponse {
                     title = trip.title,
                     startDate = trip.startDate,
                     endDate = trip.endDate,
-                    country = trip.country.koreanName,
+                    country = trip.country.code,
                     members = trip.members.map { MemberInfo.from(it) }
                 )
             }

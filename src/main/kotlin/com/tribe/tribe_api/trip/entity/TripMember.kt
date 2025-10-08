@@ -3,6 +3,7 @@ package com.tribe.tribe_api.trip.entity
 import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
+import com.tribe.tribe_api.itinerary.entity.WishlistItem
 import com.tribe.tribe_api.member.entity.Member
 import jakarta.persistence.*
 
@@ -26,6 +27,9 @@ class TripMember(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "trip_member_id")
     val id: Long? = null
+
+    @OneToMany(mappedBy = "adder", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var wishlistItems: MutableList<WishlistItem> = mutableListOf()
 
     @OneToMany(mappedBy = "payer", cascade = [CascadeType.ALL])
     var paidExpenses: MutableList<Expense> = mutableListOf()
