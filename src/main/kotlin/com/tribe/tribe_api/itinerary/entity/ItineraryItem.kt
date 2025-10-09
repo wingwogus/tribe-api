@@ -13,15 +13,13 @@ class ItineraryItem(
     val category: Category,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "place_id")
+    @JoinColumn(name = "place_id", nullable = false)
     val place: Place?,
 
-    @Column(nullable = false)
-    var title: String, // **[추가]** 일정 자체의 제목 (장소 이름과 다를 수 있음)
+    var title: String?, // 사용자가 직접 입력하는 일정 (placeId를 통해 지도에서 받아오는 장소가 없을경우나
+                        // '호텔에서 휴식' 같은 직접 입력해야하는 일정용
 
-    var startTime: LocalDateTime?, // **[추가]** 일정 시작 시간
-
-    var endTime: LocalDateTime?, // **[추가]** 일정 종료 시간
+    var time: LocalDateTime? , // 사용자가 직접 입력하는 시간 (할수도 있고 안할수도 있음)
 
     @Column(name = "item_order")
     var order: Int,
