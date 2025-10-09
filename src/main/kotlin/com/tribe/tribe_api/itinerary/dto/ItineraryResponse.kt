@@ -5,43 +5,49 @@ import com.tribe.tribe_api.itinerary.entity.Place
 import java.time.LocalDateTime
 
 data class ItineraryResponse(
-    val itemId: Long,
+    val itineraryId: Long,
     val categoryId: Long,
-    val title: String,
-    val startTime: LocalDateTime?,
-    val endTime: LocalDateTime?,
+    //  placeName과 title을 name 하나로 통일
+    val name: String,
+    val time: LocalDateTime?,
     val order: Int,
     val memo: String?,
-    val place: PlaceInfo?
+    // location은 장소가 있을 때만 값이 있어서 nullable로 변경
+    val location: LocationInfo?
 ) {
     companion object {
         fun from(item: ItineraryItem): ItineraryResponse {
             return ItineraryResponse(
-                itemId = item.id!!,
+                itineraryId = item.id!!,
                 categoryId = item.category.id!!,
-                title = item.title,
-                startTime = item.startTime,
-                endTime = item.endTime,
+                // place가 있으면 place.name을, 없으면 title을 이름으로 사용
+                name = item.place?.name ?: item.title!!,
+                time = item.time,
                 order = item.order,
                 memo = item.memo,
-                place = item.place?.let { PlaceInfo.from(it) }
+                // place가 있을 때만 location 정보를 생성하고, 없으면 null을 보냄
+                location = item.place?.let { LocationInfo.from(it) }
             )
         }
     }
 }
 
-data class PlaceInfo(
-    val placeId: Long,
-    val name: String,
+
+data class LocationInfo(
+    val lat: Double,
+    val lng: Double,
     val address: String?
 ) {
     companion object {
-        fun from(place: Place): PlaceInfo {
-            return PlaceInfo(
-                placeId = place.id!!,
-                name = place.name,
+
+        // Place 엔티티를 LocationInfo DTO로 변환
+        fun from(place: Place): LocationInfo {
+            return LocationInfo(
+                lat = place.latitude.toDouble(),
+                lng = place.longitude.toDouble(),
                 address = place.address
             )
         }
     }
 }
+

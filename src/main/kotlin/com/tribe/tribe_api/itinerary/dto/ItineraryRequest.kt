@@ -1,31 +1,23 @@
 package com.tribe.tribe_api.itinerary.dto
 
-import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import java.time.LocalDateTime
 
 sealed class ItineraryRequest {
 
     data class Create(
-        @field:NotNull(message = "카테고리 ID는 필수입니다.")
-        val categoryId: Long,
 
+        // placeId와 title 모두 선택적으로 받도록 nullable(?)로 변경
         val placeId: Long?,
+        val title: String?,
 
-        @field:NotBlank(message = "일정 제목은 필수입니다.")
-        val title: String,
-
-        val startTime: LocalDateTime?,
-        val endTime: LocalDateTime?,
+        val time: LocalDateTime?,
         val memo: String?
     )
 
+    // 일정 수정
     data class Update(
-        @field:NotBlank(message = "일정 제목은 필수입니다.")
-        val title: String,
-
-        val startTime: LocalDateTime?,
-        val endTime: LocalDateTime?,
+        val time: LocalDateTime?,
         val memo: String?
     )
 
@@ -41,3 +33,4 @@ sealed class ItineraryRequest {
         val order: Int
     )
 }
+
