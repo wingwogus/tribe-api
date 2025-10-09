@@ -50,13 +50,6 @@ class ExpenseService(
 
         verifyTripIdParticipation(tripId)
 
-        // --- 👇 [추가] 품목 합계와 총액 비교 검증 로직 ---
-        val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
-        if (request.totalAmount.compareTo(itemsTotal) != 0) {
-            throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
-        }
-        // --- 검증 로직 끝 ---
-
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
         val payer = tripMemberRepository.findById(request.payerId)
@@ -78,12 +71,17 @@ class ExpenseService(
             else -> throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
         }
 
+        val itemsTotal = processedData.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
+        if (processedData.totalAmount.compareTo(itemsTotal) != 0) {
+            throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
+        }
+
         val expense = Expense(
             trip = trip,
             itineraryItem = itineraryItem,
             payer = payer,
             title = request.expenseTitle,
-            totalAmount = request.totalAmount,
+            totalAmount = processedData.totalAmount,
             entryMethod = InputMethod.valueOf(request.inputMethod.uppercase()),
             paymentDate = request.paymentDate,
             receiptImageUrl = request.receiptImageUrl
@@ -124,7 +122,20 @@ class ExpenseService(
             mimeType = imageFile.contentType ?: "image/jpeg"
         ) ?: throw BusinessException(ErrorCode.AI_FEEDBACK_ERROR)
 
-        return objectMapper.readValue(geminiResponseJson, ExpenseDto.OcrResponse::class.java)
+        val firstBraceIndex = geminiResponseJson.indexOf('{')
+        val lastBraceIndex = geminiResponseJson.lastIndexOf('}')
+
+        if (firstBraceIndex == -1 || lastBraceIndex == -1) {
+            throw BusinessException(ErrorCode.AI_RESPONSE_PARSING_ERROR)
+        }
+
+        val sanitizedJson = geminiResponseJson.substring(firstBraceIndex, lastBraceIndex + 1)
+
+        return try {
+            objectMapper.readValue(sanitizedJson, ExpenseDto.OcrResponse::class.java)
+        } catch (e: Exception) {
+            throw BusinessException(ErrorCode.AI_RESPONSE_PARSING_ERROR)
+        }
     }
 
     //특정 비용 상세 조회
