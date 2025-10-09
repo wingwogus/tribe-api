@@ -39,6 +39,15 @@ class ExpenseService(
         }
     }
 
+    private fun findExpenseAndValidate(expenseId: Long, tripId: Long): Expense {
+        val expense = expenseRepository.findById(expenseId)
+            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+
+        if (expense.trip.id != tripId) { throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP) }
+
+        return expense
+    }
+
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
     fun createExpense(
@@ -140,9 +149,8 @@ class ExpenseService(
 
     //특정 비용 상세 조회
     @Transactional(readOnly = true)
-    fun getExpenseDetail(expenseId: Long): ExpenseDto.DetailResponse {
-        val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+    fun getExpenseDetail(tripId: Long, expenseId: Long): ExpenseDto.DetailResponse {
+        val expense = findExpenseAndValidate(expenseId, tripId)
 
         expense.trip.id?.let { tripId ->
             verifyTripIdParticipation(tripId)
@@ -153,9 +161,8 @@ class ExpenseService(
 
     //특정 비용 수정
     @Transactional
-    fun updateExpense(expenseId: Long, request: ExpenseDto.UpdateRequest): ExpenseDto.DetailResponse {
-        val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+    fun updateExpense(tripId: Long, expenseId: Long, request: ExpenseDto.UpdateRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseAndValidate(expenseId, tripId)
 
         expense.trip.id?.let { tripId ->
             verifyTripIdParticipation(tripId)
@@ -199,9 +206,8 @@ class ExpenseService(
 
     // 멤버별 배분 정보 등록/수정
     @Transactional
-    fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
-        val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
+    fun assignParticipants(tripId: Long, expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseAndValidate(expenseId, tripId)
 
         expense.trip.id?.let { tripId ->
             verifyTripIdParticipation(tripId)
