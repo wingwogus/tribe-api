@@ -173,4 +173,15 @@ object ExpenseDto {
         }
     }
 
+    // Gemini의 JSON 응답을 파싱하기 위한 DTO
+    data class OcrResponse(
+        val totalAmount: BigDecimal,
+        val items: List<OcrItem>
+    )
+
+    data class OcrItem(
+        val itemName: String,
+        val price: BigDecimal
+    )
+
 }
