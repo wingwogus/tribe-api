@@ -19,6 +19,9 @@ object ExpenseDto {
 
         val receiptImageUrl: String?,
 
+        @field:NotNull(message = "여정 아이템 ID는 필수입니다.")
+        val itineraryItemId: Long,
+
         @field:NotNull(message = "결제자 ID는 필수입니다.")
         val payerId: Long,
 
