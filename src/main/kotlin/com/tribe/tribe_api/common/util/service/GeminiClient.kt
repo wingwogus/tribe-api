@@ -45,7 +45,7 @@ class GeminiApiClient(
             )
         )
 
-        val uri = "$apiUrl:generateContent?key=$apiKey"
+        val uri = "$apiUrl?key=$apiKey"
 
         return try {
             val response = webClient.post()
@@ -57,6 +57,9 @@ class GeminiApiClient(
 
             response?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
         } catch (e: Exception) {
+            println("===== Gemini API Error =====")
+            e.printStackTrace()
+            println("==========================")
             throw RuntimeException("Gemini API 호출 중 오류가 발생했습니다.", e)
         }
     }
