@@ -43,6 +43,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     ALREADY_SIGNED_EMAIL(HttpStatus.CONFLICT, "이미 회원가입한 이메일입니다"),
 
     // 500 INTERNAL_SERVER_ERROR
+    AI_RESPONSE_PARSING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,  "AI 응답 파싱에 실패했습니다."),
     SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부에 문제가 발생했습니다."),
     CODE_GENERATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "코드 생성 중 오류가 발생했습니다."),
     AI_FEEDBACK_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AI 여행 검토 중 오류가 발생했습니다")
