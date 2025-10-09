@@ -69,7 +69,7 @@ class ExpenseService(
                 val file = imageFile ?: throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
                 processReceipt(file)
             }
-            "MANUAL" -> {
+            "HANDWRITE" -> {
                 ExpenseDto.OcrResponse(
                     totalAmount = request.totalAmount,
                     items = request.items.map { ExpenseDto.OcrItem(it.itemName, it.price) }
