@@ -12,7 +12,6 @@ import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.EntityNotFoundException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import org.springframework.stereotype.Service
@@ -224,5 +223,4 @@ class ExpenseService(
 
         return ExpenseDto.DetailResponse.from(expense)
     }
-
 }
