@@ -4,11 +4,12 @@ import com.ninjasquad.springmockk.MockkBean
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
-import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.itinerary.entity.Place
+import com.tribe.tribe_api.itinerary.repository.CategoryRepository
+import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
@@ -35,6 +36,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 @SpringBootTest
 @Transactional
@@ -45,10 +47,10 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     private val tripReviewRepository: TripReviewRepository,
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val placeRepository: PlaceRepository,
+    private val categoryRepository: CategoryRepository,
+    private val itineraryItemRepository: ItineraryItemRepository,
 ) {
-    @Autowired
-    private lateinit var placeRepository: PlaceRepository
-
     // Mock 객체 주입
     @MockkBean
     private lateinit var geminiApiClient: GeminiApiClient
@@ -66,9 +68,7 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
                 "owner@test.com",
                 passwordEncoder.encode("pw"),
                 "방장",
-                null,
-                Role.USER,
-                Provider.LOCAL,
+                null, Role.USER, Provider.LOCAL,
                 null,
                 false))
         member = memberRepository.save(
@@ -76,45 +76,52 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
                 "member@test.com",
                 passwordEncoder.encode("pw"),
                 "멤버",
-                null,
-                Role.USER,
-                Provider.LOCAL,
+                null, Role.USER, Provider.LOCAL,
                 null,
                 false))
 
         // 2. 여행 데이터 생성
         trip = Trip(
             "테스트 여행",
-            LocalDate.now(),
-            LocalDate.now().plusDays(5),
+            LocalDate.now(), LocalDate.now().plusDays(5),
             Country.JAPAN)
-
         trip.addMember(owner, TripRole.OWNER)
         trip.addMember(member, TripRole.MEMBER)
-
-        val category = Category(trip, 1, "Day 1",1)
-        val place = Place(
-            "id",
-            "오사카성",
-            "일본 오사카",
-            BigDecimal.valueOf(34.6873),
-            BigDecimal.valueOf(34.6873))
-
-        placeRepository.save(place)
-
-        val itineraryItem = ItineraryItem(category, place, 1, "오사카성 방문")
-        category.itineraryItems.add(itineraryItem)
-        trip.categories.add(category)
-
         tripRepository.save(trip)
 
+        // 새로운 ItineraryItem 생성자에 맞게 테스트 데이터 생성 로직 변경
+        val place = placeRepository.save(Place
+            ("id",
+            "오사카성",
+            "일본 오사카",
+            BigDecimal.valueOf(34.6873), BigDecimal.valueOf(34.6873)))
+
+        val category = categoryRepository.save(Category
+            (trip, 1, "Day 1", 1))
+
+        val itineraryItem = itineraryItemRepository.save(
+            ItineraryItem(
+                category = category,
+                place = place,
+                title = null, // 장소 기반 일정이므로 title은 null
+                time = LocalDateTime.now(),
+                order = 1,
+                memo = "오사카성 방문"
+            )
+        )
+        category.itineraryItems.add(itineraryItem)
+        trip.categories.add(category)
+        tripRepository.save(trip)
+
+
         // 3. 기존 리뷰 데이터 생성
-        savedReview = tripReviewRepository.save(
-            TripReview(trip, "기존 컨셉", "## 기존 AI 피드백 내용\n"))
+        savedReview = tripReviewRepository.save(TripReview
+            (trip, "기존 컨셉", "## 기존 AI 피드백 내용\n"))
     }
 
     private fun setAuthentication(member: Member) {
         val userDetails = CustomUserDetails(member)
+
         val authentication = UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
         SecurityContextHolder.getContext().authentication = authentication
     }
@@ -124,10 +131,8 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     fun createReview_Success() {
         // given: 방장 로그인
         setAuthentication(owner)
-
         val request = TripReviewRequest.CreateReview("새로운 럭셔리 여행 컨셉")
         val fakeAiFeedback = "## AI가 생성한 피드백입니다.\n"
-
         every { geminiApiClient.getFeedback(any()) } returns fakeAiFeedback
 
         // when: 리뷰 생성
@@ -137,7 +142,6 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
         assertThat(reviewDetail.reviewId).isNotNull()
         assertThat(reviewDetail.concept).isEqualTo("새로운 럭셔리 여행 컨셉")
         assertThat(reviewDetail.content).isEqualTo(fakeAiFeedback)
-
         val foundReview = tripReviewRepository.findById(reviewDetail.reviewId).get()
         assertThat(foundReview.trip.id).isEqualTo(trip.id)
     }
@@ -150,9 +154,7 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
         val request = TripReviewRequest.CreateReview("새로운 럭셔리 여행 컨셉")
 
         // when & then: NO_AUTHORITY_TRIP 에러가 발생하는지 검증
-        val exception = assertThrows<BusinessException> {
-            tripReviewService.createReview(trip.id!!, request)
-        }
+        val exception = assertThrows<BusinessException> { tripReviewService.createReview(trip.id!!, request) }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
 
@@ -194,9 +196,7 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
         val invalidReviewId = 999L
 
         // when & then: TRIP_REVIEW_NOT_FOUND 에러 발생 검증
-        val exception = assertThrows<BusinessException> {
-            tripReviewService.getReview(trip.id!!, invalidReviewId)
-        }
+        val exception = assertThrows<BusinessException> { tripReviewService.getReview(trip.id!!, invalidReviewId) }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.TRIP_REVIEW_NOT_FOUND)
     }
 }
