@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime // [추가!] LocalDateTime을 사용하기 위해 import 합니다.
 
 
 @Component
@@ -36,7 +37,6 @@ class InitDataService(
             return
         }
 
-        // 1. 테스트용 회원 2명 생성
         val memberA = Member(
             email = "user1@example.com",
             password = passwordEncoder.encode("password"),
@@ -55,7 +55,6 @@ class InitDataService(
             isFirstLogin = false
         ).apply { memberRepository.save(this) }
 
-        // 2. 여행 생성 (기존과 동일)
         val trip =
             Trip("일본 오사카 미식 여행",
                 LocalDate.of(2025, 10, 26),
@@ -68,87 +67,57 @@ class InitDataService(
 
         tripRepository.save(trip)
 
-        // 3. 테스트용 장소(Place) 데이터 생성
-        val dotonbori = placeRepository.save(
-            Place(
-                "dotonbori_id",
-                "도톤보리",
-                "일본 오사카시",
-                BigDecimal("34.6688"),
-                BigDecimal("135.5013")
-            )
-        )
-        val osakaCastle = placeRepository.save(
-            Place(
-                "osaka_castle_id",
-                "오사카성",
-                "일본 오사카시",
-                BigDecimal("34.6873"),
-                BigDecimal("135.5262")
-            )
-        )
-        val usj = placeRepository.save(
-            Place(
-                "usj_id",
-                "효고 박물관",
-                "일본 오사카시",
-                BigDecimal("34.582007"),
-                BigDecimal("135.925498")
-            )
-        )
+        val dotonbori = placeRepository.save(Place("dotonbori_id", "도톤보리", "일본 오사카시", BigDecimal("34.6688"), BigDecimal("135.5013")))
+        val osakaCastle = placeRepository.save(Place("osaka_castle_id", "오사카성", "일본 오사카시", BigDecimal("34.6873"), BigDecimal("135.5262")))
+        val usj = placeRepository.save(Place("usj_id", "유니버설 스튜디오 재팬", "일본 오사카시", BigDecimal("34.6654"), BigDecimal("135.4323")))
 
-        // 4. Day 1 카테고리 및 일정 생성
-        val day1Cat1 = categoryRepository.save(
-            Category(
-                trip,
-                1,
-                "오후 관광",
-                1
+
+        val day1Category = categoryRepository.save(Category(trip, 1, "1일차: 오사카 도착", 1))
+
+        itineraryItemRepository.save(
+            ItineraryItem(
+                category = day1Category,
+                place = usj,
+                title = null,
+                time = trip.startDate.atTime(14, 0),
+                order = 1,
+                memo = "익스프레스 티켓 구매하기"
             )
         )
 
         itineraryItemRepository.save(
             ItineraryItem(
-                day1Cat1,
-                usj,
-                1,
-                "천수각 입장권 예매하기"
+                category = day1Category,
+                place = dotonbori,
+                title = null,
+                time = trip.startDate.atTime(19, 30),
+                order = 2,
+                memo = "글리코상 앞에서 사진찍기"
             )
         )
 
-        val day1Cat2 = categoryRepository.save(
-            Category(
-                trip,
-                1,
-                "저녁 식사",
-                2
-            )
-        )
-        itineraryItemRepository.save(
-            ItineraryItem(
-                day1Cat2,
-                dotonbori,
-                1,
-                "글리코상 앞에서 사진찍기"
-            )
-        )
+        val day2Category = categoryRepository.save(Category(trip, 2, "2일차: 성곽 투어", 1))
 
-        // 5. Day 2 카테고리 및 일정 생성
-        val day2Cat1 = categoryRepository.save(
-            Category(trip,
-                2,
-                "박물관",
-                1
-            )
-        )
         itineraryItemRepository.save(
             ItineraryItem(
-                day2Cat1,
-                osakaCastle,
-                1,
-                null
+                category = day2Category,
+                place = osakaCastle,
+                title = null,
+                time = trip.startDate.plusDays(1).atTime(10, 0),
+                order = 1,
+                memo = "천수각 입장"
+            )
+        )
+        // 5-2. 텍스트 기반 일정 (title 사용)
+        itineraryItemRepository.save(
+            ItineraryItem(
+                category = day2Category,
+                place = null,
+                title = "호텔에서 휴식 및 짐 정리",
+                time = trip.startDate.plusDays(1).atTime(17, 0),
+                order = 2,
+                memo = "저녁 식사 장소 찾아보기"
             )
         )
     }
 }
-
