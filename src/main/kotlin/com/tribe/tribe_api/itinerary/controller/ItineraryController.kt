@@ -33,14 +33,13 @@ class ItineraryController(
         @PathVariable categoryId: Long,
         @PathVariable tripId: Long
     ): ResponseEntity<ApiResponse<List<ItineraryResponse>>> {
-        val response = itineraryService.getItinerariesByCategory(categoryId)
+        val response = itineraryService.getItinerariesByCategory(tripId, categoryId)
         return ResponseEntity.ok(ApiResponse.success("카테고리별 일정 조회 성공", response))
     }
 
     @PatchMapping("/categories/{categoryId}/itineraries/{itemId}")
     fun updateItinerary(
         @PathVariable itemId: Long,
-        @PathVariable categoryId: Long,
         @PathVariable tripId: Long,
         @Valid @RequestBody request: ItineraryRequest.Update
     ): ResponseEntity<ApiResponse<ItineraryResponse>> {
@@ -51,7 +50,6 @@ class ItineraryController(
     @DeleteMapping("/categories/{categoryId}/itineraries/{itemId}")
     fun deleteItinerary(
         @PathVariable itemId: Long,
-        @PathVariable categoryId: Long,
         @PathVariable tripId: Long
     ): ResponseEntity<ApiResponse<Unit>> {
         itineraryService.deleteItinerary(itemId)
