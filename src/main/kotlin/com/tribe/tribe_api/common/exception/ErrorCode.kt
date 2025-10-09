@@ -21,6 +21,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     UNKNOWN_TOKEN_ERROR(HttpStatus.UNAUTHORIZED, "알 수 없는 토큰 오류가 발생했습니다."),
     INVALID_EMAIL(HttpStatus.UNAUTHORIZED, "인증되지 않은 이메일입니다"),
     NO_AUTHORITY_TRIP(HttpStatus.UNAUTHORIZED, "해당 여행의 수정 권한이 없습니다."),
+    NO_BELONG_TRIP(HttpStatus.UNAUTHORIZED, "해당 카테고리는 현재 여행에 속해있지 않습니다."),
 
     // 404 NOT_FOUND
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 사용자를 찾을 수 없습니다."),
@@ -32,6 +33,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 장소를 찾을 수 없습니다."),
     NOT_A_TRIP_MEMBER(HttpStatus.NOT_FOUND, "해당 여행에 멤버가 아닙니다."),
     WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당하는 위시리스트를 찾을 수 없습니다."),
+    ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 여정을 찾을 수 없습니다."),
 
     // 409 CONFLICT
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
