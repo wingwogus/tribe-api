@@ -31,18 +31,18 @@ object SettlementDto {
         val debtRelations: List<DebtRelation>
     )
 
+    // 변경내역있습니다. Hyeni
     data class MemberBalance(
-        val memberId: Long,
-        val memberName: String,
+        val tripMemberId: Long, // memberId -> tripMemberId
+        val nickname: String,   // memberName -> nickname
         val balance: BigDecimal
     )
 
     data class DebtRelation(
-        val fromMemberName: String,
-        val fromMemberId: Long,
-        val toMemberName: String,
-        val toMemberId: Long,
+        val fromNickname: String,      // fromMemberName -> fromNickname
+        val fromTripMemberId: Long,  // fromMemberId -> fromTripMemberId
+        val toNickname: String,        // toMemberName -> toNickname
+        val toTripMemberId: Long,    // toMemberId -> toTripMemberId
         val amount: BigDecimal
     )
-
 }

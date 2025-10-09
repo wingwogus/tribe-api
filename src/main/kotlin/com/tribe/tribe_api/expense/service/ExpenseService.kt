@@ -12,10 +12,12 @@ import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import jakarta.persistence.EntityNotFoundException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import org.springframework.web.multipart.MultipartFile
 
 @Service
@@ -48,6 +50,14 @@ class ExpenseService(
     ): ExpenseDto.CreateResponse {
 
         verifyTripIdParticipation(tripId)
+
+        // --- 👇 [추가] 품목 합계와 총액 비교 검증 로직 ---
+        val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
+        if (request.totalAmount.compareTo(itemsTotal) != 0) {
+            throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
+        }
+        // --- 검증 로직 끝 ---
+
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
         val payer = tripMemberRepository.findById(request.payerId)
