@@ -1,9 +1,11 @@
 package com.tribe.tribe_api.trip.dto
 
 import com.tribe.tribe_api.trip.entity.TripMember
+import jakarta.validation.constraints.NotBlank
 
 object TripMemberDto {
     data class AddGuestRequest(
+        @field:NotBlank(message = "게스트 이름은 비워둘 수 없습니다.")
         val name: String
     )
 
