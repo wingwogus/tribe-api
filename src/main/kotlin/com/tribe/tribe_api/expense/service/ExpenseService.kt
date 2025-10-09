@@ -12,8 +12,11 @@ import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.multipart.MultipartFile
 
 @Service
 class ExpenseService(
@@ -21,7 +24,9 @@ class ExpenseService(
     private val expenseAssignmentRepository: ExpenseAssignmentRepository,
     private val tripRepository: TripRepository,
     private val tripMemberRepository: TripMemberRepository,
-    private val itineraryItemRepository: ItineraryItemRepository
+    private val itineraryItemRepository: ItineraryItemRepository,
+    private val geminiApiClient: GeminiApiClient,
+    private val objectMapper: ObjectMapper
 ) {
 
     private fun verifyTripIdParticipation(tripId: Long){
@@ -35,7 +40,13 @@ class ExpenseService(
 
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
-    fun createExpense(tripId: Long, itineraryItemId: Long, request: ExpenseDto.CreateRequest): ExpenseDto.CreateResponse {
+    fun createExpense(
+        tripId: Long,
+        itineraryItemId: Long,
+        request: ExpenseDto.CreateRequest,
+        imageFile: MultipartFile?
+    ): ExpenseDto.CreateResponse {
+
         verifyTripIdParticipation(tripId)
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
@@ -43,6 +54,20 @@ class ExpenseService(
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
         val itineraryItem = itineraryItemRepository.findById(itineraryItemId)
             .orElseThrow { BusinessException(ErrorCode.ITINERARY_ITEM_NOT_FOUND) }
+
+        val processedData = when (request.inputMethod.uppercase()){
+            "SCAN" -> {
+                val file = imageFile ?: throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
+                processReceipt(file)
+            }
+            "MANUAL" -> {
+                ExpenseDto.OcrResponse(
+                    totalAmount = request.totalAmount,
+                    items = request.items.map { ExpenseDto.OcrItem(it.itemName, it.price) }
+                )
+            }
+            else -> throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
+        }
 
         val expense = Expense(
             trip = trip,
@@ -55,7 +80,7 @@ class ExpenseService(
             receiptImageUrl = request.receiptImageUrl
         )
 
-        request.items.forEach { itemDto ->
+        processedData.items.forEach { itemDto ->
             val expenseItem = ExpenseItem(
                 expense = expense,
                 name = itemDto.itemName,
@@ -66,6 +91,31 @@ class ExpenseService(
 
         val savedExpense = expenseRepository.save(expense)
         return ExpenseDto.CreateResponse.from(savedExpense)
+    }
+
+    private fun processReceipt(imageFile: MultipartFile): ExpenseDto.OcrResponse {
+        val base64Image = java.util.Base64.getEncoder().encodeToString(imageFile.bytes)
+        val prompt = """
+            이 영수증 이미지에서 지출 총액(totalAmount)과 모든 지출 항목(items)을 추출해줘.
+            각 항목은 이름(itemName)과 가격(price)을 가져야 해.
+            결과는 반드시 아래와 같은 JSON 형식으로만 응답해줘.
+            
+            {
+              "totalAmount": 15000,
+              "items": [
+                { "itemName": "아메리카노", "price": 4500 },
+                { "itemName": "카페라떼", "price": 5000 }
+              ]
+            }
+        """.trimIndent()
+
+        val geminiResponseJson = geminiApiClient.generateContentFromImage(
+            prompt = prompt,
+            base64Image = base64Image,
+            mimeType = imageFile.contentType ?: "image/jpeg"
+        ) ?: throw BusinessException(ErrorCode.AI_FEEDBACK_ERROR)
+
+        return objectMapper.readValue(geminiResponseJson, ExpenseDto.OcrResponse::class.java)
     }
 
     //특정 비용 상세 조회
