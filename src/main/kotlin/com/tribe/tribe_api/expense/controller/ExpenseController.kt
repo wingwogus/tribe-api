@@ -7,6 +7,9 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import org.springframework.http.MediaType
+import org.springframework.web.multipart.MultipartFile
+import org.springframework.web.bind.annotation.RequestPart
 
 @RestController
 @RequestMapping("/api/v1")
@@ -14,14 +17,16 @@ class ExpenseController(
     private val expenseService: ExpenseService
 ) {
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
-    @PostMapping("/trips/{tripId}/itineraries/{itineraryItemId}/expenses")
+    @PostMapping("/trips/{tripId}/itineraries/{itineraryItemId}/expenses",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun createExpense(
         @PathVariable tripId: Long,
         @PathVariable itineraryItemId: Long,
-        @Valid @RequestBody request: ExpenseDto.CreateRequest
+        @Valid @RequestPart("request") request: ExpenseDto.CreateRequest,
+        @RequestPart("image", required = false) imageFile: MultipartFile?
     ): ResponseEntity<ApiResponse<ExpenseDto.CreateResponse>> {
 
-        val response = expenseService.createExpense(tripId, itineraryItemId, request)
+        val response = expenseService.createExpense(tripId, itineraryItemId, request, imageFile)
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse.success("지출 내역 생성 성공", response))
