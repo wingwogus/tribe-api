@@ -1,5 +1,7 @@
 package com.tribe.tribe_api.trip.service
 
+import com.tribe.tribe_api.common.exception.BusinessException
+import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.trip.dto.TripMemberDto
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
@@ -19,7 +21,7 @@ class TripMemberService(
     @Transactional
     fun addGuest(tripId: Long, request: TripMemberDto.AddGuestRequest): TripMemberDto.Info {
         val trip = tripRepository.findById(tripId)
-            .orElseThrow { EntityNotFoundException("Trip Not Found $tripId") }
+            .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
         val newGuest = TripMember(
             member = null,
