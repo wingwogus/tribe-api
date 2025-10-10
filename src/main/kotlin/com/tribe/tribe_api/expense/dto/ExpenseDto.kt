@@ -10,6 +10,8 @@ import java.time.LocalDate
 
 object ExpenseDto {
     data class CreateRequest(
+        val tripId: Long,
+
         @field:NotBlank(message = "지출 이름은 필수입니다.")
         val expenseTitle: String,
 
@@ -45,6 +47,8 @@ object ExpenseDto {
     )
 
     data class UpdateRequest(
+        val tripId: Long,
+
         @field:NotBlank(message = "지출 제목은 필수입니다.")
         val expenseTitle: String,
 
@@ -64,7 +68,7 @@ object ExpenseDto {
     )
 
     data class ItemUpdate(
-        val itemId: Long?,
+        val itemId: Long,
 
         @field:NotBlank(message = "항목 이름은 비워둘 수 없습니다.")
         val itemName: String,
@@ -75,6 +79,8 @@ object ExpenseDto {
     )
 
     data class ParticipantAssignRequest(
+        val tripId: Long,
+
         val items: List<ItemAssignment> = emptyList()
     )
 
