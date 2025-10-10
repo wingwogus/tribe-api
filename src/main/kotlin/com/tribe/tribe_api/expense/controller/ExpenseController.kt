@@ -12,7 +12,7 @@ import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.bind.annotation.RequestPart
 
 @RestController
-@RequestMapping("/api/v1/trips/{tripId}/expenses")
+@RequestMapping("/api/v1/expenses")
 class ExpenseController(
     private val expenseService: ExpenseService
 ) {
@@ -20,12 +20,11 @@ class ExpenseController(
     @PostMapping("",
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun createExpense(
-        @PathVariable tripId: Long,
         @Valid @RequestPart("request") request: ExpenseDto.CreateRequest,
         @RequestPart("image", required = false) imageFile: MultipartFile?
     ): ResponseEntity<ApiResponse<ExpenseDto.CreateResponse>> {
 
-        val response = expenseService.createExpense(tripId, request.itineraryItemId, request, imageFile)
+        val response = expenseService.createExpense(request.tripId, request.itineraryItemId, request, imageFile)
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse.success("지출 내역 생성 성공", response))
@@ -34,7 +33,7 @@ class ExpenseController(
     //특정 비용 상세 조회
     @GetMapping("/{expenseId}")
     fun getExpenseDetail(
-        @PathVariable tripId: Long,
+        @RequestParam tripId: Long,
         @PathVariable expenseId: Long
     ): ResponseEntity<ApiResponse<ExpenseDto.DetailResponse>> {
 
@@ -45,24 +44,22 @@ class ExpenseController(
     //특정 비용 수정
     @PatchMapping("/{expenseId}")
     fun updateExpense(
-        @PathVariable tripId: Long,
         @PathVariable expenseId: Long,
         @Valid @RequestBody request: ExpenseDto.UpdateRequest
     ): ResponseEntity<ApiResponse<ExpenseDto.DetailResponse>> {
 
-        val response = expenseService.updateExpense(tripId, expenseId, request)
+        val response = expenseService.updateExpense(request.tripId, expenseId, request)
         return ResponseEntity.ok(ApiResponse.success("지출 내역 수정 성공", response))
     }
 
     //멤버별 배분 정보 등록 및 수정
     @PostMapping("/{expenseId}/assignments")
     fun assignParticipants(
-        @PathVariable tripId: Long,
         @PathVariable expenseId: Long,
         @Valid @RequestBody request: ExpenseDto.ParticipantAssignRequest
     ): ResponseEntity<ApiResponse<ExpenseDto.DetailResponse>> {
 
-        val response = expenseService.assignParticipants(tripId, expenseId, request)
+        val response = expenseService.assignParticipants(request.tripId, expenseId, request)
         return ResponseEntity.ok(ApiResponse.success("비용 배분 성공", response))
     }
 }
