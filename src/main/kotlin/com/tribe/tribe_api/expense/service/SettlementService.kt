@@ -1,5 +1,7 @@
 package com.tribe.tribe_api.expense.service
 
+import com.tribe.tribe_api.common.exception.BusinessException
+import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.expense.dto.SettlementDto
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.trip.entity.TripMember
@@ -22,7 +24,7 @@ class SettlementService(
     fun getDailySettlement(tripId: Long, date: LocalDate): SettlementDto.DailyResponse {
         // 1. 여행 정보와 참여 멤버들을 조회
         val trip = tripRepository.findById(tripId)
-            .orElseThrow { EntityNotFoundException("Trip not found with id: $tripId") }
+            .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
         // 2. 특정 날짜에 발생한 모든 지출 내역을 조회
         val dailyExpenses = expenseRepository.findAllByTripIdAndPaymentDateBetween(tripId, date, date)
@@ -79,7 +81,7 @@ class SettlementService(
     }
     fun getTotalSettlement(tripId: Long): SettlementDto.TotalResponse {
         val trip = tripRepository.findById(tripId)
-            .orElseThrow { EntityNotFoundException("Trip not found with id: $tripId") }
+            .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
         // 1. 여행 전체 기간의 모든 지출 내역 가져옴
         val allExpenses = expenseRepository.findAllByTripId(tripId)
