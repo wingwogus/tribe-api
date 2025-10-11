@@ -154,7 +154,7 @@ class InitDataService(
             )
         )
 
-        // 정산 테스트 더미
+        // --- 정산 테스트 데이터 ---
         val guestSihwan = TripMember(member = null, trip = trip, guestNickname = "시환", role = TripRole.GUEST)
             .apply { tripMemberRepository.save(this) }
         trip.members.add(guestSihwan)
@@ -173,13 +173,12 @@ class InitDataService(
         val dinnerItem2 = ExpenseItem(expenseForDinner, "음료수", BigDecimal(5000))
         expenseForDinner.expenseItems.addAll(listOf(dinnerItem1, dinnerItem2))
 
-        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터A" }))
-        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터B" }))
-        dinnerItem2.assignments.add(ExpenseAssignment(dinnerItem2, guestSihwan))
+        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터A" }, BigDecimal(12500)))
+        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터B" }, BigDecimal(12500)))
+        dinnerItem2.assignments.add(ExpenseAssignment(dinnerItem2, guestSihwan, BigDecimal(5000)))
 
         expenseRepository.save(expenseForDinner)
 
-        // 여러명 결제 같은 날에 테스터 B가 편의점 간식을 사고 정산하는 더미
         val expenseForSnack = Expense(
             trip = trip,
             itineraryItem = dinnerItinerary,
@@ -195,9 +194,9 @@ class InitDataService(
         val snackItem3 = ExpenseItem(expenseForSnack, "시환 간식", BigDecimal(3333))
         expenseForSnack.expenseItems.addAll(listOf(snackItem1, snackItem2, snackItem3))
 
-        snackItem1.assignments.add(ExpenseAssignment(snackItem1, trip.members.first { it.member?.nickname == "테스터A" }))
-        snackItem2.assignments.add(ExpenseAssignment(snackItem2, trip.members.first { it.member?.nickname == "테스터B" }))
-        snackItem3.assignments.add(ExpenseAssignment(snackItem3, guestSihwan))
+        snackItem1.assignments.add(ExpenseAssignment(snackItem1, trip.members.first { it.member?.nickname == "테스터A" }, BigDecimal(3333)))
+        snackItem2.assignments.add(ExpenseAssignment(snackItem2, trip.members.first { it.member?.nickname == "테스터B" }, BigDecimal(3334)))
+        snackItem3.assignments.add(ExpenseAssignment(snackItem3, guestSihwan, BigDecimal(3333)))
 
         expenseRepository.save(expenseForSnack)
     }
