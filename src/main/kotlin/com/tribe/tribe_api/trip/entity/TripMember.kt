@@ -39,4 +39,10 @@ class TripMember(
 
     @OneToMany(mappedBy = "author", cascade = [CascadeType.ALL])
     var communityPosts: MutableList<CommunityPost> = mutableListOf()
+
+    val name: String
+        get() = this.member?.nickname ?: this.guestNickname ?: "unknown" //이름 받아오기
+
+    val isGuest: Boolean
+        get() = (this.role == TripRole.GUEST)
 }

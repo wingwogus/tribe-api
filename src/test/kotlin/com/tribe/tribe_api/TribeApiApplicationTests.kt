@@ -9,5 +9,4 @@ class TribeApiApplicationTests {
 	@Test
 	fun contextLoads() {
 	}
-
 }
