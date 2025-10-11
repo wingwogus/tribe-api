@@ -1,8 +1,10 @@
 package com.tribe.tribe_api.expense.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
+import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseItem
@@ -12,12 +14,11 @@ import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
 import org.springframework.web.multipart.MultipartFile
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 @Service
 class ExpenseService(
@@ -32,7 +33,6 @@ class ExpenseService(
 
     private fun verifyTripIdParticipation(tripId: Long){
         val currentMemberId = SecurityUtil.getCurrentMemberId()
-            ?: throw BusinessException(ErrorCode.UNAUTHORIZED_ACCESS)
 
         if(!tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)){
             throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
@@ -209,32 +209,45 @@ class ExpenseService(
     fun assignParticipants(tripId: Long, expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
         val expense = findExpenseAndValidate(expenseId, tripId)
 
-        expense.trip.id?.let { tripId ->
-            verifyTripIdParticipation(tripId)
-        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
+        verifyTripIdParticipation(tripId)
 
         val expenseItemsById = expense.expenseItems.associateBy { it.id }
 
         request.items.forEach { itemAssignmentDto ->
             val itemId = itemAssignmentDto.itemId
-
             val expenseItem = expenseItemsById[itemId]
                 ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_IN_EXPENSE)
 
-            expenseAssignmentRepository.deleteByExpenseItemId(itemId)
-            expenseItem.assignments.clear() // 영속성 컨텍스트의 캐시와 동기화
+            // 1/N 분배 로직을 여기에 구현
 
+            // 1. 기존 분배 내역 삭제
+            expenseAssignmentRepository.deleteByExpenseItemId(itemId)
+            expenseItem.assignments.clear()
+
+            // 2. 참여자 정보 확인
             val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
             if (participants.size != itemAssignmentDto.participantIds.size) {
                 throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
             }
 
-            participants.forEach { participant ->
-                val newAssignment = com.tribe.tribe_api.expense.entity.ExpenseAssignment(
-                    expenseItem = expenseItem,
-                    tripMember = participant
-                )
-                expenseItem.assignments.add(newAssignment)
+            val participantCount = participants.size.toBigDecimal()
+            if (participantCount > BigDecimal.ZERO) {
+                // 3. 1/N 금액 계산 (1원 오차 처리 포함)
+                val baseAmount = expenseItem.price.divide(participantCount, 0, RoundingMode.DOWN)
+                val remainder = expenseItem.price.subtract(baseAmount.multiply(participantCount))
+
+                participants.forEachIndexed { index, participant ->
+                    // 첫 번째 참여자에게 나머지 금액을 더해줍니다.
+                    val amount = if (index == 0) baseAmount + remainder else baseAmount
+
+                    // 4. 계산된 금액으로 ExpenseAssignment 생성
+                    val newAssignment = com.tribe.tribe_api.expense.entity.ExpenseAssignment(
+                        expenseItem = expenseItem,
+                        tripMember = participant,
+                        amount = amount
+                    )
+                    expenseItem.assignments.add(newAssignment)
+                }
             }
         }
 
