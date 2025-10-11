@@ -45,4 +45,11 @@ object SettlementDto {
         val toTripMemberId: Long,    // toMemberId -> toTripMemberId
         val amount: BigDecimal
     )
+
+    // Repository에서 멤버별 정산 요약 데이터를 받아오기 위한 DTO
+    data class SettlementSummary(
+        val tripMemberId: Long,
+        val totalPaid: BigDecimal,
+        val totalAssigned: BigDecimal
+    )
 }
