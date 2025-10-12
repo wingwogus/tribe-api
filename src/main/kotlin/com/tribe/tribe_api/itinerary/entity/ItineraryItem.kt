@@ -10,7 +10,7 @@ import java.time.LocalDateTime
 class ItineraryItem(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
-    val category: Category,
+    var category: Category,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id", nullable = true)
