@@ -13,7 +13,7 @@ class ItineraryItem(
     val category: Category,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "place_id", nullable = false)
+    @JoinColumn(name = "place_id", nullable = true)
     val place: Place?,
 
     var title: String?, // 사용자가 직접 입력하는 일정 (placeId를 통해 지도에서 받아오는 장소가 없을경우나

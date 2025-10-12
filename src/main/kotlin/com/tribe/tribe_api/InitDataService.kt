@@ -1,5 +1,10 @@
 package com.tribe.tribe_api
 
+import com.tribe.tribe_api.expense.entity.Expense
+import com.tribe.tribe_api.expense.entity.ExpenseAssignment
+import com.tribe.tribe_api.expense.entity.ExpenseItem
+import com.tribe.tribe_api.expense.enumeration.InputMethod
+import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.itinerary.entity.Place
@@ -32,7 +37,7 @@ class InitDataService(
     private val categoryRepository: CategoryRepository,
     private val itineraryItemRepository: ItineraryItemRepository,
     private val tripMemberRepository: TripMemberRepository,
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
 ) {
     @PostConstruct
     fun dbInit() {
@@ -88,7 +93,7 @@ class InitDataService(
             )
         )
 
-        itineraryItemRepository.save(
+        val dinnerItinerary = itineraryItemRepository.save(
             ItineraryItem(
                 category = day1Category,
                 place = dotonbori,
@@ -111,7 +116,7 @@ class InitDataService(
                 memo = "천수각 입장"
             )
         )
-        // 5-2. 텍스트 기반 일정 (title 사용)
+
         itineraryItemRepository.save(
             ItineraryItem(
                 category = day2Category,
