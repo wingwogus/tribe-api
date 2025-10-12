@@ -58,17 +58,20 @@ sealed class TripResponse {
     data class MemberInfo(
         val memberId: Long?,
         val nickname: String,
+        val avatar: String?,
         val role: TripRole
     ) {
         companion object {
             fun from(tripMember: TripMember): MemberInfo {
                 val displayName = tripMember.member?.nickname ?: tripMember.guestNickname ?: "게스트"
                 val memberId = tripMember.member?.id
+                val avatar = tripMember.member?.avatar
 
                 return MemberInfo(
-                    memberId = memberId,
-                    nickname = displayName,
-                    role = tripMember.role
+                    memberId,
+                    displayName,
+                    avatar,
+                    tripMember.role
                 )
             }
         }
