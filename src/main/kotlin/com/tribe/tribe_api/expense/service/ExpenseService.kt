@@ -171,6 +171,16 @@ class ExpenseService(
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
 
+        // --- 💡 수정된 부분 시작 ---
+        // 1. 요청된 아이템들의 가격 합계를 계산합니다.
+        val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
+
+        // 2. 요청된 totalAmount와 아이템 합계가 일치하는지 검증합니다.
+        if (request.totalAmount.compareTo(itemsTotal) != 0) {
+            throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
+        }
+        // --- 💡 수정된 부분 끝 ---
+
         expense.title = request.expenseTitle
         expense.totalAmount = request.totalAmount
         expense.paymentDate = request.paymentDate
@@ -178,8 +188,15 @@ class ExpenseService(
 
         updateExpenseItems(expense, request.items)
 
+        // --- 💡 추가된 부분 시작 ---
+        // 3. 금액이 변경되었으므로, 기존 배분 내역을 모두 삭제하여 데이터 정합성을 유지합니다.
+        //    사용자는 이 API 호출 후에 다시 배분(/assignments)을 설정해야 합니다.
+        expenseAssignmentRepository.deleteByExpenseId(expenseId)
+        // --- 💡 추가된 부분 끝 ---
+
         return ExpenseDto.DetailResponse.from(expense)
     }
+
 
     // Item 리스트를 요청 DTO의 상태와 동일하게 업데이트
     private fun updateExpenseItems(expense: Expense, itemUpdateRequests: List<ExpenseDto.ItemUpdate>) {
@@ -188,14 +205,15 @@ class ExpenseService(
         expense.expenseItems.removeAll(itemsToRemove)
 
         itemUpdateRequests.forEach { request ->
-            if (request.itemId == null) {
+            // itemId가 null(또는 0)이면 새 항목으로 간주하고 추가
+            if (request.itemId <= 0L) {
                 val newItem = ExpenseItem(
                     expense = expense,
                     name = request.itemName,
                     price = request.price
                 )
                 expense.addExpenseItem(newItem)
-            } else {
+            } else { // 기존 항목은 수정
                 val existingItem = expense.expenseItems.find { it.id == request.itemId }
                     ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_FOUND)
                 existingItem.name = request.itemName
@@ -203,6 +221,7 @@ class ExpenseService(
             }
         }
     }
+
 
     // 멤버별 배분 정보 등록/수정
     @Transactional
