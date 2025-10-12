@@ -1,0 +1,17 @@
+services:
+  tribe-backend:
+    build: ./
+    container_name: tribe-backend
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
+    expose:
+      - "8083"
+    networks:
+      - npm-net
+    restart: unless-stopped
+
+networks:
+  npm-net:
+    external: true

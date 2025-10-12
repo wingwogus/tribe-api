@@ -58,6 +58,8 @@ class WishlistService(
             adder = tripMember
         )
         val savedWishlistItem = wishlistItemRepository.save(wishlistItem)
+        trip.wishlistItems.add(savedWishlistItem)
+        tripMember.wishlistItems.add(savedWishlistItem)
 
         return WishlistDto.WishlistItemDto.from(savedWishlistItem)
     }

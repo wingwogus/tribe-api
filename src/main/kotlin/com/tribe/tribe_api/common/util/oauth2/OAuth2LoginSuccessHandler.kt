@@ -4,7 +4,6 @@ import com.tribe.tribe_api.common.util.jwt.JwtTokenProvider
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.Authentication
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler
@@ -15,7 +14,7 @@ import java.nio.charset.StandardCharsets
 @Component
 class OAuth2LoginSuccessHandler(
     private val jwtTokenProvider: JwtTokenProvider,
-    @Value("\${app.oauth.redirect-url}") private val redirectUrl: String
+    @Value("\${app.url}") private val appUrl: String
 ) : SimpleUrlAuthenticationSuccessHandler() {
 
     override fun onAuthenticationSuccess(
@@ -27,7 +26,7 @@ class OAuth2LoginSuccessHandler(
         val jwtToken = jwtTokenProvider.generateToken(authentication)
         val isNewUser = oAuth2User.member.isFirstLogin
 
-        val targetUrl = UriComponentsBuilder.fromUriString(redirectUrl)
+        val targetUrl = UriComponentsBuilder.fromUriString("$appUrl/oauth/callback")
             .queryParam("accessToken", jwtToken.accessToken)
             .queryParam("refreshToken", jwtToken.refreshToken)
             .queryParam("isNewUser", isNewUser)
