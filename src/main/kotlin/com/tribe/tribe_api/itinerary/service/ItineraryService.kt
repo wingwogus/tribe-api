@@ -49,15 +49,16 @@ class ItineraryService(
             throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
         }
 
-        val lastOrder = itineraryItemRepository.findByCategoryIdOrderByOrderAsc(category.id!!)
-            .lastOrNull()?.order ?: 0
+        // 현재 카테고리의 전체 아이템 개수를 셈
+        val currentItemCount = itineraryItemRepository.countByCategoryId(category.id!!)
 
         val newItem = ItineraryItem(
             category = category,
             place = place,
             title = title,
             time = request.time,
-            order = lastOrder + 1,
+            // 새 아이템의 순서는 (현재 개수 + 1)
+            order = currentItemCount + 1,
             memo = request.memo
         )
 
@@ -137,7 +138,7 @@ class ItineraryService(
             val item = itemMap[orderItem.itemId]!!
             val newCategory = categoryMap[orderItem.categoryId]!!
 
-            // [핵심 수정!] order와 category를 모두 업데이트합니다.
+            // order와 category를 모두 업데이트합니다.
             item.order = orderItem.order
             item.category = newCategory
         }
