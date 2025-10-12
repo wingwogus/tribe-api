@@ -202,7 +202,7 @@ class ExpenseService(
 
         itemUpdateRequests.forEach { request ->
             // itemId가 null(또는 0)이면 새 항목으로 간주하고 추가
-            if (request.itemId <= 0L) {
+            if (request.itemId == null) {
                 val newItem = ExpenseItem(
                     expense = expense,
                     name = request.itemName,
