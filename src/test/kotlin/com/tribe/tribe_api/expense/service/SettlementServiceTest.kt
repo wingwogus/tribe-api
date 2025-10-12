@@ -4,10 +4,13 @@ import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.entity.ExpenseItem
 import com.tribe.tribe_api.expense.enumeration.InputMethod
+import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
+import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
+import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
 import com.tribe.tribe_api.member.entity.Role
@@ -25,144 +28,125 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
+@ActiveProfiles("test")
 class SettlementServiceIntegrationTest @Autowired constructor(
     private val settlementService: SettlementService,
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
     private val tripRepository: TripRepository,
     private val tripMemberRepository: TripMemberRepository,
+    private val placeRepository: PlaceRepository,
     private val categoryRepository: CategoryRepository,
-    private val itineraryItemRepository: ItineraryItemRepository
+    private val itineraryItemRepository: ItineraryItemRepository,
+    private val expenseRepository: ExpenseRepository
 ) {
-    private lateinit var memberA: Member
-    private lateinit var memberB: Member
     private lateinit var trip: Trip
-    private lateinit var tripMemberA: TripMember
-    private lateinit var tripMemberB: TripMember
+    private lateinit var memberA: TripMember
+    private lateinit var memberB: TripMember
     private lateinit var guestC: TripMember
-    private lateinit var itineraryItem: ItineraryItem
-
-    private val settlementDate = LocalDate.of(2025, 10, 26)
+    private val paymentDate = LocalDate.of(2025, 10, 26)
 
     @BeforeEach
     fun setUp() {
         // 1. 사용자 생성
-        memberA = memberRepository.save(
-            Member("user1@example.com", passwordEncoder.encode("password"), "테스터A", null, Role.USER, Provider.LOCAL, null, false)
-        )
-        memberB = memberRepository.save(
-            Member("user2@example.com", passwordEncoder.encode("password"), "테스터B", null, Role.USER, Provider.LOCAL, null, false)
-        )
+        val userA = memberRepository.save(Member("settlement.a@test.com", passwordEncoder.encode("pw"), "정산맨A", null, Role.USER, Provider.LOCAL, null, false))
+        val userB = memberRepository.save(Member("settlement.b@test.com", passwordEncoder.encode("pw"), "정산맨B", null, Role.USER, Provider.LOCAL, null, false))
 
-        // 2. 여행 및 멤버 설정
-        trip = Trip("정산 테스트 여행", settlementDate, settlementDate.plusDays(3), Country.JAPAN)
-        trip.addMember(memberA, TripRole.OWNER)
-        trip.addMember(memberB, TripRole.MEMBER)
+        // 2. 여행 데이터 생성
+        trip = Trip("정산 테스트 여행", LocalDate.now(), LocalDate.now().plusDays(5), Country.SOUTH_KOREA)
+        trip.addMember(userA, TripRole.OWNER)
+        trip.addMember(userB, TripRole.MEMBER)
         tripRepository.save(trip)
 
-        tripMemberA = trip.members.first { it.member?.id == memberA.id }
-        tripMemberB = trip.members.first { it.member?.id == memberB.id }
+        memberA = trip.members.first { it.member?.email == "settlement.a@test.com" }
+        memberB = trip.members.first { it.member?.email == "settlement.b@test.com" }
+        guestC = tripMemberRepository.save(TripMember(member = null, trip = trip, guestNickname = "게스트C", role = TripRole.GUEST))
+        trip.members.add(guestC)
 
-        // 3. 게스트 추가
-        guestC = tripMemberRepository.save(
-            TripMember(member = null, trip = trip, guestNickname = "게스트C", role = TripRole.GUEST)
+        // 3. 테스트용 일정 데이터 생성
+        val place = placeRepository.save(Place("place_id_settlement", "테스트 장소", "주소", BigDecimal.ZERO, BigDecimal.ZERO))
+        val category = categoryRepository.save(Category(trip, 1, "Day 1", 1))
+
+        val itinerary = itineraryItemRepository.save(
+            ItineraryItem(
+                category = category,
+                place = place,
+                order = 1,
+                memo = "저녁 식사"
+            )
         )
 
-        // 4. 테스트용 일정 생성
-        val category = categoryRepository.save(Category(trip, 1, "식사", 1))
-        itineraryItem = itineraryItemRepository.save(ItineraryItem(category, null, 1, "저녁 식사"))
+        // 4. 테스트용 지출 데이터 생성
+        val dinnerExpense = Expense(trip, itinerary, memberA, "저녁 식사", BigDecimal(30000), InputMethod.HANDWRITE, paymentDate)
+        val dinnerItem = ExpenseItem(dinnerExpense, "저녁메뉴", BigDecimal(30000))
+        dinnerExpense.expenseItems.add(dinnerItem)
+        dinnerItem.assignments.add(ExpenseAssignment(dinnerItem, memberA, BigDecimal(15000)))
+        dinnerItem.assignments.add(ExpenseAssignment(dinnerItem, memberB, BigDecimal(15000)))
+        expenseRepository.save(dinnerExpense)
 
-        // 5. 지출 및 배분 데이터 생성
-        setupExpenses()
-    }
-
-    private fun setupExpenses() {
-        // 지출 1: 테스터A가 30,000원 결제
-        val expense1 = Expense(trip, itineraryItem, tripMemberA, "저녁 식사", BigDecimal("30000"), InputMethod.HANDWRITE, settlementDate)
-        val item1A = ExpenseItem(expense1, "라면과 맥주", BigDecimal("25000"))
-        val item1B = ExpenseItem(expense1, "음료수", BigDecimal("5000"))
-
-        // 배분: 라면/맥주는 A, B가 부담. 음료수는 C가 부담
-        item1A.assignments.add(ExpenseAssignment(item1A, tripMemberA, BigDecimal("12500")))
-        item1A.assignments.add(ExpenseAssignment(item1A, tripMemberB, BigDecimal("12500")))
-        item1B.assignments.add(ExpenseAssignment(item1B, guestC, BigDecimal("5000")))
-        expense1.expenseItems.addAll(listOf(item1A, item1B))
-
-        // 지출 2: 테스터B가 10,000원 결제
-        val expense2 = Expense(trip, itineraryItem, tripMemberB, "편의점 간식", BigDecimal("10000"), InputMethod.HANDWRITE, settlementDate)
-        val item2A = ExpenseItem(expense2, "모두의 간식", BigDecimal("10000"))
-        // 배분: A, B, C가 1/N 부담
-        item2A.assignments.add(ExpenseAssignment(item2A, tripMemberA, BigDecimal("3333")))
-        item2A.assignments.add(ExpenseAssignment(item2A, tripMemberB, BigDecimal("3334")))
-        item2A.assignments.add(ExpenseAssignment(item2A, guestC, BigDecimal("3333")))
-        expense2.expenseItems.add(item2A)
-
-        trip.expenses.addAll(listOf(expense1, expense2))
-        tripRepository.save(trip)
+        val snackExpense = Expense(trip, itinerary, memberB, "간식", BigDecimal(12000), InputMethod.HANDWRITE, paymentDate)
+        val snackItem = ExpenseItem(snackExpense, "간식메뉴", BigDecimal(12000))
+        snackExpense.expenseItems.add(snackItem)
+        snackItem.assignments.add(ExpenseAssignment(snackItem, memberA, BigDecimal(4000)))
+        snackItem.assignments.add(ExpenseAssignment(snackItem, memberB, BigDecimal(4000)))
+        snackItem.assignments.add(ExpenseAssignment(snackItem, guestC, BigDecimal(4000)))
+        expenseRepository.save(snackExpense)
     }
 
     @Test
     @DisplayName("일별 정산 조회 성공")
     fun getDailySettlement_Success() {
         // when
-        val dailyResponse = settlementService.getDailySettlement(trip.id!!, settlementDate)
+        val response = settlementService.getDailySettlement(trip.id!!, paymentDate)
 
         // then
-        assertThat(dailyResponse.dailyTotalAmount.toInt()).isEqualTo(40000)
-        assertThat(dailyResponse.expenses).hasSize(2)
+        assertThat(response.date).isEqualTo(paymentDate)
+        assertThat(response.dailyTotalAmount).isEqualByComparingTo(BigDecimal(42000))
+        assertThat(response.expenses).hasSize(2)
 
-        val summaryA = dailyResponse.memberSummaries.first { it.memberName == "테스터A" }
-        val summaryB = dailyResponse.memberSummaries.first { it.memberName == "테스터B" }
-        val summaryC = dailyResponse.memberSummaries.first { it.memberName == "게스트C" }
+        val summaryA = response.memberSummaries.first { it.memberName == "정산맨A" }
+        val summaryB = response.memberSummaries.first { it.memberName == "정산맨B" }
+        val summaryC = response.memberSummaries.first { it.memberName == "게스트C" }
 
-        assertThat(summaryA.paidAmount.toInt()).isEqualTo(30000)
-        assertThat(summaryA.assignedAmount.toInt()).isEqualTo(12500 + 3333) // 15833
+        assertThat(summaryA.paidAmount).isEqualByComparingTo(BigDecimal(30000))
+        assertThat(summaryA.assignedAmount).isEqualByComparingTo(BigDecimal(19000))
 
-        assertThat(summaryB.paidAmount.toInt()).isEqualTo(10000)
-        assertThat(summaryB.assignedAmount.toInt()).isEqualTo(12500 + 3334) // 15834
+        assertThat(summaryB.paidAmount).isEqualByComparingTo(BigDecimal(12000))
+        assertThat(summaryB.assignedAmount).isEqualByComparingTo(BigDecimal(19000))
 
-        assertThat(summaryC.paidAmount.toInt()).isEqualTo(0)
-        assertThat(summaryC.assignedAmount.toInt()).isEqualTo(5000 + 3333) // 8333
+        assertThat(summaryC.paidAmount).isEqualByComparingTo(BigDecimal.ZERO)
+        assertThat(summaryC.assignedAmount).isEqualByComparingTo(BigDecimal(4000))
     }
 
     @Test
     @DisplayName("전체 정산 조회 및 최소 송금 관계 계산 성공")
     fun getTotalSettlement_Success() {
         // when
-        val totalResponse = settlementService.getTotalSettlement(trip.id!!)
+        val response = settlementService.getTotalSettlement(trip.id!!)
 
         // then
-        // 1. 최종 잔액 검증
-        val balanceA = totalResponse.memberBalances.first { it.nickname == "테스터A" }
-        val balanceB = totalResponse.memberBalances.first { it.nickname == "테스터B" }
-        val balanceC = totalResponse.memberBalances.first { it.nickname == "게스트C" }
+        val balanceA = response.memberBalances.first { it.nickname == "정산맨A" }
+        val balanceB = response.memberBalances.first { it.nickname == "정산맨B" }
+        val balanceC = response.memberBalances.first { it.nickname == "게스트C" }
 
-        // 30000(지출) - 15833(부담) = 14167
-        assertThat(balanceA.balance.toInt()).isEqualTo(14167)
-        // 10000(지출) - 15834(부담) = -5834
-        assertThat(balanceB.balance.toInt()).isEqualTo(-5834)
-        // 0(지출) - 8333(부담) = -8333
-        assertThat(balanceC.balance.toInt()).isEqualTo(-8333)
+        assertThat(balanceA.balance.toInt()).isEqualTo(11000)
+        assertThat(balanceB.balance.toInt()).isEqualTo(-7000)
+        assertThat(balanceC.balance.toInt()).isEqualTo(-4000)
 
-        // 2. 송금 관계 검증 (Debtor -> Creditor)
-        val debtRelations = totalResponse.debtRelations
-        assertThat(debtRelations).hasSize(2)
+        assertThat(response.debtRelations).hasSize(2)
+        val debtBtoA = response.debtRelations.first { it.fromNickname == "정산맨B" }
+        val debtCtoA = response.debtRelations.first { it.fromNickname == "게스트C" }
 
-        val debtFromB = debtRelations.first { it.fromNickname == "테스터B" }
-        val debtFromC = debtRelations.first { it.fromNickname == "게스트C" }
-
-        // B가 A에게 5834원 송금
-        assertThat(debtFromB.toNickname).isEqualTo("테스터A")
-        assertThat(debtFromB.amount.toInt()).isEqualTo(5834)
-
-        // C가 A에게 8333원 송금
-        assertThat(debtFromC.toNickname).isEqualTo("테스터A")
-        assertThat(debtFromC.amount.toInt()).isEqualTo(8333)
+        assertThat(debtBtoA.toNickname).isEqualTo("정산맨A")
+        assertThat(debtBtoA.amount.toInt()).isEqualTo(7000)
+        assertThat(debtCtoA.toNickname).isEqualTo("정산맨A")
+        assertThat(debtCtoA.amount.toInt()).isEqualTo(4000)
     }
 }
