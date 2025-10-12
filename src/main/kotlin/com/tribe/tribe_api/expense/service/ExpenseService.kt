@@ -171,7 +171,6 @@ class ExpenseService(
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
 
-        // --- 💡 수정된 부분 시작 ---
         // 1. 요청된 아이템들의 가격 합계를 계산합니다.
         val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
 
@@ -179,7 +178,6 @@ class ExpenseService(
         if (request.totalAmount.compareTo(itemsTotal) != 0) {
             throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
         }
-        // --- 💡 수정된 부분 끝 ---
 
         expense.title = request.expenseTitle
         expense.totalAmount = request.totalAmount
@@ -188,11 +186,9 @@ class ExpenseService(
 
         updateExpenseItems(expense, request.items)
 
-        // --- 💡 추가된 부분 시작 ---
         // 3. 금액이 변경되었으므로, 기존 배분 내역을 모두 삭제하여 데이터 정합성을 유지합니다.
         //    사용자는 이 API 호출 후에 다시 배분(/assignments)을 설정해야 합니다.
         expenseAssignmentRepository.deleteByExpenseId(expenseId)
-        // --- 💡 추가된 부분 끝 ---
 
         return ExpenseDto.DetailResponse.from(expense)
     }
