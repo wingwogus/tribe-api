@@ -68,7 +68,7 @@ object ExpenseDto {
     )
 
     data class ItemUpdate(
-        val itemId: Long,
+        val itemId: Long?,
 
         @field:NotBlank(message = "항목 이름은 비워둘 수 없습니다.")
         val itemName: String,
