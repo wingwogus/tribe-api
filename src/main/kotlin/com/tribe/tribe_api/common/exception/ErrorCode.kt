@@ -14,6 +14,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     ALREADY_JOINED_TRIP(HttpStatus.BAD_REQUEST, "이미 여행에 참여한 유저입니다."),
     EXPENSE_ITEM_NOT_IN_EXPENSE(HttpStatus.BAD_REQUEST, "지출 내역에 해당 항목이 존재하지 않습니다."),
     EXPENSE_TOTAL_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "지출 총액과 품목 금액의 합이 일치하지 않습니다."),
+    NO_BELONG_TRIP(HttpStatus.BAD_REQUEST, "해당 카테고리는 현재 여행에 속해있지 않습니다."),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),
@@ -23,7 +24,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     UNKNOWN_TOKEN_ERROR(HttpStatus.UNAUTHORIZED, "알 수 없는 토큰 오류가 발생했습니다."),
     INVALID_EMAIL(HttpStatus.UNAUTHORIZED, "인증되지 않은 이메일입니다"),
     NO_AUTHORITY_TRIP(HttpStatus.UNAUTHORIZED, "해당 여행의 수정 권한이 없습니다."),
-    NO_BELONG_TRIP(HttpStatus.UNAUTHORIZED, "해당 카테고리는 현재 여행에 속해있지 않습니다."),
+
 
     // 404 NOT_FOUND
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 사용자를 찾을 수 없습니다."),
