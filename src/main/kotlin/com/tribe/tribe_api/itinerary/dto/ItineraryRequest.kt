@@ -29,6 +29,10 @@ sealed class ItineraryRequest {
     data class OrderItem(
         @field:NotNull
         val itemId: Long,
+
+        @field:NotNull
+        val categoryId: Long,
+
         @field:NotNull
         val order: Int
     )

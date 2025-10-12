@@ -119,14 +119,27 @@ class ItineraryService(
         val itemIds = request.items.map { it.itemId }
         val itemsToUpdate = itineraryItemRepository.findByIdInAndTripId(itemIds, tripId)
 
+        // 요청에 포함된 모든 카테고리 ID를 미리 조회하여 Map으로 만듬
+        val categoryIds = request.items.map { it.categoryId }.distinct()
+        val categoryMap = categoryRepository.findAllById(categoryIds).associateBy { it.id }
+
+        // 모든 요청된 카테고리가 DB에 존재하는지, 그리고 현재 여행에 속하는지 확인
+        if (categoryMap.size != categoryIds.size || categoryMap.values.any { it.trip.id != tripId }) {
+            throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
+        }
+
         if (itemsToUpdate.size != itemIds.size) {
             throw BusinessException(ErrorCode.ITEM_NOT_FOUND)
         }
 
         val itemMap = itemsToUpdate.associateBy { it.id }
-        request.items.forEach {
-            val item = itemMap[it.itemId]!!
-            item.order = it.order
+        request.items.forEach { orderItem ->
+            val item = itemMap[orderItem.itemId]!!
+            val newCategory = categoryMap[orderItem.categoryId]!!
+
+            // [핵심 수정!] order와 category를 모두 업데이트합니다.
+            item.order = orderItem.order
+            item.category = newCategory
         }
 
         return itemsToUpdate.sortedBy { it.order }.map { ItineraryResponse.from(it) }
