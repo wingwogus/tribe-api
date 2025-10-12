@@ -34,7 +34,7 @@ class TripService(
     companion object {
         private const val INVITE_TOKEN_PREFIX = "INVITE:"
         private const val INVITE_PATH = "/invite?token="
-        private val INVITE_EXPIRATION = Duration.ofMinutes(10)
+        private val INVITE_EXPIRATION = Duration.ofDays(7)
     }
 
     fun createTrip(request: TripRequest.Create): TripResponse.TripDetail {
@@ -116,7 +116,7 @@ class TripService(
 
         val trip = findTripWithMembers(tripId)
 
-        trip.addMember(member, TripRole.OWNER)
+        trip.addMember(member, TripRole.MEMBER)
 
         return TripResponse.TripDetail.from(trip)
     }
