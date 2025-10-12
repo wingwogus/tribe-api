@@ -7,7 +7,7 @@ import java.math.BigDecimal
 class ExpenseItem(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expense_id", nullable = false)
-    val expense: Expense,
+    var expense: Expense,
 
     var name: String,
 

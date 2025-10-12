@@ -12,14 +12,15 @@ import com.tribe.tribe_api.member.entity.Role
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.entity.Trip
+import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
+import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import jakarta.annotation.PostConstruct
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.time.LocalDate
-import java.time.LocalDateTime // [추가!] LocalDateTime을 사용하기 위해 import 합니다.
 
 
 @Component
@@ -29,7 +30,9 @@ class InitDataService(
     private val tripRepository: TripRepository,
     private val placeRepository: PlaceRepository,
     private val categoryRepository: CategoryRepository,
-    private val itineraryItemRepository: ItineraryItemRepository
+    private val itineraryItemRepository: ItineraryItemRepository,
+    private val tripMemberRepository: TripMemberRepository,
+    private val expenseRepository: ExpenseRepository
 ) {
     @PostConstruct
     fun dbInit() {
@@ -119,5 +122,52 @@ class InitDataService(
                 memo = "저녁 식사 장소 찾아보기"
             )
         )
+
+        // --- 정산 테스트 데이터 ---
+        val guestSihwan = TripMember(member = null, trip = trip, guestNickname = "시환", role = TripRole.GUEST)
+            .apply { tripMemberRepository.save(this) }
+        trip.members.add(guestSihwan)
+
+        val expenseForDinner = Expense(
+            trip = trip,
+            itineraryItem = dinnerItinerary,
+            payer = trip.members.first { it.member?.nickname == "테스터A" },
+            title = "저녁 식사비",
+            totalAmount = BigDecimal(30000),
+            entryMethod = InputMethod.HANDWRITE,
+            paymentDate = LocalDate.of(2025, 10, 26)
+        )
+
+        val dinnerItem1 = ExpenseItem(expenseForDinner, "라면과 맥주", BigDecimal(25000))
+        val dinnerItem2 = ExpenseItem(expenseForDinner, "음료수", BigDecimal(5000))
+        expenseForDinner.expenseItems.addAll(listOf(dinnerItem1, dinnerItem2))
+
+        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터A" }, BigDecimal(12500)))
+        dinnerItem1.assignments.add(ExpenseAssignment(dinnerItem1, trip.members.first { it.member?.nickname == "테스터B" }, BigDecimal(12500)))
+        dinnerItem2.assignments.add(ExpenseAssignment(dinnerItem2, guestSihwan, BigDecimal(5000)))
+
+        expenseRepository.save(expenseForDinner)
+
+        val expenseForSnack = Expense(
+            trip = trip,
+            itineraryItem = dinnerItinerary,
+            payer = trip.members.first { it.member?.nickname == "테스터B" },
+            title = "편의점 간식",
+            totalAmount = BigDecimal(10000),
+            entryMethod = InputMethod.HANDWRITE,
+            paymentDate = LocalDate.of(2025, 10, 26)
+        )
+
+        val snackItem1 = ExpenseItem(expenseForSnack, "테스터A 간식", BigDecimal(3333))
+        val snackItem2 = ExpenseItem(expenseForSnack, "테스터B 간식", BigDecimal(3334))
+        val snackItem3 = ExpenseItem(expenseForSnack, "시환 간식", BigDecimal(3333))
+        expenseForSnack.expenseItems.addAll(listOf(snackItem1, snackItem2, snackItem3))
+
+        snackItem1.assignments.add(ExpenseAssignment(snackItem1, trip.members.first { it.member?.nickname == "테스터A" }, BigDecimal(3333)))
+        snackItem2.assignments.add(ExpenseAssignment(snackItem2, trip.members.first { it.member?.nickname == "테스터B" }, BigDecimal(3334)))
+        snackItem3.assignments.add(ExpenseAssignment(snackItem3, guestSihwan, BigDecimal(3333)))
+
+        expenseRepository.save(expenseForSnack)
     }
 }
+
