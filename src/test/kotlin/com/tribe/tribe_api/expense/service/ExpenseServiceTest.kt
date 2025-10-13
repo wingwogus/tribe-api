@@ -6,7 +6,6 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
-//import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
@@ -40,7 +39,6 @@ import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
@@ -94,7 +92,7 @@ class ExpenseServiceTest @Autowired constructor(
         // 3. 테스트용 여정 생성 (이제 이렇게 생성하면 됩니다)
         val category = categoryRepository.save(Category(trip, 1, "1일차", 1))
         val place = placeRepository.save(Place("place_id_settlement", "테스트 장소", "주소", BigDecimal.ZERO, BigDecimal.ZERO))
-        itineraryItem = itineraryItemRepository.save(ItineraryItem(category, place, 1, "저녁 식사"))
+        itineraryItem = itineraryItemRepository.save(ItineraryItem(category, place, "저녁 식사", null, 1, null))
 
         // 4. Mock 객체들의 동작 정의
         // Cloudinary는 어떤 파일이든 "mock-url"을 반환하도록 설정
@@ -189,7 +187,6 @@ class ExpenseServiceTest @Autowired constructor(
             tripId = trip.id!!,
             expenseTitle = "수정된 지출",
             totalAmount = BigDecimal("40000"),
-            paymentDate = java.time.LocalDate.now(),
             payerId = ownerTripMember.id!!,
             items = listOf(
                 ExpenseDto.ItemUpdate(
