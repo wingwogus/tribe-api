@@ -5,13 +5,16 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
+import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
+import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.entity.ExpenseItem
 import com.tribe.tribe_api.expense.enumeration.InputMethod
 import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
+import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.springframework.stereotype.Service
@@ -28,6 +31,7 @@ class ExpenseService(
     private val tripMemberRepository: TripMemberRepository,
     private val itineraryItemRepository: ItineraryItemRepository,
     private val geminiApiClient: GeminiApiClient,
+    private val cloudinaryUploadService: CloudinaryUploadService,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -66,18 +70,28 @@ class ExpenseService(
         val itineraryItem = itineraryItemRepository.findById(itineraryItemId)
             .orElseThrow { BusinessException(ErrorCode.ITINERARY_ITEM_NOT_FOUND) }
 
+        val dayNumber = itineraryItem.category.day
+        val paymentDate = trip.startDate.plusDays(dayNumber.toLong() - 1) //날짜 확인
+
         val processedData = when (request.inputMethod.uppercase()){
             "SCAN" -> {
                 val file = imageFile ?: throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
                 processReceipt(file)
             }
             "HANDWRITE" -> {
+                val totalAmount = request.totalAmount
+                    ?: throw BusinessException(ErrorCode.INVALID_INPUT_VALUE) //수기 입력시 필수 입력
                 ExpenseDto.OcrResponse(
-                    totalAmount = request.totalAmount,
+                    totalAmount = totalAmount,
                     items = request.items.map { ExpenseDto.OcrItem(it.itemName, it.price) }
                 )
             }
             else -> throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
+        }
+
+        var imageUrl: String? = null
+        if (imageFile != null && !imageFile.isEmpty) {
+            imageUrl = cloudinaryUploadService.upload(imageFile)
         }
 
         val itemsTotal = processedData.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
@@ -92,8 +106,8 @@ class ExpenseService(
             title = request.expenseTitle,
             totalAmount = processedData.totalAmount,
             entryMethod = InputMethod.valueOf(request.inputMethod.uppercase()),
-            paymentDate = request.paymentDate,
-            receiptImageUrl = request.receiptImageUrl
+            paymentDate = paymentDate,
+            receiptImageUrl = imageUrl
         )
 
         processedData.items.forEach { itemDto ->
@@ -171,53 +185,64 @@ class ExpenseService(
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
 
-        // 1. 요청된 아이템들의 가격 합계를 계산합니다.
+        // 요청된 아이템들의 가격 합계를 계산합니다.
         val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
 
-        // 2. 요청된 totalAmount와 아이템 합계가 일치하는지 검증합니다.
+        // 요청된 totalAmount와 아이템 합계가 일치하는지 검증
         if (request.totalAmount.compareTo(itemsTotal) != 0) {
             throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
         }
 
         expense.title = request.expenseTitle
         expense.totalAmount = request.totalAmount
-        expense.paymentDate = request.paymentDate
         expense.payer = payer
 
         updateExpenseItems(expense, request.items)
 
-        // 3. 금액이 변경되었으므로, 기존 배분 내역을 모두 삭제하여 데이터 정합성을 유지합니다.
-        //    사용자는 이 API 호출 후에 다시 배분(/assignments)을 설정해야 합니다.
-        expenseAssignmentRepository.deleteByExpenseId(expenseId)
-
         return ExpenseDto.DetailResponse.from(expense)
     }
 
-
     // Item 리스트를 요청 DTO의 상태와 동일하게 업데이트
     private fun updateExpenseItems(expense: Expense, itemUpdateRequests: List<ExpenseDto.ItemUpdate>) {
-        val requestedItemIds = itemUpdateRequests.mapNotNull { it.itemId }.toSet()
-        val itemsToRemove = expense.expenseItems.filter { it.id !in requestedItemIds }
-        expense.expenseItems.removeAll(itemsToRemove)
+        // 기존 항목들을 ID를 키로 하는 맵으로 변환
+        val existingItemsMap = expense.expenseItems.associateBy { it.id }
+        val requestItemsIds = itemUpdateRequests.mapNotNull { it.itemId }.toSet()
 
+        //기존 항목 중 요청에 포함되지 않는 항목 검색
+        val itemsToRemove = existingItemsMap.filterKeys { it !in requestItemsIds } .values
+        expense.expenseItems.removeAll(itemsToRemove.toList())
+
+        //item Id가 null이라면 새 항목으로 간주하고 추가, 수정
         itemUpdateRequests.forEach { request ->
-            // itemId가 null(또는 0)이면 새 항목으로 간주하고 추가
-            if (request.itemId == null) {
+            if (request.itemId == null){
                 val newItem = ExpenseItem(
                     expense = expense,
                     name = request.itemName,
                     price = request.price
                 )
                 expense.addExpenseItem(newItem)
-            } else { // 기존 항목은 수정
-                val existingItem = expense.expenseItems.find { it.id == request.itemId }
+            } else {
+                val existingItem = existingItemsMap[request.itemId]
                     ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_FOUND)
+
+                //가격 변경시 기존 배정 내역이 있는 경우
+                val priceChanged = existingItem.price.compareTo(request.price) != 0
+                if (priceChanged && existingItem.assignments.isNotEmpty()) {
+                    // 기존 참여자 목록을 가져옴
+                    val participants = existingItem.assignments.map { it.tripMember }
+                    // 새로운 가격으로 N빵 재계산
+                    val newAmounts = calculateFairShare(request.price, participants)
+                    // 기존 배정 내역에 새 금액을 덮어씀
+                    existingItem.assignments.zip(newAmounts).forEach { (assignment, newAmount) ->
+                        assignment.amount = newAmount
+                    }
+                }
+
                 existingItem.name = request.itemName
                 existingItem.price = request.price
             }
         }
     }
-
 
     // 멤버별 배분 정보 등록/수정
     @Transactional
@@ -233,30 +258,23 @@ class ExpenseService(
             val expenseItem = expenseItemsById[itemId]
                 ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_IN_EXPENSE)
 
-            // 1/N 분배 로직을 여기에 구현
-
-            // 1. 기존 분배 내역 삭제
+            // 기존 분배 내역 삭제
             expenseAssignmentRepository.deleteByExpenseItemId(itemId)
             expenseItem.assignments.clear()
 
-            // 2. 참여자 정보 확인
+            // 참여자 정보 확인
             val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
             if (participants.size != itemAssignmentDto.participantIds.size) {
                 throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
             }
 
-            val participantCount = participants.size.toBigDecimal()
-            if (participantCount > BigDecimal.ZERO) {
-                // 3. 1/N 금액 계산 (1원 오차 처리 포함)
-                val baseAmount = expenseItem.price.divide(participantCount, 0, RoundingMode.DOWN)
-                val remainder = expenseItem.price.subtract(baseAmount.multiply(participantCount))
+            // N빵 계산
+            if (participants.isNotEmpty()) {
+                val amounts = calculateFairShare(expenseItem.price, participants)
 
-                participants.forEachIndexed { index, participant ->
-                    // 첫 번째 참여자에게 나머지 금액을 더해줍니다.
-                    val amount = if (index == 0) baseAmount + remainder else baseAmount
-
-                    // 4. 계산된 금액으로 ExpenseAssignment 생성
-                    val newAssignment = com.tribe.tribe_api.expense.entity.ExpenseAssignment(
+                // 계산된 금액으로 ExpenseAssignment 생성
+                participants.zip(amounts).forEach { (participant, amount) ->
+                    val newAssignment = ExpenseAssignment(
                         expenseItem = expenseItem,
                         tripMember = participant,
                         amount = amount
@@ -267,5 +285,22 @@ class ExpenseService(
         }
 
         return ExpenseDto.DetailResponse.from(expense)
+    }
+
+    // 1/n 계산 로직
+    private fun calculateFairShare(totalAmount: BigDecimal, participants: List<TripMember>): List<BigDecimal> {
+        val participantCount = participants.size.toBigDecimal()
+        if (participantCount == BigDecimal.ZERO) {
+            return emptyList()
+        }
+
+        val baseAmount = totalAmount.divide(participantCount, 0, RoundingMode.DOWN)
+        val remainder = totalAmount.subtract(baseAmount.multiply(participantCount))
+
+        val amounts = MutableList(participants.size) { baseAmount }
+        if (amounts.isNotEmpty()) {
+            amounts[0] = amounts[0] + remainder
+        }
+        return amounts
     }
 }

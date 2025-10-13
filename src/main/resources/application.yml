@@ -83,3 +83,6 @@ server:
 app:
   url: ${APP_URL}
 
+cloudinary:
+  url: ${CLOUDINARY_URL}
+

@@ -4,7 +4,6 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.service.RedisService
 import com.tribe.tribe_api.member.dto.AuthDto
-import com.tribe.tribe_api.member.dto.MemberDto
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
 import com.tribe.tribe_api.member.entity.Role
