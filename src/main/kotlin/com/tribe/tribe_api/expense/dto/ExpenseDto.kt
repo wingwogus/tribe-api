@@ -50,10 +50,6 @@ object ExpenseDto {
         @field:PositiveOrZero(message = "총액은 0 또는 양수여야 합니다.")
         val totalAmount: BigDecimal,
 
-        @field:NotNull(message = "결제일은 필수입니다.")
-        @field:PastOrPresent(message = "결제일은 오늘 또는 과거 날짜여야 합니다.")
-        val paymentDate: LocalDate,
-
         @field:NotNull(message = "결제자 ID는 필수입니다.")
         val payerId: Long,
 
