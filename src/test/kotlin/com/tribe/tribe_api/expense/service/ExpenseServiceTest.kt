@@ -44,7 +44,6 @@ import java.math.BigDecimal
 
 @SpringBootTest
 @Transactional
-@ExtendWith(MockKExtension::class)
 class ExpenseServiceTest @Autowired constructor(
     private val expenseService: ExpenseService,
     private val expenseRepository: ExpenseRepository,

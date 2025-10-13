@@ -35,7 +35,6 @@ import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
-@ActiveProfiles("test")
 class SettlementServiceIntegrationTest @Autowired constructor(
     private val settlementService: SettlementService,
     private val memberRepository: MemberRepository,
@@ -79,7 +78,9 @@ class SettlementServiceIntegrationTest @Autowired constructor(
                 category = category,
                 place = place,
                 order = 1,
-                memo = "저녁 식사"
+                memo = "저녁 식사",
+                title = null,
+                time = null
             )
         )
 
