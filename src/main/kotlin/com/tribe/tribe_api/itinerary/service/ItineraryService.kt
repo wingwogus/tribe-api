@@ -117,6 +117,19 @@ class ItineraryService(
         val memberId = SecurityUtil.getCurrentMemberId()
         validateTripMember(tripId, memberId)
 
+        // 요청 데이터 자체의 검증 로직 추가, 동일한 카테고리 내에 중복된 order 값이 있는지 확인
+        val hasDuplicateOrders = request.items
+            .groupBy { it.categoryId } // categoryId 별로 그룹을 만듬
+            .any { (_, itemsInCategory) -> // 각 그룹(카테고리)에 대해 검사
+                val orders = itemsInCategory.map { it.order } // 해당 카테고리의 order 목록을 추출
+                orders.size != orders.toSet().size // 목록의 크기와 Set(중복제거)의 크기가 다르면 중복이 있다는 뜻
+            }
+
+        if (hasDuplicateOrders) {
+            throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
+        }
+
+
         val itemIds = request.items.map { it.itemId }
         val itemsToUpdate = itineraryItemRepository.findByIdInAndTripId(itemIds, tripId)
 
