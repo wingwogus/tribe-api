@@ -15,6 +15,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     EXPENSE_ITEM_NOT_IN_EXPENSE(HttpStatus.BAD_REQUEST, "지출 내역에 해당 항목이 존재하지 않습니다."),
     EXPENSE_TOTAL_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "지출 총액과 품목 금액의 합이 일치하지 않습니다."),
     IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다."),
+    NO_BELONG_TRIP(HttpStatus.BAD_REQUEST, "해당 카테고리는 현재 여행에 속해있지 않습니다."),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),
@@ -35,6 +36,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 장소를 찾을 수 없습니다."),
     NOT_A_TRIP_MEMBER(HttpStatus.NOT_FOUND, "해당 여행에 멤버가 아닙니다."),
     WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당하는 위시리스트를 찾을 수 없습니다."),
+    ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 여정을 찾을 수 없습니다."),
     EXPENSE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 지출 내역을 찾을 수 없습니다."),
     EXPENSE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 지출 항목을 찾을 수 없습니다."),
 
