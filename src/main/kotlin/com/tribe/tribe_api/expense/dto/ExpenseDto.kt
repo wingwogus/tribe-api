@@ -15,20 +15,14 @@ object ExpenseDto {
         @field:NotBlank(message = "지출 이름은 필수입니다.")
         val expenseTitle: String,
 
-        @field:NotNull(message = "총액은 필수입니다.")
         @field:PositiveOrZero(message = "총액은 0 또는 양수여야 합니다.")
-        val totalAmount: BigDecimal,
-
-        val receiptImageUrl: String?,
+        val totalAmount: BigDecimal?, //SCAN 시에는 값을 보내지 않아도 되도록
 
         @field:NotNull(message = "여정 아이템 ID는 필수입니다.")
         val itineraryItemId: Long,
 
         @field:NotNull(message = "결제자 ID는 필수입니다.")
         val payerId: Long,
-
-        @field:NotNull(message = "결제일은 필수입니다.")
-        val paymentDate: LocalDate,
 
         @field:NotBlank(message = "입력 방식은 필수입니다.")
         val inputMethod: String,
