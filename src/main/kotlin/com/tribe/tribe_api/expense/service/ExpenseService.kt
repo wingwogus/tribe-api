@@ -195,7 +195,6 @@ class ExpenseService(
 
         expense.title = request.expenseTitle
         expense.totalAmount = request.totalAmount
-        expense.paymentDate = request.paymentDate
         expense.payer = payer
 
         updateExpenseItems(expense, request.items)
