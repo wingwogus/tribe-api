@@ -14,6 +14,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     ALREADY_JOINED_TRIP(HttpStatus.BAD_REQUEST, "이미 여행에 참여한 유저입니다."),
     EXPENSE_ITEM_NOT_IN_EXPENSE(HttpStatus.BAD_REQUEST, "지출 내역에 해당 항목이 존재하지 않습니다."),
     EXPENSE_TOTAL_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "지출 총액과 품목 금액의 합이 일치하지 않습니다."),
+    IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다."),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),
