@@ -8,7 +8,7 @@ object WishlistDto {
 
     data class WishlistItemDto(
         val wishlistItemId: Long,
-        val placeId: String,
+        val placeId: Long,
         val name: String,
         val address: String?,
         val latitude: BigDecimal,
@@ -19,7 +19,7 @@ object WishlistDto {
                 val place = entity.place // 가독성을 위해 Place 엔티티를 변수로 추출
                 return WishlistItemDto(
                     wishlistItemId = entity.id!!,
-                    placeId = place.externalPlaceId,
+                    placeId = place.id!!,
                     name = place.name,
                     address = place.address,
                     latitude = place.latitude,
