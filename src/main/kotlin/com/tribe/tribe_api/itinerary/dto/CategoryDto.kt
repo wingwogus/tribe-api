@@ -20,7 +20,7 @@ object CategoryDto {
         val day: Int,
         val order: Int,
         val tripId: Long,
-        val itineraryItems: List<ItineraryItemResponse>,
+        val itineraryItems: List<ItineraryResponse>,
         val memo: String?,
         val createdAt: LocalDateTime,
         val updatedAt: LocalDateTime
@@ -33,29 +33,11 @@ object CategoryDto {
                     day = category.day,
                     order = category.order,
                     tripId = category.trip.id!!,
-                    itineraryItems = category.itineraryItems.map { ItineraryItemResponse.from(it) },
+                    itineraryItems = category.itineraryItems.map { ItineraryResponse.from(it) },
                     memo = category.memo,
                     createdAt = category.createdAt,
                     updatedAt = category.lastModifiedAt
                 )
-            }
-        }
-
-        data class ItineraryItemResponse(
-            val itemId: Long,
-            val placeName: String?,
-            val order: Int,
-            val memo: String?
-        ) {
-            companion object {
-                fun from(item: ItineraryItem): ItineraryItemResponse {
-                    return ItineraryItemResponse(
-                        itemId = item.id!!,
-                        placeName = item.place?.name,
-                        order = item.order,
-                        memo = item.memo
-                    )
-                }
             }
         }
     }
