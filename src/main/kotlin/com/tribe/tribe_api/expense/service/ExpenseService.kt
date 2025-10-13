@@ -193,7 +193,6 @@ class ExpenseService(
         return ExpenseDto.DetailResponse.from(expense)
     }
 
-
     // Item 리스트를 요청 DTO의 상태와 동일하게 업데이트
     private fun updateExpenseItems(expense: Expense, itemUpdateRequests: List<ExpenseDto.ItemUpdate>) {
         val requestedItemIds = itemUpdateRequests.mapNotNull { it.itemId }.toSet()
@@ -202,14 +201,14 @@ class ExpenseService(
 
         itemUpdateRequests.forEach { request ->
             // itemId가 null(또는 0)이면 새 항목으로 간주하고 추가
-            if (request.itemId == null) {
+            if (request.itemId <= 0L) {
                 val newItem = ExpenseItem(
                     expense = expense,
                     name = request.itemName,
                     price = request.price
                 )
                 expense.addExpenseItem(newItem)
-            } else { // 기존 항목은 수정
+            } else {
                 val existingItem = expense.expenseItems.find { it.id == request.itemId }
                     ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_FOUND)
                 existingItem.name = request.itemName
@@ -217,7 +216,6 @@ class ExpenseService(
             }
         }
     }
-
 
     // 멤버별 배분 정보 등록/수정
     @Transactional
