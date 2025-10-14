@@ -4,6 +4,7 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.RedisService
+import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.dto.TripRequest
 import com.tribe.tribe_api.trip.dto.TripResponse
@@ -33,14 +34,13 @@ class TripService(
     companion object {
         private const val INVITE_TOKEN_PREFIX = "INVITE:"
         private const val INVITE_PATH = "/invite?token="
-        private val INVITE_EXPIRATION = Duration.ofMinutes(10)
+        private val INVITE_EXPIRATION = Duration.ofDays(7)
     }
 
     fun createTrip(request: TripRequest.Create): TripResponse.TripDetail {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
 
-        val member = memberRepository.findByIdOrNull(currentMemberId)
-            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+        val member = findMember(currentMemberId)
 
         return request.toEntity()
             .apply { addMember(member, TripRole.OWNER) }
@@ -53,7 +53,14 @@ class TripService(
 
         return findTripWithMembers(tripId)
             .also { validateTripOwner(it, currentMemberId) }
-            .apply { update(request.title, request.startDate, request.endDate, request.country) }
+            .apply {
+                update(
+                request.title,
+                request.startDate,
+                request.endDate,
+                    request.country
+                )
+            }
             .let { TripResponse.TripDetail.from(it) }
     }
 
@@ -68,6 +75,12 @@ class TripService(
 
     @Transactional(readOnly = true)
     fun getTripDetails(tripId: Long): TripResponse.TripDetail {
+        val currentMemberId = SecurityUtil.getCurrentMemberId()
+
+        if (!tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
+
         return TripResponse.TripDetail.from(findTripWithMembers(tripId))
     }
 
@@ -91,18 +104,19 @@ class TripService(
 
     fun joinTrip(request: TripRequest.Join): TripResponse.TripDetail {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
-        val tripIdString = redisService.getValues("$INVITE_TOKEN_PREFIX${request.token}")
-            ?: throw BusinessException(ErrorCode.INVALID_INVITE_TOKEN)
+        val tripId= (redisService.getValues("$INVITE_TOKEN_PREFIX${request.token}")
+            ?: throw BusinessException(ErrorCode.INVALID_INVITE_TOKEN))
+            .toLong()
 
-        val member = memberRepository.findByIdOrNull(currentMemberId)
-            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
-        val trip = findTripWithMembers(tripIdString.toLong())
-
-        if (tripMemberRepository.existsByTripAndMember(trip, member)) {
+        if (tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)) {
             throw BusinessException(ErrorCode.ALREADY_JOINED_TRIP)
         }
 
-        trip.addMember(member, TripRole.OWNER)
+        val member = findMember(currentMemberId)
+
+        val trip = findTripWithMembers(tripId)
+
+        trip.addMember(member, TripRole.MEMBER)
 
         return TripResponse.TripDetail.from(trip)
     }
@@ -126,5 +140,10 @@ class TripService(
         if (!isOwner) {
             throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
         }
+    }
+
+    private fun findMember(currentMemberId: Long): Member {
+        return memberRepository.findByIdOrNull(currentMemberId)
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
     }
 }

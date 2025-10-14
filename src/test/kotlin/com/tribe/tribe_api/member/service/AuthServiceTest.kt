@@ -3,7 +3,7 @@ package com.tribe.tribe_api.member.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.service.RedisService
-import com.tribe.tribe_api.member.dto.MemberDto
+import com.tribe.tribe_api.member.dto.AuthDto
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
 import com.tribe.tribe_api.member.entity.Role
@@ -43,7 +43,7 @@ class AuthServiceIntegrationTest @Autowired constructor(
     @DisplayName("회원가입 성공")
     fun signUp_Success_WhenEmailIsVerified() {
         // given
-        val request = MemberDto.SignUpRequest("test@tribe.com", "password123", "testUser")
+        val request = AuthDto.SignUpRequest("test@tribe.com", "password123", "testUser")
         redisService.setValues("$VERIFIED_EMAIL_PREFIX${request.email}", "true", Duration.ofMinutes(10))
 
         // when
@@ -61,7 +61,7 @@ class AuthServiceIntegrationTest @Autowired constructor(
     @DisplayName("회원가입 실패 - 이메일 미 인증시")
     fun signUp_Fail_WhenEmailIsNotVerified() {
         // given
-        val request = MemberDto.SignUpRequest("test@tribe.com", "password123", "testUser")
+        val request = AuthDto.SignUpRequest("test@tribe.com", "password123", "testUser")
 
         // when & then
         val exception = assertThrows<BusinessException> {
@@ -74,7 +74,7 @@ class AuthServiceIntegrationTest @Autowired constructor(
     @DisplayName("닉네임 중복 체크 성공")
     fun checkDuplicatedNickname_Success_WhenNicknameIsAvailable() {
         // given
-        val request = MemberDto.VerifiedNicknameRequest("availableNickname")
+        val request = AuthDto.VerifiedNicknameRequest("availableNickname")
 
         // when & then
         authService.checkDuplicatedNickname(request) // Should not throw exception
@@ -92,7 +92,7 @@ class AuthServiceIntegrationTest @Autowired constructor(
             Role.USER,
             Provider.LOCAL,
             isFirstLogin = false))
-        val request = MemberDto.VerifiedNicknameRequest("duplicatedNickname")
+        val request = AuthDto.VerifiedNicknameRequest("duplicatedNickname")
 
         // when & then
         val exception = assertThrows<BusinessException> {

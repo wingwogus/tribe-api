@@ -4,16 +4,22 @@ import com.tribe.tribe_api.common.util.BaseTimeEntity
 import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.expense.entity.Expense
 import jakarta.persistence.*
+import java.time.LocalDateTime
 
 @Entity
 class ItineraryItem(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
-    val category: Category,
+    var category: Category,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "place_id")
+    @JoinColumn(name = "place_id", nullable = true)
     val place: Place?,
+
+    var title: String?, // 사용자가 직접 입력하는 일정 (placeId를 통해 지도에서 받아오는 장소가 없을경우나
+                        // '호텔에서 휴식' 같은 직접 입력해야하는 일정용
+
+    var time: LocalDateTime? , // 사용자가 직접 입력하는 시간 (할수도 있고 안할수도 있음)
 
     @Column(name = "item_order")
     var order: Int,

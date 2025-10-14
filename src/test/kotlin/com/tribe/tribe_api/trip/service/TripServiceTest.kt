@@ -159,7 +159,7 @@ class TripServiceIntegrationTest @Autowired constructor(
         assertThat(updateTrip.title).isEqualTo("수정된 여행")
         assertThat(updateTrip.startDate).isEqualTo(LocalDate.now())
         assertThat(updateTrip.endDate).isEqualTo(LocalDate.now().plusDays(2))
-        assertThat(updateTrip.country).isEqualTo(Country.SOUTH_KOREA.koreanName)
+        assertThat(updateTrip.country).isEqualTo(Country.SOUTH_KOREA.code)
     }
 
     @Test
