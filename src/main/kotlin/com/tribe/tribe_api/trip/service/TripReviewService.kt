@@ -14,7 +14,6 @@ import com.tribe.tribe_api.trip.repository.TripReviewRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -96,7 +95,7 @@ class TripReviewService(
             * **링크 생성 규칙:** 추천하는 모든 식당과 장소는 **클릭하면 구글 맵에서 해당 장소의 정보를 보여주는 검색하는 '검색 링크'**를 생성해야 합니다.
                 - **링크 형식:** `https://www.google.com/maps/search/?api=1&query=https://mandumanti.wordpress.com/2014/12/01/%EC%9E%A5%EC%86%8C/`
                 - **예시:** '킨류 라멘 도톤보리점'을 추천하는 경우, 링크는 `[킨류 라멘 金龍ラーメン](https://www.google.com/maps/search/?api=1&query=%ED%82%A8%EB%A5%98+%EB%9D%BC%EB%A9%98+%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%EC%A0%90)` 와 같이 생성되어야 합니다.
-        
+        * **D. 최적화 동선 추천:** 현재 일정들의 동선을 파악하고 이보다 더 효율적인 동선이 있을 시 해당 동선을 추천.
         ---
         **[출력 규칙 (사용자에게 보여줄 최종 결과물 형식)]**
         
