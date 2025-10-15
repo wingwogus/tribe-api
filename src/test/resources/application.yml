@@ -74,7 +74,7 @@ gemini:
     url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 server:
-  port: 8080
+  port: 8083
 
 app:
   url: ${APP_URL}
