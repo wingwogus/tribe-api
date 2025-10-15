@@ -185,6 +185,7 @@ object ExpenseDto {
 
     // 어떤 항목의 배분 내역을 삭제할지 서버에 알려주는 역할
     data class AssignmentClearRequest(
+        val tripId: Long,
         val itemIds: List<Long>
     )
 
