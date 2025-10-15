@@ -304,7 +304,7 @@ class ExpenseService(
         return amounts
     }
 
-    // 특정 비용(지출) 내역 삭제
+    // 지출 내역 삭제
     @Transactional
     fun deleteExpense(tripId: Long, expenseId: Long) {
         verifyTripIdParticipation(tripId)
@@ -312,7 +312,7 @@ class ExpenseService(
         expenseRepository.delete(expense)
     }
 
-    // 특정 지출 항목의 배분 내역만 삭제
+    // 특정 지출 항목의 배분 내역 삭제
     @Transactional
     fun clearExpenseAssignments(tripId: Long, expenseId: Long, request: ExpenseDto.AssignmentClearRequest): ExpenseDto.DetailResponse {
         verifyTripIdParticipation(tripId)
