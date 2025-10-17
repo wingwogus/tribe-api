@@ -44,7 +44,7 @@ import java.math.BigDecimal
 
 @SpringBootTest
 @Transactional
-class ExpenseServiceTest @Autowired constructor(
+class ExpenseServiceIntegrationTest @Autowired constructor(
     private val expenseService: ExpenseService,
     private val expenseRepository: ExpenseRepository,
     private val memberRepository: MemberRepository,
@@ -263,6 +263,70 @@ class ExpenseServiceTest @Autowired constructor(
         assertThat(ownerAssignment.amount).isEqualByComparingTo("3334")
         assertThat(member1Assignment.amount).isEqualByComparingTo("3333")
         assertThat(member2Assignment.amount).isEqualByComparingTo("3333")
+    }
+
+    @Test
+    @DisplayName("지출 내역 전체 삭제 성공")
+    fun deleteExpense_Success() {
+        // given: '방장'이 로그인하고, 삭제할 지출을 하나 생성
+        setAuthentication(owner)
+        val expenseResponse = createTestExpense(BigDecimal("9999"))
+        val expenseId = expenseResponse.expenseId
+
+        // when: 생성한 지출 내역을 삭제
+        expenseService.deleteExpense(trip.id!!, expenseId)
+
+        // then: 데이터베이스에서 해당 지출 내역이 조회되지 않아야 함
+        val findExpense = expenseRepository.findById(expenseId)
+        assertThat(findExpense.isPresent).isFalse()
+    }
+
+    @Test
+    @DisplayName("특정 지출 항목의 배분 내역 삭제 성공")
+    fun clearExpenseAssignments_Success() {
+        // given: '방장'이 로그인. 지출을 생성하고 2명(방장, 멤버1)에게 배정한 상태.
+        setAuthentication(owner)
+        val expenseResponse = createTestExpense(BigDecimal("20000"))
+        val expenseId = expenseResponse.expenseId
+        val expenseItemId = expenseResponse.items[0].itemId
+        assignTestParticipants(expenseId, listOf(ownerTripMember.id!!, member1TripMember.id!!))
+
+        // DB에서 배정이 잘 되었는지 먼저 확인
+        val expenseBeforeClear = expenseRepository.findById(expenseId).get()
+        assertThat(expenseBeforeClear.expenseItems[0].assignments).hasSize(2)
+
+        // when: 해당 항목의 배분 내역을 삭제하도록 요청
+        val request = ExpenseDto.AssignmentClearRequest(
+            tripId = trip.id!!,
+            itemIds = listOf(expenseItemId)
+        )
+        expenseService.clearExpenseAssignments(trip.id!!, expenseId, request)
+
+        // then: 배분 내역은 삭제되고, 지출과 지출 항목은 그대로 남아있어야 함
+        val expenseAfterClear = expenseRepository.findById(expenseId).get()
+        assertThat(expenseAfterClear).isNotNull
+        assertThat(expenseAfterClear.expenseItems).hasSize(1)
+        assertThat(expenseAfterClear.expenseItems[0].assignments).isEmpty()
+    }
+
+    @Test
+    @DisplayName("지출 삭제 실패 - 여행 멤버가 아닌 경우")
+    fun deleteExpense_Fail_NotATripMember() {
+        // given: 지출을 하나 생성하고, 여행에 참여하지 않은 제3의 멤버를 생성
+        setAuthentication(owner)
+        val expenseResponse = createTestExpense()
+        val expenseId = expenseResponse.expenseId
+
+        val nonMember = memberRepository.save(Member(
+            "nonmember@test.com", passwordEncoder.encode("pw"),
+            "외부인", provider = Provider.LOCAL, role = Role.USER, isFirstLogin = false))
+        setAuthentication(nonMember) // 외부인으로 로그인
+
+        // when & then: 다른 사람의 여행 지출을 삭제하려고 할 때 예외가 발생하는지 검증
+        val exception = assertThrows<BusinessException> {
+            expenseService.deleteExpense(trip.id!!, expenseId)
+        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
     }
 
     // 테스트용 지출 생성 헬퍼

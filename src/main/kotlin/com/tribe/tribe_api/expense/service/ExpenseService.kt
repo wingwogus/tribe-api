@@ -303,4 +303,33 @@ class ExpenseService(
         }
         return amounts
     }
+
+    // 지출 내역 삭제
+    @Transactional
+    fun deleteExpense(tripId: Long, expenseId: Long) {
+        verifyTripIdParticipation(tripId)
+        val expense = findExpenseAndValidate(expenseId, tripId)
+        expenseRepository.delete(expense)
+    }
+
+    // 특정 지출 항목의 배분 내역 삭제
+    @Transactional
+    fun clearExpenseAssignments(tripId: Long, expenseId: Long, request: ExpenseDto.AssignmentClearRequest): ExpenseDto.DetailResponse {
+        verifyTripIdParticipation(tripId)
+        val expense = findExpenseAndValidate(expenseId, tripId)
+
+        val expenseItemsById = expense.expenseItems.associateBy { it.id }
+
+        request.itemIds.forEach { itemId ->
+            val expenseItem = expenseItemsById[itemId]
+                ?: throw BusinessException(ErrorCode.EXPENSE_ITEM_NOT_IN_EXPENSE)
+
+            // 데이터베이스에서 배분 내역 삭제
+            expenseAssignmentRepository.deleteByExpenseItemId(itemId)
+            // 영속성 컨텍스트의 1차 캐시와 DB의 동기화를 위해 collection도 clear
+            expenseItem.assignments.clear()
+        }
+
+        return ExpenseDto.DetailResponse.from(expense)
+    }
 }

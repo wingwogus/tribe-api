@@ -62,4 +62,26 @@ class ExpenseController(
         val response = expenseService.assignParticipants(request.tripId, expenseId, request)
         return ResponseEntity.ok(ApiResponse.success("비용 배분 성공", response))
     }
+
+    // 특정 비용 삭제
+    @DeleteMapping("/{expenseId}")
+    fun deleteExpense(
+        @RequestParam tripId: Long,
+        @PathVariable expenseId: Long
+    ): ResponseEntity<ApiResponse<Unit>> {
+
+        expenseService.deleteExpense(tripId, expenseId)
+        return ResponseEntity.ok(ApiResponse.success("지출 내역 삭제 성공", Unit))
+    }
+
+    // 멤버별 배분 정보 삭제
+    @DeleteMapping("/{expenseId}/assignments")
+    fun clearExpenseAssignments(
+        @PathVariable expenseId: Long,
+        @Valid @RequestBody request: ExpenseDto.AssignmentClearRequest
+    ): ResponseEntity<ApiResponse<ExpenseDto.DetailResponse>> {
+
+        val response = expenseService.clearExpenseAssignments(request.tripId, expenseId, request)
+        return ResponseEntity.ok(ApiResponse.success("비용 배분 내역 삭제 성공", response))
+    }
 }
