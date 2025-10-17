@@ -36,7 +36,7 @@ class TripServiceIntegrationTest @Autowired constructor(
     private val tripRepository: TripRepository,
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val redisService: RedisService,
+    private val redisService: RedisService
 ) {
     // 테스트에 사용할 사용자 및 여행 객체
     private lateinit var owner: Member
@@ -128,17 +128,20 @@ class TripServiceIntegrationTest @Autowired constructor(
         assertThat(tripDetail.members.any { it.nickname == "멤버" }).isTrue
     }
 
-//    @Test
-//    @DisplayName("여행 상세 조회 실패 - 멤버가 아닌 경우")
-//    fun `getTripDetails_Fail_When_UserIsNotMember`() {
-//        // given: '외부인'이 로그인을 했다고 가정
-//        setAuthentication(nonMember)
-//
-//        // when & then: NO_AUTHORITY_TRIP 에러가 발생하는지 검증
-//        assertThrows<BusinessException> {
-//            tripService.getTripDetails(trip.id!!)
-//        }
-//    }
+    @Test
+    @DisplayName("여행 상세 조회 실패 - 멤버가 아닌 경우")
+    fun getTripDetails_Fail_When_UserIsNotMember() {
+        // given: '외부인'이 로그인을 했다고 가정
+        setAuthentication(nonMember)
+
+        // when & then: NO_AUTHORITY_TRIP 에러가 발생하는지 검증
+        val exception = assertThrows<BusinessException> {
+            tripService.getTripDetails(trip.id!!)
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
+
+    }
 
     @Test
     @DisplayName("여행 수정 성공")
@@ -183,6 +186,8 @@ class TripServiceIntegrationTest @Autowired constructor(
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
 
+
+
     @Test
     @DisplayName("내 여행 목록 조회")
     fun getAllTrips_Success() {
@@ -196,6 +201,35 @@ class TripServiceIntegrationTest @Autowired constructor(
         // then: 결과 검증
         assertThat(myTrips.content).hasSize(1)
         assertThat(myTrips.content[0].title).isEqualTo("테스트 여행")
+    }
+    @Test
+    @DisplayName("여행 삭제 성공")
+    fun deleteTrip_Success() {
+        // given: 주인이 로그인
+        setAuthentication(owner)
+
+        // when: 여행 삭제
+        tripService.deleteTrip(trip.id!!)
+
+        val findById = tripRepository.findById(trip.id!!)
+
+        // then: 검증
+        assertThat(findById.isPresent).isFalse()
+    }
+
+    @Test
+    @DisplayName("여행 삭제 실패 - 주인이 아닌 경우")
+    fun deleteTrip_Failed_When_UserIsNotOwner() {
+        // given: 멤버가 로그인
+        setAuthentication(member)
+
+        // when: 여행 삭제
+        val exception = assertThrows<BusinessException> {
+            tripService.deleteTrip(trip.id!!)
+        }
+
+        // then: 검증
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
 
     @Test
