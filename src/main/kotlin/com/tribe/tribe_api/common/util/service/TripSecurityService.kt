@@ -43,6 +43,9 @@ class TripSecurityService(
         val expense = expenseRepository.findByIdOrNull(expenseId)
             ?: throw BusinessException(ErrorCode.EXPENSE_NOT_FOUND)
 
-        return isTripMember(expense.trip.id!!)
+        val tripId = expense.trip.id
+            ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
+        return isTripMember(tripId)
     }
 }
