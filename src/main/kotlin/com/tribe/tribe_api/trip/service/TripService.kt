@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.security.SecureRandom
@@ -48,6 +49,7 @@ class TripService(
             .let { TripResponse.TripDetail.from(it) }
     }
 
+    @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
     fun updateTrip(tripId: Long, request: TripRequest.Update): TripResponse.TripDetail {
         return findTripWithMembers(tripId)
             .apply {
@@ -61,12 +63,14 @@ class TripService(
             .let { TripResponse.TripDetail.from(it) }
     }
 
+    @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
     fun deleteTrip(tripId: Long) {
         tripRepository.findByIdOrNull(tripId)
             ?.let { tripRepository.delete(it) }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
     }
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     @Transactional(readOnly = true)
     fun getTripDetails(tripId: Long): TripResponse.TripDetail {
         return TripResponse.TripDetail.from(findTripWithMembers(tripId))
@@ -81,6 +85,7 @@ class TripService(
         return trips.map { TripResponse.SimpleTrip.from(it) }
     }
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createInvitation(tripId: Long): TripResponse.Invitation {
         tripRepository.existsById(tripId).takeIf { it }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)

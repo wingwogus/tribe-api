@@ -147,18 +147,6 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("AI 여행 리뷰 생성 실패 - 방장이 아닌 경우")
-    fun createReview_Fail_When_UserIsNotOwner() {
-        // given: '멤버'가 로그인하고, 리뷰 생성을 요청
-        setAuthentication(member)
-        val request = TripReviewRequest.CreateReview("새로운 럭셔리 여행 컨셉")
-
-        // when & then: NO_AUTHORITY_TRIP 에러가 발생하는지 검증
-        val exception = assertThrows<BusinessException> { tripReviewService.createReview(trip.id!!, request) }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
-    }
-
-    @Test
     @DisplayName("특정 여행의 모든 리뷰 목록 조회 성공")
     fun getAllReviews_Success() {
         // given: 페이지 정보
@@ -177,6 +165,8 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     @Test
     @DisplayName("리뷰 상세 조회 성공")
     fun getReview_Success() {
+        setAuthentication(member)
+
         // given
         val reviewId = savedReview.id!!
 
@@ -192,6 +182,8 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
     @Test
     @DisplayName("리뷰 상세 조회 실패 - 존재하지 않는 리뷰 ID")
     fun getReview_Fail_When_ReviewNotFound() {
+        setAuthentication(member)
+
         // given
         val invalidReviewId = 999L
 

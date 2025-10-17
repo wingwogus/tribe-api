@@ -14,6 +14,7 @@ import com.tribe.tribe_api.trip.repository.TripReviewRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -25,16 +26,13 @@ class TripReviewService(
     private val geminiApiClient: GeminiApiClient
 ) {
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createReview(
         tripId: Long,
         request: TripReviewRequest.CreateReview
     ): TripReviewResponse.ReviewDetail {
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
-
         val trip = tripRepository.findTripWithFullItineraryById(tripId)
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
-
-        validateTripOwner(trip, currentMemberId)
 
         val prompt = createPromptFromTrip(trip, request.concept)
         val aiFeedback = geminiApiClient.getFeedback(prompt)
@@ -51,6 +49,7 @@ class TripReviewService(
             .map { TripReviewResponse.SimpleReviewInfo.from(it) }
     }
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun getReview(tripId: Long, reviewId: Long): TripReviewResponse.ReviewDetail {
         val review = tripReviewRepository.findByIdOrNull(reviewId)
             ?: throw BusinessException(ErrorCode.TRIP_REVIEW_NOT_FOUND)
@@ -136,15 +135,5 @@ class TripReviewService(
             """.trimIndent()
         }.joinToString("\n")}
         """.trimIndent()
-    }
-
-    private fun validateTripOwner(trip: Trip, currentMemberId: Long) {
-        val isOwner = trip.members.any {
-            it.member?.id == currentMemberId && it.role == TripRole.OWNER
-        }
-
-        if (!isOwner) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
-        }
     }
 }

@@ -47,7 +47,6 @@ class TripController(
     /**
      * 특정 여행 상세 조회
      */
-    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     @GetMapping("/{tripId}")
     fun getTripDetails(
         @PathVariable tripId: Long
@@ -60,7 +59,6 @@ class TripController(
     /**
      * 특정 여행 정보 수정
      */
-    @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
     @PatchMapping("/{tripId}")
     fun updateTrip(
         @PathVariable tripId: Long,
@@ -74,7 +72,6 @@ class TripController(
     /**
      * 특정 여행 삭제
      */
-    @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
     @DeleteMapping("/{tripId}")
     fun deleteTrip(
         @PathVariable tripId: Long
@@ -87,7 +84,6 @@ class TripController(
     /**
      * 초대 링크 생성
      */
-    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     @PostMapping("/{tripId}/invite")
     fun createInvitation(
         @PathVariable tripId: Long
