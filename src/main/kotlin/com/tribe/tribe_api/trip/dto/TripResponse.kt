@@ -64,11 +64,11 @@ sealed class TripResponse {
         companion object {
             fun from(tripMember: TripMember): TripMemberInfo {
                 val displayName = tripMember.member?.nickname ?: tripMember.guestNickname ?: "게스트"
-                val memberId = tripMember.id
+                val tripMemberId = tripMember.id
                 val avatar = tripMember.member?.avatar
 
                 return TripMemberInfo(
-                    memberId,
+                    tripMemberId,
                     displayName,
                     avatar,
                     tripMember.role
