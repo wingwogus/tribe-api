@@ -49,10 +49,7 @@ class TripService(
     }
 
     fun updateTrip(tripId: Long, request: TripRequest.Update): TripResponse.TripDetail {
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
-
         return findTripWithMembers(tripId)
-            .also { validateTripOwner(it, currentMemberId) }
             .apply {
                 update(
                 request.title,
@@ -65,22 +62,13 @@ class TripService(
     }
 
     fun deleteTrip(tripId: Long) {
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
-
         tripRepository.findByIdOrNull(tripId)
-            ?.also { validateTripOwner(it, currentMemberId) }
             ?.let { tripRepository.delete(it) }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
     }
 
     @Transactional(readOnly = true)
     fun getTripDetails(tripId: Long): TripResponse.TripDetail {
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
-
-        if (!tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
-        }
-
         return TripResponse.TripDetail.from(findTripWithMembers(tripId))
     }
 
@@ -132,15 +120,6 @@ class TripService(
         return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes)
     }
 
-    private fun validateTripOwner(trip: Trip, currentMemberId: Long) {
-        val isOwner = trip.members.any {
-            it.member?.id == currentMemberId && it.role == TripRole.OWNER
-        }
-
-        if (!isOwner) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
-        }
-    }
 
     private fun findMember(currentMemberId: Long): Member {
         return memberRepository.findByIdOrNull(currentMemberId)
