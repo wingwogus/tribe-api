@@ -39,7 +39,7 @@ sealed class TripResponse {
         val startDate: LocalDate,
         val endDate: LocalDate,
         val country: String,
-        val members: List<MemberInfo>
+        val members: List<TripMemberInfo>
     ) {
         companion object {
             fun from(trip: Trip): TripDetail {
@@ -49,25 +49,25 @@ sealed class TripResponse {
                     startDate = trip.startDate,
                     endDate = trip.endDate,
                     country = trip.country.code,
-                    members = trip.members.map { MemberInfo.from(it) }
+                    members = trip.members.map { TripMemberInfo.from(it) }
                 )
             }
         }
     }
 
-    data class MemberInfo(
+    data class TripMemberInfo(
         val memberId: Long?,
         val nickname: String,
         val avatar: String?,
         val role: TripRole
     ) {
         companion object {
-            fun from(tripMember: TripMember): MemberInfo {
+            fun from(tripMember: TripMember): TripMemberInfo {
                 val displayName = tripMember.member?.nickname ?: tripMember.guestNickname ?: "게스트"
-                val memberId = tripMember.member?.id
+                val memberId = tripMember.id
                 val avatar = tripMember.member?.avatar
 
-                return MemberInfo(
+                return TripMemberInfo(
                     memberId,
                     displayName,
                     avatar,
