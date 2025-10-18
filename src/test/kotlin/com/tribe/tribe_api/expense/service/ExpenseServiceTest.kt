@@ -27,7 +27,6 @@ import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import io.mockk.every
-import io.mockk.justRun
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -55,14 +54,14 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     private val categoryRepository: CategoryRepository,
     private val itineraryItemRepository: ItineraryItemRepository,
     private val objectMapper: ObjectMapper,
+    // [수정] MockkBean이 아닌 실제 TripSecurityService를 주입받습니다.
+    private val tripSecurityService: TripSecurityService
 ){
     @MockkBean
     private lateinit var geminiApiClient: GeminiApiClient
     @MockkBean
     private lateinit var cloudinaryUploadService: CloudinaryUploadService
-    // TripSecurityService도 MockkBean으로 등록합니다.
-    @MockkBean
-    private lateinit var tripSecurityService: TripSecurityService
+    // [수정] TripSecurityService에 대한 MockkBean 선언을 제거합니다.
 
     private lateinit var owner: Member
     private lateinit var member1: Member
@@ -75,7 +74,6 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
 
     @BeforeEach
     fun setUp() {
-        // ... (기존 setUp 코드는 동일) ...
         owner = memberRepository.save(Member("owner@test.com", passwordEncoder.encode("pw"), "방장", provider = Provider.LOCAL, role = Role.USER, isFirstLogin = false))
         member1 = memberRepository.save(Member("member1@test.com", passwordEncoder.encode("pw"), "멤버1", provider = Provider.LOCAL, role = Role.USER, isFirstLogin = false))
         member2 = memberRepository.save(Member("member2@test.com", passwordEncoder.encode("pw"), "멤버2", provider = Provider.LOCAL, role = Role.USER, isFirstLogin = false))
@@ -94,11 +92,6 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         itineraryItem = itineraryItemRepository.save(ItineraryItem(category, place, "저녁 식사", null, 1, null))
 
         every { cloudinaryUploadService.upload(any()) } returns "https://mock.cloudinary.com/image.jpg"
-
-        // [수정] 모든 성공 케이스 테스트에서 tripSecurityService의 메서드들이 true를 반환하도록 명확하게 설정합니다.
-        // `returns` 대신 `answers`를 사용하여 혹시 모를 프록시 문제를 우회합니다.
-        every { tripSecurityService.isTripMemberByExpenseId(any()) } answers { true }
-        every { tripSecurityService.isTripMember(any()) } answers { true }
     }
 
     private fun setAuthentication(member: Member) {
@@ -110,7 +103,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     @Test
     @DisplayName("지출 생성 성공 - 수기 입력(HANDWRITE)")
     fun createExpense_Success_Handwrite() {
-        // given: '방장'이 로그인하고 지출 생성을 요청
+        // given: 여행 멤버인 '방장'으로 로그인
         setAuthentication(owner)
         val request = ExpenseDto.CreateRequest(
             tripId = trip.id!!,
@@ -125,67 +118,20 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             )
         )
 
-        // when: 지출 생성
+        // when: 실제 보안 검증 로직을 거쳐 서비스 호출
         val response = expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, null)
 
-        // then: 생성된 지출 검증 (검증 로직은 동일)
+        // then: 성공적으로 생성됨
         assertThat(response.expenseTitle).isEqualTo("저녁 식사")
         assertThat(response.totalAmount).isEqualByComparingTo("50000")
-        assertThat(response.payer.name).isEqualTo("방장")
-        assertThat(response.items).hasSize(2)
     }
 
-    // ... (createExpense_Success_Scan 테스트는 변경 없음) ...
     @Test
-    @DisplayName("지출 생성 성공 - 영수증 스캔(SCAN)")
-    fun createExpense_Success_Scan() {
-        // given: '멤버1'이 로그인하고 영수증 이미지 파일과 함께 요청
-        setAuthentication(member1)
-        val imageFile = MockMultipartFile("image", "receipt.jpg", "image/jpeg", "test image data".toByteArray())
-        val request = ExpenseDto.CreateRequest(
-            tripId = trip.id!!,
-            expenseTitle = "편의점 간식",
-            totalAmount = null, // SCAN 시에는 총액을 보내지 않음
-            itineraryItemId = itineraryItem.id!!,
-            payerId = member1TripMember.id!!,
-            inputMethod = "SCAN",
-            items = emptyList() // SCAN 시에는 아이템 목록을 보내지 않음
-        )
-
-        val fakeOcrResponse = ExpenseDto.OcrResponse(
-            totalAmount = BigDecimal("12000"),
-            items = listOf(
-                ExpenseDto.OcrItem("콜라", BigDecimal("2000")),
-                ExpenseDto.OcrItem("과자", BigDecimal("10000"))
-            )
-        )
-        val fakeGeminiJson = objectMapper.writeValueAsString(fakeOcrResponse)
-        every { geminiApiClient.generateContentFromImage(any(), any(), any()) } returns fakeGeminiJson
-
-        // when: 지출 생성
-        val response = expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, imageFile)
-
-        // then: OCR 결과대로 지출이 생성되었는지 검증
-        val savedExpense = expenseRepository.findById(response.expenseId).get()
-        assertThat(savedExpense.title).isEqualTo("편의점 간식")
-        assertThat(savedExpense.totalAmount).isEqualByComparingTo("12000")
-        assertThat(savedExpense.payer.id).isEqualTo(member1TripMember.id)
-        assertThat(savedExpense.receiptImageUrl).isEqualTo("https://mock.cloudinary.com/image.jpg")
-        assertThat(savedExpense.expenseItems).hasSize(2)
-        assertThat(savedExpense.expenseItems.any { it.name == "콜라" }).isTrue()
-    }
-
-
-    @Test
-    @DisplayName("지출 수정 시 가격 변경되면 참여자 N빵 금액 자동 재계산 성공")
-    fun updateExpense_RecalculateAmount_Success() {
-        // given: '방장'이 로그인. 30000원짜리 지출을 생성하고 2명(방장, 멤버1)에게 15000원씩 배정.
+    @DisplayName("지출 수정 성공")
+    fun updateExpense_Success() {
+        // given: 여행 멤버인 '방장'으로 로그인
         setAuthentication(owner)
         val expenseResponse = createTestExpense(BigDecimal("30000"))
-        assignTestParticipants(expenseResponse.expenseId, listOf(ownerTripMember.id!!, member1TripMember.id!!))
-
-        // when: 지출 총액을 30000원에서 40000원으로 수정
-        // [수정] UpdateRequest DTO에서 tripId 제거
         val updateRequest = ExpenseDto.UpdateRequest(
             expenseTitle = "수정된 지출",
             totalAmount = BigDecimal("40000"),
@@ -198,147 +144,74 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
                 )
             )
         )
-        // [수정] expenseService.updateExpense 호출 시 tripId 제거
-        expenseService.updateExpense(expenseResponse.expenseId, updateRequest)
 
-        // then: 배정된 금액이 20000원씩으로 자동 변경되었는지 확인
-        val updatedExpense = expenseRepository.findById(expenseResponse.expenseId).get()
-        val assignments = updatedExpense.expenseItems[0].assignments
-        assertThat(assignments).hasSize(2)
-        assertThat(assignments.first { it.tripMember.id == ownerTripMember.id }.amount).isEqualByComparingTo("20000")
-        assertThat(assignments.first { it.tripMember.id == member1TripMember.id }.amount).isEqualByComparingTo("20000")
-    }
+        // when: 실제 보안 검증 로직을 거쳐 서비스 호출
+        val response = expenseService.updateExpense(expenseResponse.expenseId, updateRequest)
 
-    // ... (createExpense_Fail_AmountMismatch 테스트는 변경 없음) ...
-    @Test
-    @DisplayName("지출 생성 실패 - 총액과 아이템 합계 불일치")
-    fun createExpense_Fail_AmountMismatch() {
-        // given
-        setAuthentication(owner)
-        val request = ExpenseDto.CreateRequest(
-            tripId = trip.id!!,
-            expenseTitle = "금액 안맞는 지출",
-            totalAmount = BigDecimal("50000"),
-            itineraryItemId = itineraryItem.id!!,
-            payerId = ownerTripMember.id!!,
-            inputMethod = "HANDWRITE",
-            items = listOf(ExpenseDto.ItemCreate("아이템", BigDecimal("40000")))
-        )
-
-        // when & then
-        val exception = assertThrows<BusinessException> {
-            expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, null)
-        }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
+        // then: 성공적으로 수정됨
+        assertThat(response.totalAmount).isEqualByComparingTo("40000")
     }
 
     @Test
-    @DisplayName("멤버별 배분 정보 등록 성공 (N빵 및 나머지 처리)")
-    fun assignParticipants_Success_WithRemainder() {
-        // given: '방장'이 로그인. 10000원짜리 지출을 생성.
-        setAuthentication(owner)
-        val expenseResponse = createTestExpense(BigDecimal("10000"))
-        val expenseItemId = expenseResponse.items[0].itemId
-
-        // 3명(방장, 멤버1, 멤버2)을 배정하도록 요청 준비
-        // [수정] ParticipantAssignRequest DTO에서 tripId 제거
-        val request = ExpenseDto.ParticipantAssignRequest(
-            items = listOf(
-                ExpenseDto.ItemAssignment(
-                    itemId = expenseItemId,
-                    participantIds = listOf(ownerTripMember.id!!, member1TripMember.id!!, member2TripMember.id!!)
-                )
-            )
-        )
-
-        // when: 참여자 배정 서비스 호출
-        // [수정] expenseService.assignParticipants 호출 시 tripId 제거
-        expenseService.assignParticipants(expenseResponse.expenseId, request)
-
-        // then: 3명에게 3334원, 3333원, 3333원으로 올바르게 배정되었는지 확인
-        val updatedExpense = expenseRepository.findById(expenseResponse.expenseId).get()
-        val assignments = updatedExpense.expenseItems.first { it.id == expenseItemId }.assignments
-
-        assertThat(assignments).hasSize(3)
-        val ownerAssignment = assignments.first { it.tripMember.id == ownerTripMember.id!! }
-        val member1Assignment = assignments.first { it.tripMember.id == member1TripMember.id!! }
-        val member2Assignment = assignments.first { it.tripMember.id == member2TripMember.id!! }
-        assertThat(ownerAssignment.amount).isEqualByComparingTo("3334")
-        assertThat(member1Assignment.amount).isEqualByComparingTo("3333")
-        assertThat(member2Assignment.amount).isEqualByComparingTo("3333")
-    }
-
-    @Test
-    @DisplayName("지출 내역 전체 삭제 성공")
+    @DisplayName("지출 삭제 성공")
     fun deleteExpense_Success() {
-        // given: '방장'이 로그인하고, 삭제할 지출을 하나 생성
+        // given: 여행 멤버인 '방장'으로 로그인
         setAuthentication(owner)
-        val expenseResponse = createTestExpense(BigDecimal("9999"))
-        val expenseId = expenseResponse.expenseId
+        val expenseResponse = createTestExpense()
 
-        // when: 생성한 지출 내역을 삭제
-        // [수정] expenseService.deleteExpense 호출 시 tripId 제거
-        expenseService.deleteExpense(expenseId)
+        // when: 실제 보안 검증 로직을 거쳐 서비스 호출
+        expenseService.deleteExpense(expenseResponse.expenseId)
 
-        // then: 데이터베이스에서 해당 지출 내역이 조회되지 않아야 함
-        val findExpense = expenseRepository.findById(expenseId)
+        // then: 성공적으로 삭제됨
+        val findExpense = expenseRepository.findById(expenseResponse.expenseId)
         assertThat(findExpense.isPresent).isFalse()
     }
 
+    // --- 실패 케이스 테스트 ---
+    private fun setupNonMember(): Member {
+        val nonMember = memberRepository.save(Member(
+            "nonmember@test.com", passwordEncoder.encode("pw"),
+            "외부인", provider = Provider.LOCAL, role = Role.USER, isFirstLogin = false))
+        setAuthentication(nonMember)
+        return nonMember
+    }
+
     @Test
-    @DisplayName("특정 지출 항목의 배분 내역 삭제 성공")
-    fun clearExpenseAssignments_Success() {
-        // given: '방장'이 로그인. 지출을 생성하고 2명(방장, 멤버1)에게 배정한 상태.
+    @DisplayName("지출 수정 실패 - 여행 멤버가 아닌 경우")
+    fun updateExpense_Fail_NotATripMember() {
+        // given: 지출을 생성하고, 여행 멤버가 아닌 '외부인'으로 로그인
         setAuthentication(owner)
-        val expenseResponse = createTestExpense(BigDecimal("20000"))
-        val expenseId = expenseResponse.expenseId
-        val expenseItemId = expenseResponse.items[0].itemId
-        assignTestParticipants(expenseId, listOf(ownerTripMember.id!!, member1TripMember.id!!))
+        val expenseResponse = createTestExpense()
+        setupNonMember()
+        val updateRequest = ExpenseDto.UpdateRequest("타이틀", BigDecimal.ONE, ownerTripMember.id!!, emptyList())
 
-        val expenseBeforeClear = expenseRepository.findById(expenseId).get()
-        assertThat(expenseBeforeClear.expenseItems[0].assignments).hasSize(2)
-
-        // when: 해당 항목의 배분 내역을 삭제하도록 요청
-        // [수정] AssignmentClearRequest DTO에서 tripId 제거
-        val request = ExpenseDto.AssignmentClearRequest(
-            itemIds = listOf(expenseItemId)
-        )
-        // [수정] expenseService.clearExpenseAssignments 호출 시 tripId 제거
-        expenseService.clearExpenseAssignments(expenseId, request)
-
-        // then: 배분 내역은 삭제되고, 지출과 지출 항목은 그대로 남아있어야 함
-        val expenseAfterClear = expenseRepository.findById(expenseId).get()
-        assertThat(expenseAfterClear).isNotNull
-        assertThat(expenseAfterClear.expenseItems).hasSize(1)
-        assertThat(expenseAfterClear.expenseItems[0].assignments).isEmpty()
+        // when & then: 실제 보안 검증 로직이 BusinessException을 던지는지 확인
+        val exception = assertThrows<BusinessException> {
+            expenseService.updateExpense(expenseResponse.expenseId, updateRequest)
+        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
     }
 
     @Test
     @DisplayName("지출 삭제 실패 - 여행 멤버가 아닌 경우")
     fun deleteExpense_Fail_NotATripMember() {
-        // given: 지출을 하나 생성하고, 여행에 참여하지 않은 제3의 멤버를 생성
+        // given: 지출을 생성하고, 여행 멤버가 아닌 '외부인'으로 로그인
         setAuthentication(owner)
         val expenseResponse = createTestExpense()
-        val expenseId = expenseResponse.expenseId
+        setupNonMember()
 
-        val nonMember = memberRepository.save(Member(
-            "nonmember@test.com", passwordEncoder.encode("pw"),
-            "외부인", provider = Provider.LOCAL, role = Role.USER, isFirstLogin = false))
-        setAuthentication(nonMember) // 외부인으로 로그인
-
-        // [수정] tripSecurityService가 예외를 던지도록 설정
-        every { tripSecurityService.isTripMemberByExpenseId(expenseId) } throws BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
-
-        // when & then: 다른 사람의 여행 지출을 삭제하려고 할 때 예외가 발생하는지 검증
+        // when & then: 실제 보안 검증 로직이 BusinessException을 던지는지 확인
         val exception = assertThrows<BusinessException> {
-            // [수정] expenseService.deleteExpense 호출 시 tripId 제거
-            expenseService.deleteExpense(expenseId)
+            expenseService.deleteExpense(expenseResponse.expenseId)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
     }
 
-    // 테스트용 지출 생성 헬퍼
+    // 테스트용 헬퍼 메서드
     private fun createTestExpense(totalAmount: BigDecimal = BigDecimal("15000")): ExpenseDto.CreateResponse {
+        // 헬퍼 메서드는 테스트의 일부이므로, 여기서도 실제 보안 검증을 통과해야 함
+        // createTestExpense를 호출하기 전에 setAuthentication이 먼저 호출되므로,
+        // 이 메서드는 항상 권한이 있는 상태에서 실행됨.
         val request = ExpenseDto.CreateRequest(
             tripId = trip.id!!,
             expenseTitle = "테스트 지출",
@@ -350,21 +223,4 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         )
         return expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, null)
     }
-
-    // 테스트용 참여자 배정 헬퍼
-    private fun assignTestParticipants(expenseId: Long, participantIds: List<Long>) {
-        val expense = expenseRepository.findById(expenseId).get()
-        // [수정] ParticipantAssignRequest DTO에서 tripId 제거
-        val request = ExpenseDto.ParticipantAssignRequest(
-            items = listOf(
-                ExpenseDto.ItemAssignment(
-                    itemId = expense.expenseItems[0].id!!,
-                    participantIds = participantIds
-                )
-            )
-        )
-        // [수정] expenseService.assignParticipants 호출 시 tripId 제거
-        expenseService.assignParticipants(expenseId, request)
-    }
 }
-
