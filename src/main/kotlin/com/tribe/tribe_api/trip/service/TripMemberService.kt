@@ -7,7 +7,7 @@ import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.EntityNotFoundException
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -19,7 +19,10 @@ class TripMemberService(
 
     //특정 여행에 임시 참여자(게스트)를 추가
     @Transactional
-    fun addGuest(tripId: Long, request: TripMemberDto.AddGuestRequest): TripMemberDto.Info {
+    @PreAuthorize("@tripSecurityService.isTripMember(tripId)")
+    fun addGuest(request: TripMemberDto.AddGuestRequest): TripMemberDto.Info {
+        val tripId = request.tripId
+
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
@@ -29,6 +32,7 @@ class TripMemberService(
             guestNickname = request.name,
             role = TripRole.GUEST
         )
+        trip.members.add(newGuest)
 
         val savedGuest = tripMemberRepository.save(newGuest)
         return TripMemberDto.Info.from(savedGuest)

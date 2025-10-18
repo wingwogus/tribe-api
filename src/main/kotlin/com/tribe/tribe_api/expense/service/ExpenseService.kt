@@ -3,7 +3,6 @@ package com.tribe.tribe_api.expense.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
-import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
 import com.tribe.tribe_api.expense.dto.ExpenseDto
@@ -17,6 +16,7 @@ import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -35,25 +35,20 @@ class ExpenseService(
     private val objectMapper: ObjectMapper
 ) {
 
-    private fun verifyTripIdParticipation(tripId: Long){
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
-
-        if(!tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)){
-            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
-        }
+    private fun findExpenseById(expenseId: Long): Expense {
+        return expenseRepository.findById(expenseId)
+            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
     }
 
-    private fun findExpenseAndValidate(expenseId: Long, tripId: Long): Expense {
-        val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
-
-        if (expense.trip.id != tripId) { throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP) }
-
-        return expense
+    private fun isPayer(tripMember: TripMember, tripId: Long){
+        if (tripMember.trip.id != tripId) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
     }
 
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createExpense(
         tripId: Long,
         itineraryItemId: Long,
@@ -61,14 +56,18 @@ class ExpenseService(
         imageFile: MultipartFile?
     ): ExpenseDto.CreateResponse {
 
-        verifyTripIdParticipation(tripId)
 
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        isPayer(payer, tripId)
+
         val itineraryItem = itineraryItemRepository.findById(itineraryItemId)
             .orElseThrow { BusinessException(ErrorCode.ITINERARY_ITEM_NOT_FOUND) }
+        if (itineraryItem.category.trip.id != tripId) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
 
         val dayNumber = itineraryItem.category.day
         val paymentDate = trip.startDate.plusDays(dayNumber.toLong() - 1) //날짜 확인
@@ -163,27 +162,22 @@ class ExpenseService(
 
     //특정 비용 상세 조회
     @Transactional(readOnly = true)
-    fun getExpenseDetail(tripId: Long, expenseId: Long): ExpenseDto.DetailResponse {
-        val expense = findExpenseAndValidate(expenseId, tripId)
-
-        expense.trip.id?.let { tripId ->
-            verifyTripIdParticipation(tripId)
-        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
-
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun getExpenseDetail(expenseId: Long): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
         return ExpenseDto.DetailResponse.from(expense)
     }
 
     //특정 비용 수정
     @Transactional
-    fun updateExpense(tripId: Long, expenseId: Long, request: ExpenseDto.UpdateRequest): ExpenseDto.DetailResponse {
-        val expense = findExpenseAndValidate(expenseId, tripId)
-
-        expense.trip.id?.let { tripId ->
-            verifyTripIdParticipation(tripId)
-        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun updateExpense(expenseId: Long, request: ExpenseDto.UpdateRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
+        val tripId = expense.trip.id!!
 
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        isPayer(payer, tripId)
 
         // 요청된 아이템들의 가격 합계를 계산합니다.
         val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
@@ -246,10 +240,10 @@ class ExpenseService(
 
     // 멤버별 배분 정보 등록/수정
     @Transactional
-    fun assignParticipants(tripId: Long, expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
-        val expense = findExpenseAndValidate(expenseId, tripId)
-
-        verifyTripIdParticipation(tripId)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
+        val tripId = expense.trip.id!!
 
         val expenseItemsById = expense.expenseItems.associateBy { it.id }
 
@@ -266,6 +260,12 @@ class ExpenseService(
             val participants = tripMemberRepository.findAllById(itemAssignmentDto.participantIds)
             if (participants.size != itemAssignmentDto.participantIds.size) {
                 throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+            }
+
+            participants.forEach { participant ->
+                if (participant.trip.id != tripId) {
+                    throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+                }
             }
 
             // N빵 계산
@@ -306,17 +306,17 @@ class ExpenseService(
 
     // 지출 내역 삭제
     @Transactional
-    fun deleteExpense(tripId: Long, expenseId: Long) {
-        verifyTripIdParticipation(tripId)
-        val expense = findExpenseAndValidate(expenseId, tripId)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun deleteExpense(expenseId: Long) {
+        val expense = findExpenseById(expenseId)
         expenseRepository.delete(expense)
     }
 
     // 특정 지출 항목의 배분 내역 삭제
     @Transactional
-    fun clearExpenseAssignments(tripId: Long, expenseId: Long, request: ExpenseDto.AssignmentClearRequest): ExpenseDto.DetailResponse {
-        verifyTripIdParticipation(tripId)
-        val expense = findExpenseAndValidate(expenseId, tripId)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun clearExpenseAssignments(expenseId: Long, request: ExpenseDto.AssignmentClearRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
 
         val expenseItemsById = expense.expenseItems.associateBy { it.id }
 
