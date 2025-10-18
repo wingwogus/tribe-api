@@ -40,6 +40,12 @@ class ExpenseService(
             .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
     }
 
+    private fun isPayer(tripMember: TripMember, tripId: Long){
+        if (tripMember.trip.id != tripId) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
+    }
+
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
     @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
@@ -53,12 +59,9 @@ class ExpenseService(
 
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
-
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
-        if (payer.trip.id != tripId) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
-        }
+        isPayer(payer, tripId)
 
         val itineraryItem = itineraryItemRepository.findById(itineraryItemId)
             .orElseThrow { BusinessException(ErrorCode.ITINERARY_ITEM_NOT_FOUND) }
@@ -174,9 +177,7 @@ class ExpenseService(
 
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
-        if (payer.trip.id != tripId) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
-        }
+        isPayer(payer, tripId)
 
         // 요청된 아이템들의 가격 합계를 계산합니다.
         val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
