@@ -48,7 +48,7 @@ class ExpenseService(
 
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
-    @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createExpense(
         tripId: Long,
         itineraryItemId: Long,
