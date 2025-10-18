@@ -38,6 +38,7 @@ import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.test.annotation.DirtiesContext
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
@@ -124,6 +125,46 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         // then: 성공적으로 생성됨
         assertThat(response.expenseTitle).isEqualTo("저녁 식사")
         assertThat(response.totalAmount).isEqualByComparingTo("50000")
+    }
+
+    @Test
+    @DisplayName("지출 생성 성공 - 영수증 스캔(SCAN)")
+    fun createExpense_Success_Scan() {
+        // given: '멤버1'이 로그인하고 영수증 이미지 파일과 함께 요청
+        setAuthentication(member1)
+        val imageFile = MockMultipartFile("image", "receipt.jpg", "image/jpeg", "test image data".toByteArray())
+        val request = ExpenseDto.CreateRequest(
+            tripId = trip.id!!,
+            expenseTitle = "편의점 간식",
+            totalAmount = null,
+            itineraryItemId = itineraryItem.id!!,
+            payerId = member1TripMember.id!!,
+            inputMethod = "SCAN",
+            items = emptyList()
+        )
+
+        // Gemini API가 정상적으로 총액과 품목을 반환하는 상황을 모의
+        val fakeOcrResponse = ExpenseDto.OcrResponse(
+            totalAmount = BigDecimal("1000"),
+            items = listOf(
+                ExpenseDto.OcrItem("과자", BigDecimal("700")),
+                ExpenseDto.OcrItem("음료수", BigDecimal("300"))
+            )
+        )
+        val fakeGeminiJson = objectMapper.writeValueAsString(fakeOcrResponse)
+        every { geminiApiClient.generateContentFromImage(any(), any(), any()) } returns fakeGeminiJson
+
+        // when: 지출 생성
+        val response = expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, imageFile)
+
+        // then: OCR 결과대로 지출이 생성되었는지 검증
+        val savedExpense = expenseRepository.findById(response.expenseId).get()
+        assertThat(savedExpense.title).isEqualTo("편의점 간식")
+        assertThat(savedExpense.totalAmount).isEqualByComparingTo("1000")
+        assertThat(savedExpense.payer.id).isEqualTo(member1TripMember.id)
+        assertThat(savedExpense.expenseItems).hasSize(2)
+        assertThat(savedExpense.expenseItems.first { it.name == "과자" }.price).isEqualByComparingTo("700")
+        assertThat(savedExpense.expenseItems.first { it.name == "음료수" }.price).isEqualByComparingTo("300")
     }
 
     @Test
