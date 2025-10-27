@@ -1,5 +1,6 @@
 package com.tribe.tribe_api.trip.dto
 
+import com.tribe.tribe_api.itinerary.dto.PlaceDto
 import com.tribe.tribe_api.trip.entity.TripReview
 import java.time.LocalDateTime
 
@@ -9,7 +10,8 @@ sealed class TripReviewResponse() {
         val reviewId: Long,
         val concept: String?,
         val content: String?,
-        val createdAt: LocalDateTime?
+        val createdAt: LocalDateTime?,
+        val recommendedPlaces: List<PlaceDto.Simple>?
     ) {
         companion object {
             fun from(review: TripReview): ReviewDetail {
@@ -17,7 +19,10 @@ sealed class TripReviewResponse() {
                     reviewId = review.id!!,
                     concept = review.concept,
                     content = review.content,
-                    createdAt = review.createdAt
+                    createdAt = review.createdAt,
+                    recommendedPlaces = review.recommendedPlaces.map{
+                        PlaceDto.Simple.from(it.place)
+                    }
                 )
             }
         }
