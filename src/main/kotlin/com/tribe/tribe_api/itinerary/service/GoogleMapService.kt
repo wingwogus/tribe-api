@@ -4,9 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.util.service.RedisService
 import com.tribe.tribe_api.itinerary.dto.GoogleDto
 import com.tribe.tribe_api.itinerary.dto.PlaceDto
-import com.tribe.tribe_api.itinerary.repository.PlaceRepository
-import com.tribe.tribe_api.member.repository.MemberRepository
-import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -36,7 +33,7 @@ class GoogleMapService(
             logger.info("Cache HIT: key=$cacheKey")
             // 캐시 데이터가 있으면, JSON 문자열을 객체로 변환하여 바로 반환
             val googleResponse = objectMapper.readValue(cachedData, GoogleDto.GoogleApiResponse::class.java)
-            return googleResponse.places?.map { PlaceDto.Simple.from(it) } ?: emptyList()
+            return googleResponse.places?.map { PlaceDto.Simple.fromGoogle(it) } ?: emptyList()
         }
 
 
@@ -66,7 +63,7 @@ class GoogleMapService(
         }
 
         return googleResponse?.places?.map {
-            PlaceDto.Simple.from(it)
+            PlaceDto.Simple.fromGoogle(it)
         } ?: emptyList()
     }
 }
