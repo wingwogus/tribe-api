@@ -9,11 +9,9 @@ import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.itinerary.repository.WishlistItemRepository
-import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.EntityNotFoundException
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -32,7 +30,7 @@ class WishlistService(
     // 위시리스트에 장소 추가
     fun addWishList(
         tripId : Long,
-        placeDto : WishlistDto.WishListAddRequest
+        request : WishlistDto.WishListAddRequest
         ) : WishlistDto.WishlistItemDto {
 
         val memberId = SecurityUtil.getCurrentMemberId()
@@ -40,21 +38,21 @@ class WishlistService(
         val trip = tripRepository.findByIdOrNull(tripId) ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
         val tripMember = tripMemberRepository.findByTripAndMember(trip, member) ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
 
-        val placeEntity = placeRepository.findByExternalPlaceId(placeDto.placeId)
+        val place = placeRepository.findByExternalPlaceId(request.externalPlaceId)
             ?: run {
                 val newPlace = Place(
-                    externalPlaceId = placeDto.placeId,
-                    name = placeDto.placeName,
-                    address = placeDto.address,
-                    latitude = placeDto.latitude,
-                    longitude = placeDto.longitude
+                    externalPlaceId = request.externalPlaceId,
+                    name = request.placeName,
+                    address = request.address,
+                    latitude = request.latitude,
+                    longitude = request.longitude
                 )
                 placeRepository.save(newPlace)
             }
 
         val wishlistItem = WishlistItem(
             trip = trip,
-            place = placeEntity,
+            place = place,
             adder = tripMember
         )
         val savedWishlistItem = wishlistItemRepository.save(wishlistItem)
