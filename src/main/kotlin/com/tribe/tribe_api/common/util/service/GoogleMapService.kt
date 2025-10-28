@@ -58,7 +58,7 @@ class GoogleMapService(
 
         if (!googleResponse?.places.isNullOrEmpty()) {
             val searchKey = "$query-$region-$language"
-            redisService.setGoogleApiData(searchKey, googleResponse)
+            redisService.setGoogleApiData(searchKey, googleResponse!!)
         }
 
         return googleResponse?.places?.map {

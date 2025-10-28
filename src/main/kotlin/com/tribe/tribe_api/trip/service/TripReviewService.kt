@@ -14,7 +14,6 @@ import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripReview
 import com.tribe.tribe_api.trip.repository.TripRepository
 import com.tribe.tribe_api.trip.repository.TripReviewRepository
-import lombok.extern.slf4j.Slf4j
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.security.access.prepost.PreAuthorize
@@ -24,7 +23,6 @@ import java.math.BigDecimal
 
 @Service
 @Transactional
-@Slf4j
 class TripReviewService(
     private val tripRepository: TripRepository,
     private val tripReviewRepository: TripReviewRepository,
@@ -51,12 +49,12 @@ class TripReviewService(
         val review = TripReview(trip, request.concept, reviewContent)
 
         // aiFeedback 장소 추출 후 저장된 Place 객체들
-        val parsedPlace = parseAndRetrievePlaces(placePart,trip.country.code)
+        val parsedPlaces = parseAndRetrievePlaces(placePart,trip.country.code)
 
         tripReviewRepository.save(review)
 
         // 추천 장소로 변환 후 저장
-        parsedPlace.forEach{
+        parsedPlaces.forEach{
             recommendedPlaceRepository.save(
                 RecommendedPlace.from(it, review)
             )
