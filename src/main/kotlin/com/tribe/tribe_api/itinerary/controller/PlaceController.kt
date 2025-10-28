@@ -1,8 +1,8 @@
 package com.tribe.tribe_api.itinerary.controller
 
 import com.tribe.tribe_api.common.util.ApiResponse
+import com.tribe.tribe_api.common.util.service.GoogleMapService
 import com.tribe.tribe_api.itinerary.dto.PlaceDto
-import com.tribe.tribe_api.itinerary.service.GoogleMapService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping

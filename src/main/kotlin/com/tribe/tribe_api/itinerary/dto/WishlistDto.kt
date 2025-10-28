@@ -30,17 +30,11 @@ object WishlistDto {
     }
 
     data class WishListAddRequest(
-        val placeId: String,
+        val externalPlaceId: String,
         val placeName: String,
         val address: String,
         val latitude: BigDecimal,
         val longitude: BigDecimal
-    )
-
-    data class WishListAddResponse(
-        val placeId: String,
-        val placeName: String,
-        val address: String
     )
 
     data class WishlistSearchResponse(
