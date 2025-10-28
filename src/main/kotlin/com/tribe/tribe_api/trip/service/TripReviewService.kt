@@ -3,11 +3,11 @@ package com.tribe.tribe_api.trip.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
+import com.tribe.tribe_api.common.util.service.GoogleMapService
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.RecommendedPlace
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.itinerary.repository.RecommendedPlaceRepository
-import com.tribe.tribe_api.itinerary.service.GoogleMapService
 import com.tribe.tribe_api.trip.dto.TripReviewRequest
 import com.tribe.tribe_api.trip.dto.TripReviewResponse
 import com.tribe.tribe_api.trip.entity.Trip

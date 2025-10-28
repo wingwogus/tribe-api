@@ -1,7 +1,6 @@
-package com.tribe.tribe_api.itinerary.service
+package com.tribe.tribe_api.common.util.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.tribe.tribe_api.common.util.service.RedisService
 import com.tribe.tribe_api.itinerary.dto.GoogleDto
 import com.tribe.tribe_api.itinerary.dto.PlaceDto
 import org.slf4j.LoggerFactory
@@ -59,7 +58,7 @@ class GoogleMapService(
 
         if (!googleResponse?.places.isNullOrEmpty()) {
             val searchKey = "$query-$region-$language"
-            redisService.setGoogleApiData(searchKey, googleResponse!!)
+            redisService.setGoogleApiData(searchKey, googleResponse)
         }
 
         return googleResponse?.places?.map {
