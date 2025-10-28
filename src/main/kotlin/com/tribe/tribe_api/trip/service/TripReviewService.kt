@@ -66,6 +66,7 @@ class TripReviewService(
         return TripReviewResponse.ReviewDetail.from(review)
     }
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun getAllReviews(tripId: Long, pageable: Pageable): Page<TripReviewResponse.SimpleReviewInfo> {
         return tripReviewRepository.findTripReviewsByTripId(tripId, pageable)
             .map { TripReviewResponse.SimpleReviewInfo.from(it) }
