@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.common.exception
 
 import com.tribe.tribe_api.common.util.ApiResponse
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
@@ -11,12 +12,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
+    val logger = LoggerFactory.getLogger(javaClass)
+
     // Java의 BusinessException.class -> Kotlin의 BusinessException::class
     // 반환 타입을 명시적으로 선언합니다: ResponseEntity<ApiResponse<Unit>>
     @ExceptionHandler(BusinessException::class)
     fun handleBusiness(ex: BusinessException): ResponseEntity<ApiResponse<Unit>> {
         val status = ex.errorCode.status
         val body = ApiResponse.error<Unit>(ex.errorCode.message)
+        logger.error(ex.errorCode.message, body)
         return ResponseEntity.status(status).body(body)
     }
 
