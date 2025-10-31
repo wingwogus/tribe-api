@@ -31,21 +31,18 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 @SpringBootTest
-@Transactional // 각 테스트가 끝난 후 롤백
+@Transactional
 class CategoryServiceIntegrationTest @Autowired constructor(
-    // 테스트 대상 서비스
     private val categoryService: CategoryService,
 
-    // 데이터 준비에 필요한 실제 리포지토리 주입
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
     private val tripRepository: TripRepository,
     private val tripMemberRepository: TripMemberRepository,
     private val categoryRepository: CategoryRepository
 ) {
-    // 테스트에서 사용할 공용 데이터
     private lateinit var member1: Member
-    private lateinit var nonMember: Member // 여행에 속하지 않은 멤버
+    private lateinit var nonMember: Member
     private lateinit var trip: Trip
     private lateinit var category1_day1: Category
     private lateinit var category2_day1: Category
@@ -55,7 +52,6 @@ class CategoryServiceIntegrationTest @Autowired constructor(
 
     @BeforeEach
     fun setUp() {
-        // 1. 사용자 2명 생성 (여행 멤버, 비-멤버)
         member1 = memberRepository.save(
             Member(
                 "member1@test.com", passwordEncoder.encode("pw"), "멤버1",
@@ -70,14 +66,10 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             )
         )
 
-        // 2. 여행 데이터 생성 및 멤버1을 OWNER로 추가
         trip = Trip("테스트 여행", LocalDate.now(), LocalDate.now().plusDays(5), Country.JAPAN)
-        // (중요) Trip과 TripMember의 연관관계 편의 메서드가 Trip 엔티티에 있다고 가정
-        // trip.addMember(member1, TripRole.OWNER)
-        // tripRepository.save(trip)
 
         // 연관관계 메서드가 없다면, TripMember를 직접 저장
-        tripRepository.save(trip) // trip의 id가 먼저 생성되어야 함
+        tripRepository.save(trip)
         tripMemberRepository.save(TripMember(member1, trip, null, TripRole.OWNER))
 
         // 3. 카테고리 5개 생성 (엔티티 생성자 순서 준수)
@@ -87,9 +79,8 @@ class CategoryServiceIntegrationTest @Autowired constructor(
         category4_day2 = categoryRepository.save(Category(trip, 2, "관광 (Day 2)", 2))
     }
 
-    // 예제에서 가져온 인증 헬퍼 메서드
     private fun setAuthentication(member: Member) {
-        val userDetails = CustomUserDetails(member) // CustomUserDetails 구현 필요
+        val userDetails = CustomUserDetails(member)
         val authentication = UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
         SecurityContextHolder.getContext().authentication = authentication
     }
@@ -101,7 +92,6 @@ class CategoryServiceIntegrationTest @Autowired constructor(
         @DisplayName("성공")
         fun createCategory_success() {
             // given
-            // (참고: createCategory는 서비스 코드상 권한 검사가 없음)
             setAuthentication(member1)
             val request = CategoryDto.CreateRequest(name = "새 카테고리", day = 3, order = 1)
 
@@ -113,7 +103,6 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             assertThat(response.name).isEqualTo("새 카테고리")
             assertThat(response.day).isEqualTo(3)
 
-            // DB에서 직접 확인
             val foundCategory = categoryRepository.findById(response.categoryId).get()
             assertThat(foundCategory.trip.id).isEqualTo(trip.id)
         }
@@ -201,9 +190,8 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             assertThat(response.name).isEqualTo("수정된 숙소")
             assertThat(response.day).isEqualTo(2)
             assertThat(response.memo).isEqualTo("메모 변경")
-            assertThat(response.order).isEqualTo(category1_day1.order) // order는 null이라 안 바뀜
+            assertThat(response.order).isEqualTo(category1_day1.order)
 
-            // DB에서 직접 확인
             val updatedCategory = categoryRepository.findById(categoryId).get()
             assertThat(updatedCategory.name).isEqualTo("수정된 숙소")
         }
@@ -212,7 +200,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
         @DisplayName("실패 - 여행 멤버가 아님")
         fun updateCategory_fail_notATripMember() {
             // given
-            setAuthentication(nonMember) // 비멤버로 인증
+            setAuthentication(nonMember)
             val categoryId = category1_day1.id!!
             val request = CategoryDto.UpdateRequest(name = "해킹 시도")
 
@@ -337,11 +325,9 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             )
 
             // when & then
-            // 요청한 items 개수(2)와 DB에서 'day=1'로 찾은 개수(1)가 다르므로 실패
             val exception = assertThrows<BusinessException> {
                 categoryService.orderUpdateCategory(trip.id!!, 1, request)
             }
-            // 서비스 코드에서 CATEGORY_NOT_FOUND로 처리하기로 했음
             assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_NOT_FOUND)
         }
     }
