@@ -37,18 +37,24 @@ class SettlementService(
             )
         }
 
-        val memberSummaries = trip.members.map { member ->
+        // 1. 멤버별 일별 PaidAmount와 AssignedAmount를 한 번에 계산
+        val memberCalcData = trip.members.map { member ->
             val paidAmount = dailyExpenses
                 .filter { it.payer.id == member.id }
                 .sumOf { it.totalAmount }
 
-            //  1/N 계산 대신 저장된 amount를 직접 합산하도록 변경
             val assignedAmount = dailyExpenses
                 .flatMap { it.expenseItems }
                 .flatMap { it.assignments }
                 .filter { it.tripMember.id == member.id }
                 .sumOf { it.amount }
 
+            // Triple: (TripMember, PaidAmount, AssignedAmount)
+            Triple(member, paidAmount, assignedAmount)
+        }
+
+        // 2. Member Summary DTO 생성
+        val memberSummaries = memberCalcData.map { (member, paidAmount, assignedAmount) ->
             SettlementDto.MemberDailySummary(
                 memberId = member.id!!,
                 memberName = member.name,
@@ -57,6 +63,17 @@ class SettlementService(
             )
         }
 
+        // 3. Debt Relation 계산을 위한 잔액(Balance) 목록 생성 (Pair: TripMember, Balance)
+        val memberBalances = memberCalcData.map { (member, paidAmount, assignedAmount) ->
+            // Balance: paidAmount - assignedAmount (양수: 받을 돈, 음수: 갚을 돈)
+            val balance = paidAmount.subtract(assignedAmount)
+            Pair(member, balance)
+        }
+
+        // 4. 일별 최소 송금 관계 계산
+        val debtRelations = calculateDebtRelations(memberBalances)
+
+        // 5. 유효성 검사 (총 지출액과 총 분배액의 일치 여부 확인)
         val totalAssigned = memberSummaries.sumOf { it.assignedAmount }
         if (dailyTotalAmount.compareTo(totalAssigned) != 0) {
             log.error(
@@ -69,7 +86,8 @@ class SettlementService(
             date = date,
             dailyTotalAmount = dailyTotalAmount,
             expenses = expenseSummaries,
-            memberSummaries = memberSummaries
+            memberSummaries = memberSummaries,
+            debtRelations = debtRelations // 추가된 필드
         )
     }
 
@@ -113,10 +131,27 @@ class SettlementService(
         return SettlementDto.TotalResponse(memberBalanceDtos, debtRelations)
     }
 
+    /**
+     * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
+     * BigDecimal 연산만 사용하여 정밀도 문제를 방지합니다.
+     * @param balances Pair(TripMember, Balance) 리스트. Balance는 Paid - Assigned
+     * @return 최소 송금 관계 리스트 (DebtRelation)
+     */
     private fun calculateDebtRelations(balances: List<Pair<TripMember, BigDecimal>>): List<SettlementDto.DebtRelation> {
-        val debtors = balances.filter { it.second < BigDecimal.ZERO }.toMutableList()
-        val creditors = balances.filter { it.second > BigDecimal.ZERO }.toMutableList()
+        // 잔액이 0.01 이상인 멤버만 필터링
+        val cleanBalances = balances
+            .filter { it.second.abs().compareTo(BigDecimal("0.01")) >= 0 } // 0.01 미만은 무시
+            .sortedBy { it.second } // 오름차순 정렬: 음수(채무자) -> 양수(채권자) 순
+
+        // 채무자(Debtor): 잔액이 음수인 멤버 (갚아야 할 돈)
+        val debtors = cleanBalances.filter { it.second.signum() < 0 }.toMutableList()
+        // 채권자(Creditor): 잔액이 양수인 멤버 (받아야 할 돈)
+        val creditors = cleanBalances.filter { it.second.signum() > 0 }.toMutableList()
+
         val relations = mutableListOf<SettlementDto.DebtRelation>()
+
+        // 0.01 미만 비교용 상수
+        val epsilon = BigDecimal("0.01")
 
         while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
             val debtorPair = debtors.first()
@@ -127,7 +162,8 @@ class SettlementService(
             val creditor = creditorPair.first
             var creditorBalance = creditorPair.second
 
-            val transferAmount = minOf(abs(debtorBalance.toDouble()), creditorBalance.toDouble()).toBigDecimal()
+            // 송금액: 채무액(음수 잔액의 절댓값)과 채권액 중 작은 값. BigDecimal.min() 사용
+            val transferAmount = debtorBalance.abs().min(creditorBalance)
 
             relations.add(
                 SettlementDto.DebtRelation(
@@ -139,16 +175,20 @@ class SettlementService(
                 )
             )
 
+            // 잔액 업데이트
+            // 채무자는 갚았으므로 잔액이 0에 가까워짐 (음수 -> 0)
             debtorBalance += transferAmount
+            // 채권자는 받았으므로 잔액이 0에 가까워짐 (양수 -> 0)
             creditorBalance -= transferAmount
 
-            if (debtorBalance.abs() < BigDecimal("0.01")) {
+            // 0.01 미만이면 정산 완료로 간주하여 리스트에서 제거 (BigDecimal 비교)
+            if (debtorBalance.abs().compareTo(epsilon) < 0) {
                 debtors.removeAt(0)
             } else {
                 debtors[0] = debtor to debtorBalance
             }
 
-            if (creditorBalance.abs() < BigDecimal("0.01")) {
+            if (creditorBalance.abs().compareTo(epsilon) < 0) {
                 creditors.removeAt(0)
             } else {
                 creditors[0] = creditor to creditorBalance

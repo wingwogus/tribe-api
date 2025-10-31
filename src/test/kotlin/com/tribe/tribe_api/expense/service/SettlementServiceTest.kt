@@ -108,6 +108,7 @@ class SettlementServiceIntegrationTest @Autowired constructor(
         val response = settlementService.getDailySettlement(trip.id!!, paymentDate)
 
         // then
+        // 1. 기본 정보 및 멤버 요약 검증 (기존 로직)
         assertThat(response.date).isEqualTo(paymentDate)
         assertThat(response.dailyTotalAmount).isEqualByComparingTo(BigDecimal(42000))
         assertThat(response.expenses).hasSize(2)
@@ -116,14 +117,31 @@ class SettlementServiceIntegrationTest @Autowired constructor(
         val summaryB = response.memberSummaries.first { it.memberName == "정산맨B" }
         val summaryC = response.memberSummaries.first { it.memberName == "게스트C" }
 
+        // Paid/Assigned 금액 검증
         assertThat(summaryA.paidAmount).isEqualByComparingTo(BigDecimal(30000))
-        assertThat(summaryA.assignedAmount).isEqualByComparingTo(BigDecimal(19000))
+        assertThat(summaryA.assignedAmount).isEqualByComparingTo(BigDecimal(19000)) // 잔액: +11000
 
         assertThat(summaryB.paidAmount).isEqualByComparingTo(BigDecimal(12000))
-        assertThat(summaryB.assignedAmount).isEqualByComparingTo(BigDecimal(19000))
+        assertThat(summaryB.assignedAmount).isEqualByComparingTo(BigDecimal(19000)) // 잔액: -7000
 
         assertThat(summaryC.paidAmount).isEqualByComparingTo(BigDecimal.ZERO)
-        assertThat(summaryC.assignedAmount).isEqualByComparingTo(BigDecimal(4000))
+        assertThat(summaryC.assignedAmount).isEqualByComparingTo(BigDecimal(4000)) // 잔액: -4000
+
+        // 2. 최소 송금 관계(debtRelations) 검증 (추가된 로직)
+        assertThat(response.debtRelations).hasSize(2)
+
+        // 정산맨B (채무자 -7000) -> 정산맨A (채권자 +11000)
+        val debtBtoA = response.debtRelations.first { it.fromNickname == "정산맨B" }
+        // 게스트C (채무자 -4000) -> 정산맨A (채권자 +4000)
+        val debtCtoA = response.debtRelations.first { it.fromNickname == "게스트C" }
+
+        // 정산맨B -> 정산맨A : 7,000
+        assertThat(debtBtoA.toNickname).isEqualTo("정산맨A")
+        assertThat(debtBtoA.amount.toInt()).isEqualTo(7000)
+
+        // 게스트C -> 정산맨A : 4,000
+        assertThat(debtCtoA.toNickname).isEqualTo("정산맨A")
+        assertThat(debtCtoA.amount.toInt()).isEqualTo(4000)
     }
 
     @Test

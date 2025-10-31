@@ -9,7 +9,8 @@ object SettlementDto {
         val date: LocalDate,
         val dailyTotalAmount: BigDecimal,
         val expenses: List<DailyExpenseSummary>,
-        val memberSummaries: List<MemberDailySummary>
+        val memberSummaries: List<MemberDailySummary>,
+        val debtRelations: List<DebtRelation> // DailyResponse에 추가
     )
 
     data class DailyExpenseSummary(
