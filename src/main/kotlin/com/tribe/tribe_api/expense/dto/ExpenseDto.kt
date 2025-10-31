@@ -63,7 +63,6 @@ object ExpenseDto {
         val itemName: String,
 
         @field:NotNull(message = "항목 가격은 필수입니다.")
-        @field:PositiveOrZero(message = "항목 가격은 0 또는 양수여야 합니다.")
         val price: BigDecimal
     )
 
