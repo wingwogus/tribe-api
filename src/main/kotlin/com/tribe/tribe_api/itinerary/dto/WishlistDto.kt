@@ -12,18 +12,26 @@ object WishlistDto {
         val name: String,
         val address: String?,
         val latitude: BigDecimal,
-        val longitude: BigDecimal
+        val longitude: BigDecimal,
+        val adderTripMemberId: Long,
+        val adderName: String
     ) {
         companion object {
             fun from(entity: WishlistItem): WishlistItemDto {
-                val place = entity.place // 가독성을 위해 Place 엔티티를 변수로 추출
+                val place = entity.place
+                val adder = entity.adder
+                val displayName = adder.member?.nickname
+                    ?: adder.guestNickname
+                    ?: "알 수 없는 사용자"
                 return WishlistItemDto(
                     wishlistItemId = entity.id!!,
                     placeId = place.id!!,
                     name = place.name,
                     address = place.address,
                     latitude = place.latitude,
-                    longitude = place.longitude
+                    longitude = place.longitude,
+                    adderTripMemberId = adder.id!!,
+                    adderName = displayName
                 )
             }
         }
@@ -32,7 +40,7 @@ object WishlistDto {
     data class WishListAddRequest(
         val externalPlaceId: String,
         val placeName: String,
-        val address: String,
+        val address: String?,
         val latitude: BigDecimal,
         val longitude: BigDecimal
     )
