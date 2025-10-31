@@ -52,7 +52,20 @@ class WishlistController(
         @PathVariable tripId: Long,
         @RequestBody request: WishlistDto.WishlistDeleteRequest
     ): ResponseEntity<ApiResponse<Unit>> {
-        wishlistService.deleteWishlistItems(request.wishlistItemIds)
+        wishlistService.deleteWishlistItems(tripId,request.wishlistItemIds)
         return ResponseEntity.ok(ApiResponse.success("선택한 항목이 삭제되었습니다.", null))
+    }
+
+    /**
+     * 위시리스트내에서 장소 검색
+     */
+    @GetMapping("/search")
+    fun searchWishlist(
+        @PathVariable tripId: Long,
+        @RequestParam query: String,
+        pageable: Pageable
+    ): ResponseEntity<ApiResponse<WishlistDto.WishlistSearchResponse>> {
+        val response = wishlistService.searchWishList(tripId, query, pageable)
+        return ResponseEntity.ok(ApiResponse.success(response))
     }
 }
