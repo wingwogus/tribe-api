@@ -61,7 +61,7 @@ class CategoryController(
         @PathVariable categoryId: Long,
         @RequestBody request: CategoryDto.UpdateRequest
     ): ResponseEntity<ApiResponse<CategoryDto.CategoryResponse>> {
-        val response = categoryService.updateCategory(categoryId,request)
+        val response = categoryService.updateCategory(tripId,categoryId,request)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
