@@ -55,6 +55,7 @@ class CategoryService (
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun updateCategory(
         categoryId: Long,
+        tripId: Long,
         request: CategoryDto.UpdateRequest
     ): CategoryDto.CategoryResponse {
 
