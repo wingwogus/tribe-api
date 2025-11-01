@@ -33,4 +33,8 @@ class Category(
 
     @OneToMany(mappedBy = "category", cascade = [CascadeType.ALL], orphanRemoval = true)
     var itineraryItems: MutableList<ItineraryItem> = mutableListOf()
+
+    fun updateOrder(newOrder: Int) {
+        this.order = newOrder
+    }
 }

@@ -8,15 +8,44 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface WishlistItemRepository : JpaRepository<WishlistItem, Long>{
-    // 전체 조회를 위한 페이지네이션 메서드 (Page 반환)
-    fun findAllByTrip_Id(tripId: Long, pageable: Pageable): Page<WishlistItem>
+    /**
+     * 위시리스트 전체 조회 (getWishList)
+     * N+1 방지를 위해 place, adder, adder.member를 fetch join
+     */
+    @Query(
+        value = """
+            SELECT wi FROM WishlistItem wi
+            JOIN FETCH wi.place p
+            JOIN FETCH wi.adder a
+            LEFT JOIN FETCH a.member m
+            WHERE wi.trip.id = :tripId
+        """,
+        countQuery = "SELECT COUNT(wi) FROM WishlistItem wi WHERE wi.trip.id = :tripId"
+    )
+    fun findAllByTrip_Id(@Param("tripId") tripId: Long, pageable: Pageable): Page<WishlistItem>
     // 검색 조회를 위한 페이지네이션 메서드
+    // N+1 방지 위해 place, adder, adder.member를 fetch join
+    @Query(
+        value = """
+            SELECT wi FROM WishlistItem wi
+            JOIN FETCH wi.place p
+            JOIN FETCH wi.adder a
+            LEFT JOIN FETCH a.member m
+            WHERE wi.trip.id = :tripId AND LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%'))
+        """,
+        countQuery = """
+            SELECT COUNT(wi) FROM WishlistItem wi
+            JOIN wi.place p
+            WHERE wi.trip.id = :tripId AND LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%'))
+        """
+    )
     fun findAllByTrip_IdAndPlace_NameContainingIgnoreCase(
-        tripId: Long,
-        query: String,
+        @Param("tripId") tripId: Long,
+        @Param("query") query: String,
         pageable: Pageable
     ): Page<WishlistItem>
+    fun existsByTrip_IdAndPlace_ExternalPlaceId(tripId: Long, externalPlaceId: String): Boolean
 
-    @Query("SELECT wi.id FROM WishlistItem wi WHERE wi.id IN :ids")
-    fun findExistingIds(@Param("ids") ids: List<Long>): List<Long>
+    @Query("SELECT w.id FROM WishlistItem w WHERE w.trip.id = :tripId AND w.id IN :ids")
+    fun findIdsByTripIdAndIdIn(@Param("tripId") tripId: Long, @Param("ids") ids: List<Long>): List<Long>
 }
