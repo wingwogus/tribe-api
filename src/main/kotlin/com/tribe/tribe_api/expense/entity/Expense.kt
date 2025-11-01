@@ -37,7 +37,11 @@ class Expense(
     @Column(name = "receipt_image_url", nullable = true)
     var receiptImageUrl: String? = null,
 
-) : BaseTimeEntity() {
+    // 통화 정보 필드 추가
+    @Column(name = "currency", nullable = true)
+    var currency: String? = null,
+
+    ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "expense_id")

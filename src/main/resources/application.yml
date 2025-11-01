@@ -9,6 +9,10 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  cloud: # Spring Cloud 설정 블록 추가
+    compatibility-verifier:
+      enabled: false
+
   data:
     redis:
       host: ${REDIS_HOST}
@@ -77,6 +81,15 @@ gemini:
     key: ${GEMINI_API_KEY} # 환경변수에서 API 키를 가져옵니다.
     url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
+key:
+  exchange-rate:
+    key: ${EXCHANGE_RATE_API_KEY}
+
+exchange:
+  rate:
+    api-url: https://www.koreaexim.go.kr/site/program/financial/exchangeJSON?data=AP01
+
+
 server:
   port: 8083
 
@@ -85,4 +98,5 @@ app:
 
 cloudinary:
   url: ${CLOUDINARY_URL}
+
 

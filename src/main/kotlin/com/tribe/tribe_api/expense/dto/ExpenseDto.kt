@@ -27,6 +27,10 @@ object ExpenseDto {
         @field:NotBlank(message = "입력 방식은 필수입니다.")
         val inputMethod: String,
 
+        // 통화 필드 추가 (USD, JPY 등)
+        @field:NotBlank(message = "통화 정보는 필수입니다.")
+        val currency: String,
+
         @field:Valid
         val items: List<ItemCreate> = emptyList()
     )

@@ -55,14 +55,12 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     private val categoryRepository: CategoryRepository,
     private val itineraryItemRepository: ItineraryItemRepository,
     private val objectMapper: ObjectMapper,
-    // [수정] MockkBean이 아닌 실제 TripSecurityService를 주입받습니다.
     private val tripSecurityService: TripSecurityService
 ){
     @MockkBean
     private lateinit var geminiApiClient: GeminiApiClient
     @MockkBean
     private lateinit var cloudinaryUploadService: CloudinaryUploadService
-    // [수정] TripSecurityService에 대한 MockkBean 선언을 제거합니다.
 
     private lateinit var owner: Member
     private lateinit var member1: Member
@@ -102,8 +100,8 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("지출 생성 성공 - 수기 입력(HANDWRITE)")
-    fun createExpense_Success_Handwrite() {
+    @DisplayName("지출 생성 성공 - 수기 입력(HANDWRITE) 및 통화 저장")
+    fun createExpense_Success_Handwrite_And_SaveCurrency() {
         // given: 여행 멤버인 '방장'으로 로그인
         setAuthentication(owner)
         val request = ExpenseDto.CreateRequest(
@@ -113,23 +111,26 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = ownerTripMember.id!!,
             inputMethod = "HANDWRITE",
+            currency = "JPY", // 💡 JPY 통화 코드 추가
             items = listOf(
                 ExpenseDto.ItemCreate("라멘", BigDecimal("20000")),
                 ExpenseDto.ItemCreate("맥주", BigDecimal("30000"))
             )
         )
 
-        // when: 실제 보안 검증 로직을 거쳐 서비스 호출
+        // when: 서비스 호출
         val response = expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, null)
 
         // then: 성공적으로 생성됨
+        val savedExpense = expenseRepository.findById(response.expenseId).get()
         assertThat(response.expenseTitle).isEqualTo("저녁 식사")
         assertThat(response.totalAmount).isEqualByComparingTo("50000")
+        assertThat(savedExpense.currency).isEqualTo("JPY") // 💡 통화 코드 검증 성공
     }
 
     @Test
-    @DisplayName("지출 생성 성공 - 영수증 스캔(SCAN)")
-    fun createExpense_Success_Scan() {
+    @DisplayName("지출 생성 성공 - 영수증 스캔(SCAN) 및 통화 저장")
+    fun createExpense_Success_Scan_And_SaveCurrency() {
         // given: '멤버1'이 로그인하고 영수증 이미지 파일과 함께 요청
         setAuthentication(member1)
         val imageFile = MockMultipartFile("image", "receipt.jpg", "image/jpeg", "test image data".toByteArray())
@@ -140,6 +141,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = member1TripMember.id!!,
             inputMethod = "SCAN",
+            currency = "USD", // 💡 USD 통화 코드 추가
             items = emptyList()
         )
 
@@ -165,6 +167,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         assertThat(savedExpense.expenseItems).hasSize(2)
         assertThat(savedExpense.expenseItems.first { it.name == "과자" }.price).isEqualByComparingTo("700")
         assertThat(savedExpense.expenseItems.first { it.name == "음료수" }.price).isEqualByComparingTo("300")
+        assertThat(savedExpense.currency).isEqualTo("USD") // 💡 통화 코드 검증 성공
     }
 
     @Test
@@ -172,7 +175,10 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     fun updateExpense_Success() {
         // given: 여행 멤버인 '방장'으로 로그인
         setAuthentication(owner)
+        // Helper 함수가 기본적으로 KRW를 사용한다고 가정
         val expenseResponse = createTestExpense(BigDecimal("30000"))
+
+        // Note: 현재 updateRequest에는 currency 필드가 없으므로, 통화 코드는 변경되지 않음 (기존 KRW 유지)
         val updateRequest = ExpenseDto.UpdateRequest(
             expenseTitle = "수정된 지출",
             totalAmount = BigDecimal("40000"),
@@ -251,8 +257,6 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     // 테스트용 헬퍼 메서드
     private fun createTestExpense(totalAmount: BigDecimal = BigDecimal("15000")): ExpenseDto.CreateResponse {
         // 헬퍼 메서드는 테스트의 일부이므로, 여기서도 실제 보안 검증을 통과해야 함
-        // createTestExpense를 호출하기 전에 setAuthentication이 먼저 호출되므로,
-        // 이 메서드는 항상 권한이 있는 상태에서 실행됨.
         val request = ExpenseDto.CreateRequest(
             tripId = trip.id!!,
             expenseTitle = "테스트 지출",
@@ -260,6 +264,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = ownerTripMember.id!!,
             inputMethod = "HANDWRITE",
+            currency = "KRW", // 💡 통화 코드 기본값 설정
             items = listOf(ExpenseDto.ItemCreate("테스트 아이템", totalAmount))
         )
         return expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, null)
