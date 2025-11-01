@@ -3,6 +3,7 @@ package com.tribe.tribe_api.expense.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.expense.dto.SettlementDto
+import com.tribe.tribe_api.expense.dto.SettlementDto.MemberSettlementData
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.exchange.repository.CurrencyRepository
@@ -63,7 +64,9 @@ class SettlementService(
                 expenseId = expense.id!!,
                 title = expense.title,
                 payerName = expense.payer.name,
-                totalAmount = convertToKrw(expense.totalAmount, expense)
+                totalAmount = convertToKrw(expense.totalAmount, expense), // KRW 금액
+                originalAmount = expense.totalAmount,                      // 원본 금액
+                currencyCode = expense.currency ?: KRW                     // 통화 코드
             )
         }
 
@@ -84,25 +87,38 @@ class SettlementService(
                     convertToKrw(assignment.amount, expense)
                 }
 
-            // Triple: (TripMember, PaidAmount_KRW, AssignedAmount_KRW)
-            Triple(member, paidAmountKrw, assignedAmountKrw)
+            // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
+            val foreignCurrencies = dailyExpenses
+                .filter { expense ->
+                    val isPayer = expense.payer.id == member.id
+                    val isAssignee = expense.expenseItems
+                        .flatMap { it.assignments }
+                        .any { it.tripMember.id == member.id }
+                    isPayer || isAssignee
+                }
+                .mapNotNull { it.currency }
+                .filter { it != KRW }
+                .distinct()
+                .toList()
+
+            MemberSettlementData(member, paidAmountKrw, assignedAmountKrw, foreignCurrencies)
         }
 
         // 2. Member Summary DTO 생성
-        val memberSummaries = memberCalcData.map { (member, paidAmount, assignedAmount) ->
+        val memberSummaries = memberCalcData.map { data ->
             SettlementDto.MemberDailySummary(
-                memberId = member.id!!,
-                memberName = member.name,
-                paidAmount = paidAmount,
-                assignedAmount = assignedAmount
+                memberId = data.member.id!!,
+                memberName = data.member.name,
+                paidAmount = data.paidAmountKrw,
+                assignedAmount = data.assignedAmountKrw
             )
         }
 
         // 3. Debt Relation 계산을 위한 잔액(Balance) 목록 생성
-        val memberBalances = memberCalcData.map { (member, paidAmount, assignedAmount) ->
+        val memberBalances = memberCalcData.map { data ->
             // Balance: paidAmount - assignedAmount (KRW 기준)
-            val balance = paidAmount.subtract(assignedAmount)
-            Pair(member, balance)
+            val balance = data.paidAmountKrw.subtract(data.assignedAmountKrw)
+            Pair(data.member, balance)
         }
 
         // 4. 일별 최소 송금 관계 계산
@@ -136,7 +152,7 @@ class SettlementService(
         // 1. 여행의 모든 지출 내역을 가져옵니다.
         val allExpenses: List<Expense> = expenseRepository.findAllByTripId(tripId)
 
-        // 2. 멤버별 PaidAmount(KRW)와 AssignedAmount(KRW)를 계산합니다.
+        // 2. 멤버별 PaidAmount(KRW), AssignedAmount(KRW), 그리고 사용된 외화를 계산합니다.
         val memberCalcData = trip.members.map { member ->
 
             // Paid Amount (KRW) 합산
@@ -154,28 +170,40 @@ class SettlementService(
                     convertToKrw(assignment.amount, expense)
                 }
 
-            // Triple: (TripMember, PaidAmount_KRW, AssignedAmount_KRW)
-            Triple(member, paidAmountKrw, assignedAmountKrw)
+            // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
+            val foreignCurrencies = allExpenses
+                .filter { expense ->
+                    val isPayer = expense.payer.id == member.id
+                    val isAssignee = expense.expenseItems
+                        .flatMap { it.assignments }
+                        .any { it.tripMember.id == member.id }
+                    isPayer || isAssignee
+                }
+                .mapNotNull { it.currency }
+                .filter { it != KRW }
+                .distinct()
+                .toList()
+
+            MemberSettlementData(member, paidAmountKrw, assignedAmountKrw, foreignCurrencies)
         }
 
         // 3. 잔액(Balance) 목록 생성 (KRW 기준)
-        val memberBalances = memberCalcData.map { (member, paidAmount, assignedAmount) ->
-            // Balance: paidAmount - assignedAmount (KRW 기준)
-            val balance = paidAmount.subtract(assignedAmount)
-            Pair(member, balance)
+        val memberBalances = memberCalcData.map { data ->
+            val balance = data.paidAmountKrw.subtract(data.assignedAmountKrw)
+            // MemberBalance DTO에 외화 정보와 잔액을 함께 묶음
+            SettlementDto.MemberBalance(
+                tripMemberId = data.member.id!!,
+                nickname = data.member.name,
+                balance = balance,
+                foreignCurrenciesUsed = data.foreignCurrencies
+            ) to Pair(data.member, balance)
         }
 
         // 4. 최소 송금 관계 계산
-        val debtRelations = calculateDebtRelations(memberBalances)
+        val debtRelations = calculateDebtRelations(memberBalances.map { it.second })
 
         // 5. DTO 변환 및 반환
-        val memberBalanceDtos = memberBalances.map { (member, balance) ->
-            SettlementDto.MemberBalance(
-                tripMemberId = member.id!!,
-                nickname = member.name,
-                balance = balance
-            )
-        }
+        val memberBalanceDtos = memberBalances.map { it.first } // MemberBalance DTO만 추출
 
         // 유효성 검사 (총 Paid와 총 Assigned의 합이 0에 가까운지 확인)
         val totalPaidSum = memberBalanceDtos.sumOf { it.balance.max(BigDecimal.ZERO) }
