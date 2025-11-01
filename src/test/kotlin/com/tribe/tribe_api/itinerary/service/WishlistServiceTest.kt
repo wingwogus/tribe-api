@@ -54,7 +54,6 @@ class WishlistServiceTest @Autowired constructor(
 
     @BeforeEach
     fun setUp() {
-        // 기존 데이터 정리 (테스트 격리)
         wishlistItemRepository.deleteAll()
         tripMemberRepository.deleteAll()
         tripRepository.deleteAll()
@@ -182,7 +181,6 @@ class WishlistServiceTest @Autowired constructor(
         @Test
         @DisplayName("실패 - 이미 위시리스트에 존재하는 장소 (중복)")
         fun addWishList_Fail_WhenItemAlreadyExists() {
-            // (내용 동일)
             setAuthentication(member)
             val request = WishlistDto.WishListAddRequest(
                 existingPlace.externalPlaceId,
