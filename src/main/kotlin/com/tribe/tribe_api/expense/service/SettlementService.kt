@@ -40,7 +40,7 @@ class SettlementService(
 
         // 지출일과 통화 코드로 환율 조회
         val currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, expense.paymentDate)
-            ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND) // EXCHANGE_RATE_NOT_FOUND 사용
+            ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
 
         // 금액 * 환율 = KRW 금액
         return amount.multiply(currencyRate.exchangeRate)
@@ -178,7 +178,6 @@ class SettlementService(
         }
 
         // 유효성 검사 (총 Paid와 총 Assigned의 합이 0에 가까운지 확인)
-        // **수정된 부분: maxOf() 대신 BigDecimal.max() 메서드 사용**
         val totalPaidSum = memberBalanceDtos.sumOf { it.balance.max(BigDecimal.ZERO) }
         val totalAssignedSum = memberBalanceDtos.sumOf { it.balance.negate().max(BigDecimal.ZERO) }
 
@@ -194,9 +193,6 @@ class SettlementService(
 
     /**
      * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
-     * BigDecimal 연산만 사용하여 정밀도 문제를 방지합니다.
-     * @param balances Pair(TripMember, Balance) 리스트. Balance는 Paid - Assigned
-     * @return 최소 송금 관계 리스트 (DebtRelation)
      */
     private fun calculateDebtRelations(balances: List<Pair<TripMember, BigDecimal>>): List<SettlementDto.DebtRelation> {
         // 잔액이 0.01 이상인 멤버만 필터링
