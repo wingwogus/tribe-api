@@ -9,7 +9,7 @@ import com.tribe.tribe_api.exchange.repository.CurrencyRepository
 import io.mockk.every
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.BeforeEach // 👈 import 추가
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -36,6 +36,14 @@ class ExchangeRateSchedulerTest @Autowired constructor(
         ExchangeRateDto(1, "JPY(100)", "일본 옌", "925.33"),  // JPY(100) -> 9.2533으로 변환되어야 함
         ExchangeRateDto(1, "CNY", "중국 위안", "185.00") // 무시될 통화
     )
+
+    /**
+     * 각 테스트 실행 전에 DB를 초기화하여 테스트 간의 격리를 보장합니다.
+     */
+    @BeforeEach
+    fun setup() {
+        currencyRepository.deleteAll()
+    }
 
     @Test
     @DisplayName("스케줄러 실행 시 환율 정보가 정확히 DB에 저장되는지 검증")
@@ -78,10 +86,12 @@ class ExchangeRateSchedulerTest @Autowired constructor(
         exchangeRateScheduler.updateCurrency()
 
         // then
+        // 1. DB에 1개의 통화만 저장되었는지 확인 (수정된 핵심 부분)
+        assertThat(currencyRepository.findAll()).hasSize(1)
+
         val savedCurrency = currencyRepository.findByCurUnit("JPY")
         assertThat(savedCurrency).isNotNull()
         assertThat(savedCurrency!!.curUnit).isEqualTo("JPY")
         assertThat(savedCurrency.exchangeRate).isEqualByComparingTo(BigDecimal("9.3109"))
-        assertThat(currencyRepository.findAll()).hasSize(1)
     }
 }

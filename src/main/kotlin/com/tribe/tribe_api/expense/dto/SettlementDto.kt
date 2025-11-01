@@ -57,7 +57,9 @@ object SettlementDto {
         val fromTripMemberId: Long,
         val toNickname: String,
         val toTripMemberId: Long,
-        val amount: BigDecimal // KRW
+        val amount: BigDecimal, // KRW 최종 송금액
+        val equivalentOriginalAmount: BigDecimal? = null, // 추가: 원본 통화 금액
+        val originalCurrencyCode: String? = null
     )
     data class MemberSettlementData(
         val member: TripMember,
