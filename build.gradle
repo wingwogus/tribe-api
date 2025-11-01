@@ -45,8 +45,6 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-	// 테스트 코드(scope = test)에서 사용
-	testImplementation("org.mockito.kotlin:mockito-kotlin:5.3.1")
 
 	// JWT
 	implementation("io.jsonwebtoken:jjwt-api:0.11.5")
@@ -60,6 +58,7 @@ dependencies {
 	// Test
 	testImplementation("io.mockk:mockk:1.13.5")
 	testImplementation("com.ninja-squad:springmockk:4.0.2")
+	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 }
 
 kotlin {
