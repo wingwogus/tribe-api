@@ -8,7 +8,5 @@ interface CategoryRepository: JpaRepository<Category, Long> {
 
     fun findAllByTripIdAndDayOrderByOrderAsc(tripId: Long, day: Int): List<Category>
 
-
-    fun findAllByTripIdAndDayAndIdIn(tripId: Long, day: Int, ids: List<Long>): List<Category>
-    fun findAllByTripIdAndDayIsNullAndIdIn(tripId: Long, ids: List<Long>): List<Category>
+    fun findAllByTripIdAndIdIn(tripId: Long, ids: List<Long>): List<Category>
 }
