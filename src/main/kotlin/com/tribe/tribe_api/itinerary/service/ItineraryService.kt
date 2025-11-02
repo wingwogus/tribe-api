@@ -187,16 +187,13 @@ class ItineraryService(
     ): List<ItineraryResponse.RouteDetails> {
         val itineraryItems = itineraryItemRepository.findByTripIdOrderByCategoryAndOrder(tripId)
 
-        // place가 있는 일정들에게서만 place 추출
-        val placeItems = itineraryItems.filter { it.place != null }
-
         // 일정이 2개보다 적다면 빈 배열 반환
-        if (placeItems.size < 2) {
+        if (itineraryItems.size < 2) {
             return emptyList()
         }
 
-        // placeItems를 순서대로 Pair<originItem, destinationItem> 쌍으로 만들어 순환하며 치환
-        return placeItems.zipWithNext().mapNotNull { (originItem, destinationItem) ->
+        // 일정들를 순서대로 Pair<originItem, destinationItem> 쌍으로 만들어 순환하며 치환
+        return itineraryItems.zipWithNext().mapNotNull { (originItem, destinationItem) ->
             getDirectionBetweenPlaces(
                 originItem.place!!,
                 destinationItem.place!!,

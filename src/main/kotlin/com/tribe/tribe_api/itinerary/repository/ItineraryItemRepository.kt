@@ -15,6 +15,13 @@ interface ItineraryItemRepository : JpaRepository<ItineraryItem, Long> {
     // 특정 카테고리에 속한 아이템의 개수를 세는 메서드
     fun countByCategoryId(categoryId: Long): Int
 
-    @Query("SELECT i FROM ItineraryItem i JOIN i.category c WHERE c.trip.id = :tripId ORDER BY c.day ASC, c.order ASC, i.order ASC")
+    @Query("""
+        SELECT i FROM ItineraryItem i 
+        JOIN i.category c
+        JOIN FETCH i.place p
+        WHERE c.trip.id = :tripId
+        AND p IS NOT NULL
+        ORDER BY c.day ASC, c.order ASC, i.order ASC
+    """)
     fun findByTripIdOrderByCategoryAndOrder(@Param("tripId") tripId: Long): List<ItineraryItem>
 }
