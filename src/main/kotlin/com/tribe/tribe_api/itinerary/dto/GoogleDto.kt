@@ -124,7 +124,7 @@ object GoogleDto {
         @JsonIgnoreProperties(ignoreUnknown = true)
         data class Line(
             @JsonProperty("short_name")
-            val shortName: String, // "6호선", "7716"
+            val shortName: String?, // "6호선", "7716"
 
             val vehicle: Vehicle
         )

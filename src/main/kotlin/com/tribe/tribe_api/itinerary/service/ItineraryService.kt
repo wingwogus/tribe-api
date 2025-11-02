@@ -245,7 +245,7 @@ class ItineraryService(
             // 4. RawTransitDetails -> TransitDetails 변환
             val cleanTransitDetails = rawStep.transitDetails?.let { rawTransit ->
                 ItineraryResponse.RouteDetails.TransitDetails(
-                    lineName = rawTransit.line.shortName,
+                    lineName = rawTransit.line.shortName ?: "이름 없음",
                     vehicleType = rawTransit.line.vehicle.type,
                     vehicleIconUrl = rawTransit.line.vehicle.icon,
                     numStops = rawTransit.numStops,

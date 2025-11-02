@@ -9,7 +9,7 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.util.Locale.getDefault
+import java.util.*
 
 @RestController
 @RequestMapping("/api/v1/trips/{tripId}")
@@ -74,7 +74,7 @@ class ItineraryController(
     ): ResponseEntity<ApiResponse<List<ItineraryResponse.RouteDetails>>> {
         val response = itineraryService.getAllDirectionsForTrip(
             tripId,
-            TravelMode.valueOf(mode.uppercase(getDefault())))
+            TravelMode.valueOf(mode.uppercase(Locale.ROOT)))
         return ResponseEntity.ok(ApiResponse.success("전체 경로 조회 성공", response))
     }
 }

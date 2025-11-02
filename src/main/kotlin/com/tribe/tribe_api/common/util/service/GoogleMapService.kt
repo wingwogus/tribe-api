@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono
 import java.time.Duration
 import java.time.LocalTime
 import java.time.ZoneId
-import java.util.Locale.getDefault
+import java.util.*
 
 @Service
 class GoogleMapService(
@@ -85,7 +85,7 @@ class GoogleMapService(
         travelMode: TravelMode
     ): GoogleDto.DirectionsRawResponse? {
         // 출발지ID:도착지ID:이동방식 으로 키 저장
-        val mode = travelMode.name.lowercase(getDefault())
+        val mode = travelMode.name.lowercase(Locale.ROOT)
 
         val cacheKey = "directions_cache:$originPlaceId:$destinationPlaceId:$mode"
         val cachedData = redisService.getValues(cacheKey)
