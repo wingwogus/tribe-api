@@ -8,7 +8,6 @@ import com.tribe.tribe_api.itinerary.service.ItineraryService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
 import java.util.Locale.getDefault
 
@@ -68,7 +67,6 @@ class ItineraryController(
         return ResponseEntity.ok(ApiResponse.success("일정 순서 변경 성공", response))
     }
 
-    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     @GetMapping("/itineraries/directions/all")
     fun getAllDirections(
         @PathVariable tripId: Long,

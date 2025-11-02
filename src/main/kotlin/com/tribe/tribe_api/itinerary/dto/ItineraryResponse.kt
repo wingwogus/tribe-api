@@ -56,10 +56,8 @@ sealed class ItineraryResponse {
      */
     data class RouteDetails(
         val travelMode: String,
-        val originPlaceName: String,
-        val originExternalPlaceId: String,
-        val destinationPlaceName: String,
-        val destinationExternalPlaceId: String,
+        val originPlace: PlaceDto.Simple,
+        val destinationPlace: PlaceDto.Simple,
         val totalDuration: String,      // 총 시간, 예: "24 mins"
         val totalDistance: String,      // 총 거리, 예: "7.3 km"
 //        val overviewPolyline: String, // 지도 위에 경로선 표시할 수 있는 폴라라인, 예: "erndF..."
@@ -69,10 +67,10 @@ sealed class ItineraryResponse {
          * 경로의 각 단계(Step)를 나타내는 DTO
          */
         data class RouteStep(
-//            val travelMode: String,         // 이동 방식, 예: "WALKING" 또는 "TRANSIT"
+            val travelMode: String,         // 이동 방식, 예: "WALKING" 또는 "TRANSIT"
             val instructions: String,       // 이동 방식 설명, 예: "Walk to Eung-Am" (html_instructions)
-//            val duration: String,           // 스텝 당 걸리는 시간, 예: "2 mins"
-//            val distance: String,           // 스텝 당 거리, 예: "0.1 km"
+            val duration: String,           // 스텝 당 걸리는 시간, 예: "2 mins"
+            val distance: String,           // 스텝 당 거리, 예: "0.1 km"
 
             // 'TRANSIT' 모드일 때만 값이 존재, 'WALKING'일 때는 null
             val transitDetails: TransitDetails?

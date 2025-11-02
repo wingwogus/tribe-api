@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 import java.time.Duration
+import java.time.LocalTime
+import java.time.ZoneId
 import java.util.Locale.getDefault
 
 @Service
@@ -91,7 +93,10 @@ class GoogleMapService(
         // 캐싱 성공 시
         if (cachedData != null) {
             logger.info("Cache HIT for directions: key=$cacheKey")
-            return objectMapper.readValue(cachedData, GoogleDto.DirectionsRawResponse::class.java)
+            return objectMapper.readValue(
+                cachedData,
+                GoogleDto.DirectionsRawResponse::class.java
+            )
         }
 
         // 캐싱 실패 시 Google Map Direction API 요청
@@ -116,9 +121,25 @@ class GoogleMapService(
         val response = responseMono.block()
 
         if (response != null) {
-            // 30일동안 캐시에 저장 -> 구글 자체에서 권장하는 저장 기간
-            redisService.setValues(cacheKey, objectMapper.writeValueAsString(response), Duration.ofDays(30))
-            logger.info("Cached directions response for key=$cacheKey")
+            val duration = when (travelMode) {
+                TravelMode.TRANSIT -> {
+                    val now = LocalTime.now(ZoneId.of("Asia/Seoul"))
+                    val endOfDawn = LocalTime.of(6, 0)
+
+                    if (now.isBefore(endOfDawn)) {
+                        // 새벽 시간 (00:00 ~ 05:59): 오전 6시까지 캐시
+                        Duration.between(now, endOfDawn)
+                    } else {
+                        // 주간 시간 (06:00 ~ 23:59): 자정까지 캐시
+                        Duration.between(now, LocalTime.MAX)
+                    }
+                }
+                else -> Duration.ofDays(30)
+            }
+
+            redisService.setValues(cacheKey, objectMapper.writeValueAsString(response), duration)
+
+            logger.info("Cached directions response for key=$cacheKey for $duration")
         }
 
         return response

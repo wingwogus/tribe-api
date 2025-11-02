@@ -6,6 +6,7 @@ import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GoogleMapService
 import com.tribe.tribe_api.itinerary.dto.ItineraryRequest
 import com.tribe.tribe_api.itinerary.dto.ItineraryResponse
+import com.tribe.tribe_api.itinerary.dto.PlaceDto
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.TravelMode
@@ -255,10 +256,10 @@ class ItineraryService(
 
             // 5. RawStep -> Clean RouteStep 변환
             ItineraryResponse.RouteDetails.RouteStep(
-//                travelMode = rawStep.travelMode,
-                instructions = rawStep.htmlInstructions, // (필요시 HTML 태그 제거 로직 추가)
-//                duration = rawStep.duration.text,
-//                distance = rawStep.distance.text,
+                travelMode = rawStep.travelMode,
+                instructions = rawStep.htmlInstructions.replace(Regex("<[^>]*>"), ""),
+                duration = rawStep.duration.text,
+                distance = rawStep.distance.text,
                 transitDetails = cleanTransitDetails // WALKING 스텝이면 여기가 자동으로 null
             )
         }
@@ -266,10 +267,8 @@ class ItineraryService(
         // 6. 최종 DTO 반환
         return ItineraryResponse.RouteDetails(
             travelMode = mode.toString(),
-            originPlaceName = originPlace.name,
-            originExternalPlaceId = originPlace.externalPlaceId,
-            destinationPlaceName = destinationPlace.name,
-            destinationExternalPlaceId = destinationPlace.externalPlaceId,
+            originPlace = PlaceDto.Simple.from(originPlace),
+            destinationPlace = PlaceDto.Simple.from(destinationPlace),
             totalDuration = leg.duration.text,
             totalDistance = leg.distance.text,
 //            overviewPolyline = route.overviewPolyline.points,
