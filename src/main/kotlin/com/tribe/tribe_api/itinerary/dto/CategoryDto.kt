@@ -1,7 +1,6 @@
 package com.tribe.tribe_api.itinerary.dto
 
 import com.tribe.tribe_api.itinerary.entity.Category
-import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
@@ -22,7 +21,7 @@ object CategoryDto {
         val day: Int,
         val order: Int,
         val tripId: Long,
-        val itineraryItems: List<ItineraryResponse>,
+        val itineraryItems: List<ItineraryResponse.ItineraryDetail>,
         val memo: String?,
         val createdAt: LocalDateTime,
         val updatedAt: LocalDateTime
