@@ -1,7 +1,10 @@
 package com.tribe.tribe_api.itinerary.dto
 
 import com.tribe.tribe_api.itinerary.entity.Category
+import com.tribe.tribe_api.itinerary.entity.ItineraryItem
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import java.time.LocalDateTime
 
 object CategoryDto {
@@ -19,7 +22,7 @@ object CategoryDto {
         val day: Int,
         val order: Int,
         val tripId: Long,
-        val itineraryItems: List<ItineraryResponse.ItineraryDetail>,
+        val itineraryItems: List<ItineraryResponse>,
         val memo: String?,
         val createdAt: LocalDateTime,
         val updatedAt: LocalDateTime
@@ -42,9 +45,23 @@ object CategoryDto {
     }
 
     data class UpdateRequest(
-        val name: String?,
-        val day: Int?,
-        val order: Int?,
-        val memo: String?
+        val name: String? = null,
+        val day: Int? = null,
+        val order: Int? = null,
+        val memo: String? = null
+    )
+
+    data class OrderUpdate(
+        @field:Valid
+        @field:NotNull
+        val items: List<OrderCategory>
+    )
+
+    data class OrderCategory(
+        @field:NotNull
+        val categoryId: Long,
+
+        @field:NotNull
+        val order: Int
     )
 }

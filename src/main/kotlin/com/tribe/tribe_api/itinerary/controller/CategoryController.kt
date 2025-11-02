@@ -61,7 +61,7 @@ class CategoryController(
         @PathVariable categoryId: Long,
         @RequestBody request: CategoryDto.UpdateRequest
     ): ResponseEntity<ApiResponse<CategoryDto.CategoryResponse>> {
-        val response = categoryService.updateCategory(categoryId,request)
+        val response = categoryService.updateCategory(tripId,categoryId,request)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
@@ -75,5 +75,18 @@ class CategoryController(
     ): ResponseEntity<ApiResponse<Unit>> {
         categoryService.deleteCategory(tripId ,categoryId)
         return ResponseEntity.ok(ApiResponse.success("카테고리가 삭제되었습니다.", null))
+    }
+
+    /**
+     * 카테고리 순서 변경
+     */
+    @PatchMapping("/order")
+    fun orderUpdateCategory(
+        @PathVariable tripId: Long,
+        @RequestParam(required = false) day: Int?,
+        @Valid @RequestBody request: CategoryDto.OrderUpdate
+    ): ResponseEntity<ApiResponse<List<CategoryDto.CategoryResponse>>>{
+        val response = categoryService.orderUpdateCategory(tripId, day, request)
+        return ResponseEntity.ok(ApiResponse.success("카테고리 순서가 변경되었습니다.",response))
     }
 }
