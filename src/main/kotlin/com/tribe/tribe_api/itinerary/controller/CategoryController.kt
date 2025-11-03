@@ -45,7 +45,7 @@ class CategoryController(
         @PathVariable tripId: Long,
         @PathVariable categoryId: Long
     ): ResponseEntity<ApiResponse<CategoryDto.CategoryResponse>> {
-        val response = categoryService.getCategory(categoryId)
+        val response = categoryService.getCategory(tripId, categoryId)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 

@@ -35,8 +35,8 @@ class CategoryService (
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("@tripSecurityService.isTripMember(#categoryId)")
-    fun getCategory(categoryId: Long): CategoryDto.CategoryResponse {
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
+    fun getCategory(tripId: Long, categoryId: Long): CategoryDto.CategoryResponse {
         val category = categoryRepository.findById(categoryId).orElseThrow { BusinessException(ErrorCode.CATEGORY_NOT_FOUND) }
         return CategoryDto.CategoryResponse.from(category)
     }
