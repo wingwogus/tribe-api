@@ -2,11 +2,13 @@ package com.tribe.tribe_api.common.config
 
 import com.tribe.tribe_api.common.util.logger.LogInterceptor
 import org.springframework.context.annotation.Configuration
+import org.springframework.data.web.config.EnableSpringDataWebSupport
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 @Configuration
+@EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 class WebConfig(
     val logInterceptor: LogInterceptor,
 ) : WebMvcConfigurer {
