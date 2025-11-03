@@ -27,6 +27,7 @@ class SettlementService(
 
     private val KRW = "KRW" // 기준 통화 정의
     private val SCALE = 0 // 정산은 원화 단위(0)로 처리
+    private val EPSILON = BigDecimal("1.00") // 💡 추가: 1 KRW의 허용 오차 (총액 유효성 검사 목적)
 
     /**
      * 외화 금액을 지출일 환율을 적용하여 KRW로 변환합니다.
@@ -143,7 +144,10 @@ class SettlementService(
 
         // 5. 유효성 검사
         val totalAssignedKrw = memberSummaries.sumOf { it.assignedAmount }
-        if (dailyTotalAmountKrw.compareTo(totalAssignedKrw) != 0) {
+
+        // [수정된 Validation 로직]: 총 지출과 총 분배액의 차이가 1 KRW보다 큰 경우에만 에러 발생
+        val difference = dailyTotalAmountKrw.subtract(totalAssignedKrw).abs()
+        if (difference.compareTo(EPSILON) > 0) {
             log.error(
                 "[정산 금액 불일치] Trip ID: {}, 날짜: {}. 총 지출액(KRW): {}, 총 분배액(KRW): {}",
                 tripId, date, dailyTotalAmountKrw, totalAssignedKrw
@@ -218,14 +222,18 @@ class SettlementService(
         }
 
         // 4. 최소 송금 관계 계산 (동적 환율 적용)
-        // 전체 정산: 여행 국가의 통화 코드와 가장 최신 환율을 대표 환율로 사용
-        val assumedCurrencyCode = trip.country.code.uppercase()
+        val assumedCountryCode = trip.country.code.uppercase() // e.g., "JP"
 
-        // 여행 국가 통화 코드가 KRW인 경우 KRW를 사용 (rate 1), 아니면 해당 외화 코드를 사용
-        val debtCurrencyCode = if (assumedCurrencyCode == "KR") KRW else assumedCurrencyCode
+        // [수정된 로직]: 여행 국가 코드("JP")를 통화 코드("JPY")로 매핑
+        val debtCurrencyCode = when (assumedCountryCode) {
+            "JP" -> "JPY"
+            "US" -> "USD"
+            "KR" -> KRW
+            else -> assumedCountryCode // 그 외 국가는 코드와 통화 코드가 일치한다고 가정
+        }
 
         val debtExchangeRate = if (debtCurrencyCode != KRW) {
-            // LATEST 환율을 조회합니다. (전체 정산이므로 가장 최근 환율을 대표로 사용)
+            // LATEST 환율을 조회합니다. (이제 "JPY"를 검색합니다.)
             currencyRepository.findByCurUnit(debtCurrencyCode)?.exchangeRate ?: BigDecimal.ONE // 없으면 1.0으로 폴백
         } else {
             BigDecimal.ONE // KRW는 환율 1
@@ -245,7 +253,9 @@ class SettlementService(
         val totalPaidSum = memberBalanceDtos.sumOf { it.balance.max(BigDecimal.ZERO) }
         val totalAssignedSum = memberBalanceDtos.sumOf { it.balance.negate().max(BigDecimal.ZERO) }
 
-        if (totalPaidSum.compareTo(totalAssignedSum) != 0) {
+        // [수정된 Validation 로직]: 총 Paid와 총 Assigned의 차이가 1 KRW보다 큰 경우에만 에러 발생
+        val difference = totalPaidSum.subtract(totalAssignedSum).abs()
+        if (difference.compareTo(EPSILON) > 0) {
             log.error(
                 "[전체 정산 금액 불일치] Trip ID: {}. 총 Paid(KRW): {}, 총 Assigned(KRW): {}",
                 tripId, totalPaidSum, totalAssignedSum
@@ -288,7 +298,7 @@ class SettlementService(
             val creditor = creditorPair.first
             var creditorBalance = creditorPair.second
 
-            // 송금액: 채무액(음수 잔액의 절댓값)과 채권액 중 작은 값. BigDecimal.min() 사용
+            // 송금액: 채무액(음수 잔액의 절댓값)과 채권액) 중 작은 값. BigDecimal.min() 사용
             val transferAmount = debtorBalance.abs().min(creditorBalance)
 
             // 💡 수정된 로직: 원본 통화 금액 계산 (KRW 금액 / 동적으로 결정된 환율)
