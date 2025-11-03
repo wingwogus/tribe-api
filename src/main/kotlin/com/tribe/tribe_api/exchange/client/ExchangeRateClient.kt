@@ -7,13 +7,15 @@ import org.springframework.web.bind.annotation.RequestParam
 
 @FeignClient(
     name = "exchangeRateApi",
-    url = "\${exchange.rate.api-url}" // application.yml에서 URL을 읽어옵니다.
+    // [수정됨] application.yml에서 호스트만 가져옵니다.
+    url = "\${exchange.rate.api-url}"
 )
 interface ExchangeRateClient {
-    @GetMapping
+    // [수정됨] 나머지 전체 API 경로를 여기에 명시합니다.
+    @GetMapping("/site/program/financial/exchangeJSON")
     fun findExchange(
         @RequestParam("authkey") authKey: String,
         @RequestParam("searchdate") searchDate: String,
-        @RequestParam("data") data: String = "AP01" // [수정] data=AP01 파라미터를 분리하여 추가합니다.
+        @RequestParam("data") data: String = "AP01"
     ): List<ExchangeRateDto>
 }

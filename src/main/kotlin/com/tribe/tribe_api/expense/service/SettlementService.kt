@@ -7,17 +7,17 @@ import com.tribe.tribe_api.expense.dto.SettlementDto.MemberSettlementData
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.exchange.entity.Currency
-import com.tribe.tribe_api.exchange.client.ExchangeRateClient
 import com.tribe.tribe_api.exchange.repository.CurrencyRepository
+import com.tribe.tribe_api.exchange.service.ExchangeRateService
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.repository.TripRepository
+import jakarta.persistence.EntityManager // [필수 추가] EntityManager import
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.DayOfWeek // [추가됨] DayOfWeek import
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 @Service
@@ -26,8 +26,8 @@ class SettlementService(
     private val expenseRepository: ExpenseRepository,
     private val tripRepository: TripRepository,
     private val currencyRepository: CurrencyRepository,
-    private val exchangeRateClient: ExchangeRateClient,
-    @Value("\${key.exchange-rate.key}") private val authKey: String
+    private val exchangeRateService: ExchangeRateService,
+    private val entityManager: EntityManager // [추가됨] EntityManager 주입
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
@@ -37,7 +37,7 @@ class SettlementService(
 
     /**
      * 외화 금액을 지출일 환율을 적용하여 KRW로 변환합니다.
-     * 지출일의 환율이 없으면, 최대 7일 전까지 역순으로 유효한 환율을 찾습니다. (주말/공휴일 대응)
+     * DB에 없으면, 최대 7일 전까지 역순으로 유효한 환율을 찾거나 API를 통해 가져옵니다.
      */
     private fun convertToKrw(amount: BigDecimal, expense: Expense): BigDecimal {
         val currencyCode = expense.currency?.uppercase()
@@ -50,25 +50,29 @@ class SettlementService(
         var currencyRate: Currency? = null
         val MAX_DAYS_BACK = 7
 
-        // 1. DB에서 환율을 찾아 거슬러 올라갑니다.
+        // 1. DB에서 환율을 찾아 거슬러 올라갑니다. (최대 7일)
         for (i in 0 until MAX_DAYS_BACK) {
-            // 2025-10-26 요청 시 -> 26일, 25일, 24일... 순으로 DB 조회
+            // 2. DB 조회 (가장 먼저 수행)
             currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, currentDate)
             if (currencyRate != null) {
-                break // DB에 있으면 바로 사용
+                break // DB에 있으면 바로 사용 (2025-10-24 데이터가 26일 요청 시 여기에 걸려야 함)
             }
 
-            // [NEW LOGIC START] DB에 없고, 과거 날짜인 경우 API에 직접 요청합니다.
-
+            // 3. 현재 날짜가 주말인지 확인합니다.
             val dayOfWeek = currentDate.dayOfWeek
-            val isWeekday = dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY
+            val isWeekend = dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY
 
-            // 1) 과거 날짜이고, 2) 평일인 경우에만 API 호출을 시도합니다.
-            if (currentDate.isBefore(LocalDate.now()) && isWeekday) {
+            // 주말인 경우 API 호출 시도 없이 바로 다음 날짜로 이동
+            if (isWeekend) {
+                currentDate = currentDate.minusDays(1)
+                continue // 다음 루프 실행
+            }
+
+            // 4. 평일이면서 과거 날짜인 경우 API 호출 시도 (온디맨드)
+            if (currentDate.isBefore(LocalDate.now())) {
                 try {
-                    // API 호출 및 DB 저장 시도
-                    // fetchAndSaveExchangeRate는 해당 날짜의 모든 통화코드를 DB에 저장합니다.
-                    fetchAndSaveExchangeRate(currentDate)
+                    // 트랜잭션을 분리하여 API 호출 및 DB 저장
+                    exchangeRateService.fetchAndSaveExchangeRate(currentDate)
 
                     // API 호출 성공 후 DB에 저장되었으므로 다시 DB에서 조회하여 사용
                     currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, currentDate)
@@ -78,11 +82,10 @@ class SettlementService(
                     }
                 } catch (e: Exception) {
                     log.warn("Failed to fetch historical rate for {}: {}", currentDate, e.message)
-                    // API 호출에 문제가 있더라도, 계속 날짜를 거슬러 올라가기 위해 break하지 않습니다.
                 }
             }
-            // [NEW LOGIC END]
 
+            // 5. 다음 날짜로 이동
             currentDate = currentDate.minusDays(1)
         }
 
@@ -99,86 +102,15 @@ class SettlementService(
             .setScale(SCALE, RoundingMode.HALF_UP)
     }
 
-    /**
-     * [수정됨] 메서드에 open 키워드를 추가하여 Spring AOP가 오버라이드할 수 있게 합니다.
-     * 특정 날짜의 환율을 API에서 조회하고, DB에 저장한 후 Currency 객체를 반환합니다.
-     */
-    @Transactional
-    internal open fun fetchAndSaveExchangeRate(date: LocalDate): Currency? {
-        val dateString = date.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
-
-        // 1. 환율 조회 API 호출
-        val exchanges = try {
-            val response = exchangeRateClient.findExchange(authKey, dateString) // API 호출
-
-            // [추가된 로그] API 응답 크기 로깅
-            log.info("API Response received for date {}: {} items", date, response.size)
-
-            response
-        } catch (e: Exception) {
-            log.error("Historical API call failed for date {}: {}", date, e.message)
-            return null
-        }
-
-        // [추가된 로그] API 응답 데이터가 비어있는지 확인
-        if (exchanges.isEmpty()) {
-            log.warn("API returned empty list for date {}. Cannot save.", date)
-            return null
-        }
-
-        // 2. 조회된 값 중 USD, JPY만 필터링 및 BigDecimal로 변환하여 DB에 저장
-        val currenciesToSave = exchanges.mapNotNull { dto ->
-            processExchangeDto(dto, date)
-        }
-
-        if (currenciesToSave.isEmpty()) return null
-
-        // 3. DB에 저장/업데이트
-        currencyRepository.saveAll(currenciesToSave)
-        log.info("On-demand saved/updated {} exchange rates for {}", currenciesToSave.size, date)
-
-        // 4. API 호출 결과에서 첫 번째(대표) 환율 객체를 반환합니다.
-        return currenciesToSave.firstOrNull()
-    }
-
-    // ExchangeRateScheduler.kt의 processExchange 로직을 private 헬퍼 함수로 가져옵니다.
-    private fun processExchangeDto(dto: com.tribe.tribe_api.exchange.dto.ExchangeRateDto, date: LocalDate): Currency? {
-        val targetCurrency: String
-        val targetName: String
-
-        when (dto.curUnit) {
-            "JPY(100)" -> { targetCurrency = "JPY"; targetName = "일본 엔" }
-            "USD" -> { targetCurrency = "USD"; targetName = "미국 달러" }
-            else -> return null // 목표 통화가 아니면 무시
-        }
-
-        // 쉼표(,) 제거 후 BigDecimal로 파싱
-        var exchangeRate = try {
-            // 매매 기준율(deal_bas_r) 사용
-            BigDecimal(dto.dealBasR.replace(",", ""))
-        } catch (e: NumberFormatException) {
-            log.warn("Failed to parse exchange rate for {}: {}", dto.curUnit, dto.dealBasR)
-            return null
-        }
-
-        // JPY는 100단위로 받으므로 1단위로 변환
-        if (dto.curUnit == "JPY(100)") {
-            exchangeRate = exchangeRate.divide(BigDecimal("100"))
-        }
-
-        return Currency(
-            curUnit = targetCurrency,
-            curName = targetName,
-            exchangeRate = exchangeRate,
-            date = date
-        )
-    }
 
     fun getDailySettlement(tripId: Long, date: LocalDate): SettlementDto.DailyResponse {
+        // [핵심 추가]: JPA 영속성 컨텍스트(1차 캐시)를 무효화하여 DB에서 강제로 데이터를 읽어오도록 합니다.
+        // 수동 삽입된 데이터를 인식하도록 강제합니다.
+        entityManager.clear()
+
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
-        // expenseRepository.findAllByTripIdAndPaymentDateBetween가 ExpenseItem과 Assignment를 Fetch Join으로 가져와야 테스트가 통과될 수 있습니다.
         val dailyExpenses: List<Expense> = expenseRepository.findAllByTripIdAndPaymentDateBetween(tripId, date, date)
 
         // 총 지출액을 KRW로 변환하여 합산
@@ -218,7 +150,6 @@ class SettlementService(
             val foreignCurrencies = dailyExpenses
                 .filter { expense ->
                     (expense.payer.id == member.id) ||
-                            // 💡 타입 추론 오류 해결: expenseItems를 통해 접근하도록 경로 수정
                             expense.expenseItems.any { item ->
                                 item.assignments.any { assign -> assign.tripMember.id == member.id }
                             }
@@ -253,11 +184,8 @@ class SettlementService(
         val debtCurrencyCode = dailyExpenses.firstOrNull { it.currency != KRW && it.currency != null }?.currency?.uppercase() ?: KRW
 
         val debtExchangeRate = if (debtCurrencyCode != KRW) {
-            // 해당 날짜의 환율을 찾습니다. 없으면 예외 발생 (정산 전제 조건)
             currencyRepository.findByCurUnitAndDate(debtCurrencyCode, date)?.exchangeRate
                 ?: run {
-                    // DB에 해당 날짜의 환율이 없으면, 7일 룩백 로직을 이용해 환율을 다시 찾습니다.
-                    // 이 로직은 convertToKrw에 있으므로, 여기서는 찾을 수 없으면 예외를 발생시킵니다.
                     var currentDate = date
                     var rate: Currency? = null
                     for (i in 0 until 7) {
@@ -281,7 +209,6 @@ class SettlementService(
         // 5. 유효성 검사
         val totalAssignedKrw = memberSummaries.sumOf { it.assignedAmount }
 
-        // [수정된 Validation 로직]: 총 지출과 총 분배액의 차이가 1 KRW보다 큰 경우에만 에러 발생
         val difference = dailyTotalAmountKrw.subtract(totalAssignedKrw).abs()
         if (difference.compareTo(EPSILON) > 0) {
             log.error(
@@ -306,11 +233,8 @@ class SettlementService(
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
-        // 1. 여행의 모든 지출 내역을 가져옵니다.
-        // expenseRepository.findAllByTripId가 ExpenseItem과 Assignment를 Fetch Join으로 가져와야 테스트가 통과될 수 있습니다.
         val allExpenses: List<Expense> = expenseRepository.findAllByTripId(tripId)
 
-        // 2. 멤버별 PaidAmount(KRW), AssignedAmount(KRW), 그리고 사용된 외화를 계산합니다.
         val memberCalcData = trip.members.map { member ->
 
             // Paid Amount (KRW) 합산
@@ -330,7 +254,6 @@ class SettlementService(
 
             // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
             val foreignCurrencies = allExpenses
-                // 💡 수정된 부분: Expense -> ExpenseItem -> Assignment 경로 사용
                 .filter { expense ->
                     (expense.payer.id == member.id) ||
                             expense.expenseItems.any { item ->
@@ -348,7 +271,6 @@ class SettlementService(
         // 3. 잔액(Balance) 목록 생성 (KRW 기준)
         val memberBalances = memberCalcData.map { data ->
             val balance = data.paidAmountKrw.subtract(data.assignedAmountKrw)
-            // MemberBalance DTO에 외화 정보와 잔액을 함께 묶음
             SettlementDto.MemberBalance(
                 tripMemberId = data.member.id!!,
                 nickname = data.member.name,
@@ -358,19 +280,18 @@ class SettlementService(
         }
 
         // 4. 최소 송금 관계 계산 (동적 환율 적용)
-        val assumedCountryCode = trip.country.code.uppercase() // e.g., "JP"
+        val assumedCountryCode = trip.country.code.uppercase()
 
-        // [수정된 로직]: 여행 국가 코드("JP")를 통화 코드("JPY")로 매핑
         val debtCurrencyCode = when (assumedCountryCode) {
             "JP" -> "JPY"
             "US" -> "USD"
             "KR" -> KRW
-            else -> assumedCountryCode // 그 외 국가는 코드와 통화 코드가 일치한다고 가정
+            else -> assumedCountryCode
         }
 
         val debtExchangeRate = if (debtCurrencyCode != KRW) {
-            // LATEST 환율을 조회합니다. (이제 "JPY"를 검색합니다.)
-            currencyRepository.findByCurUnit(debtCurrencyCode)?.exchangeRate ?: BigDecimal.ONE // 없으면 1.0으로 폴백
+            // [수정 필요]: findTopByCurUnitOrderByDateDesc를 사용해야 합니다.
+            currencyRepository.findTopByCurUnitOrderByDateDesc(debtCurrencyCode)?.exchangeRate ?: BigDecimal.ONE
         } else {
             BigDecimal.ONE // KRW는 환율 1
         }
@@ -383,13 +304,11 @@ class SettlementService(
 
 
         // 5. DTO 변환 및 반환
-        val memberBalanceDtos = memberBalances.map { it.first } // MemberBalance DTO만 추출
+        val memberBalanceDtos = memberBalances.map { it.first }
 
-        // 유효성 검사 (총 Paid와 총 Assigned의 합이 0에 가까운지 확인)
         val totalPaidSum = memberBalanceDtos.sumOf { it.balance.max(BigDecimal.ZERO) }
         val totalAssignedSum = memberBalanceDtos.sumOf { it.balance.negate().max(BigDecimal.ZERO) }
 
-        // [수정된 Validation 로직]: 총 Paid와 총 Assigned의 차이가 1 KRW보다 큰 경우에만 에러 발생
         val difference = totalPaidSum.subtract(totalAssignedSum).abs()
         if (difference.compareTo(EPSILON) > 0) {
             log.error(
@@ -403,7 +322,6 @@ class SettlementService(
 
     /**
      * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
-     * [수정] 대표 통화 코드와 환율을 인자로 받아 하드코딩된 값을 대체합니다.
      */
     private fun calculateDebtRelations(
         balances: List<Pair<TripMember, BigDecimal>>,

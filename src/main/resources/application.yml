@@ -87,7 +87,7 @@ key:
 
 exchange:
   rate:
-    api-url: https://www.koreaexim.go.kr/site/program/financial/exchangeJSON
+    api-url: https://www.koreaexim.go.kr
 
 server:
   port: 8083
