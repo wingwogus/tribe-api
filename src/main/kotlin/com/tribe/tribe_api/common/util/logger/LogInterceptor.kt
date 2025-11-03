@@ -34,15 +34,14 @@ class LogInterceptor : HandlerInterceptor {
         val status = response.status
         val clientIP = getClientIP(request)
 
-        // 예외가 발생했는지 여부 확인
-        if (ex != null) {
-            // 예외가 발생했다면 ERROR 레벨로 로그를 남김 (스택 트레이스 포함)
-            log.error(
-                "[REQ ERROR] {} {}, status={}, duration={}ms, client={}",
-                request.method, request.requestURI, status, duration, clientIP, ex
+        if (status >= 400) {
+            // 4xx, 5xx 에러 (JwtExceptionFilter, EntryPoint, GlobalExceptionHandler 모두 포함)
+            log.warn(
+                "[REQ END] {} {}, status={}, duration={}ms, client={}",
+                request.method, request.requestURI, status, duration, clientIP
             )
         } else {
-            // 정상 종료
+            // 2xx, 3xx 성공
             log.info(
                 "[REQ END] {} {}, status={}, duration={}ms, client={}",
                 request.method, request.requestURI, status, duration, clientIP
