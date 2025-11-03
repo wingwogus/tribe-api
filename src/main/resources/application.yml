@@ -87,8 +87,7 @@ key:
 
 exchange:
   rate:
-    api-url: https://www.koreaexim.go.kr/site/program/financial/exchangeJSON?data=AP01
-
+    api-url: https://www.koreaexim.go.kr/site/program/financial/exchangeJSON
 
 server:
   port: 8083
@@ -98,5 +97,13 @@ app:
 
 cloudinary:
   url: ${CLOUDINARY_URL}
+
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000  # 연결 시도 타임아웃 (5초)
+        readTimeout: 10000
 
 

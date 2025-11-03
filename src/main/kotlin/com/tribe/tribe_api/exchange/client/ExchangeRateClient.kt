@@ -13,6 +13,7 @@ interface ExchangeRateClient {
     @GetMapping
     fun findExchange(
         @RequestParam("authkey") authKey: String,
-        @RequestParam("searchdate") searchDate: String
+        @RequestParam("searchdate") searchDate: String,
+        @RequestParam("data") data: String = "AP01" // [수정] data=AP01 파라미터를 분리하여 추가합니다.
     ): List<ExchangeRateDto>
 }

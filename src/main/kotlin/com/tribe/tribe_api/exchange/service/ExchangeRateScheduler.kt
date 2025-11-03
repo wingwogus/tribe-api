@@ -35,6 +35,7 @@ class ExchangeRateScheduler(
             val apiDate = DateUtils.parseApiDate(todayString)
 
             // 1. 환율 조회 API 호출
+            // ExchangeRateClient.kt에서 data=AP01 파라미터를 추가했으므로, 여기서는 searchdate와 authkey만 전달합니다.
             val exchanges = exchangeRateClient.findExchange(authKey, todayString)
 
             // 2. 조회된 값 중 USD, JPY만 필터링 및 BigDecimal로 변환

@@ -6,14 +6,18 @@ import com.tribe.tribe_api.expense.dto.SettlementDto
 import com.tribe.tribe_api.expense.dto.SettlementDto.MemberSettlementData
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
+import com.tribe.tribe_api.exchange.entity.Currency
+import com.tribe.tribe_api.exchange.client.ExchangeRateClient
 import com.tribe.tribe_api.exchange.repository.CurrencyRepository
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.DayOfWeek // [추가됨] DayOfWeek import
 import java.time.LocalDate
 
 @Service
@@ -21,7 +25,9 @@ import java.time.LocalDate
 class SettlementService(
     private val expenseRepository: ExpenseRepository,
     private val tripRepository: TripRepository,
-    private val currencyRepository: CurrencyRepository
+    private val currencyRepository: CurrencyRepository,
+    private val exchangeRateClient: ExchangeRateClient,
+    @Value("\${key.exchange-rate.key}") private val authKey: String
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
@@ -31,6 +37,7 @@ class SettlementService(
 
     /**
      * 외화 금액을 지출일 환율을 적용하여 KRW로 변환합니다.
+     * 지출일의 환율이 없으면, 최대 7일 전까지 역순으로 유효한 환율을 찾습니다. (주말/공휴일 대응)
      */
     private fun convertToKrw(amount: BigDecimal, expense: Expense): BigDecimal {
         val currencyCode = expense.currency?.uppercase()
@@ -39,15 +46,132 @@ class SettlementService(
             return amount.setScale(SCALE, RoundingMode.HALF_UP)
         }
 
-        // 지출일과 통화 코드로 환율 조회
-        val currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, expense.paymentDate)
-            ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
+        var currentDate = expense.paymentDate
+        var currencyRate: Currency? = null
+        val MAX_DAYS_BACK = 7
+
+        // 1. DB에서 환율을 찾아 거슬러 올라갑니다.
+        for (i in 0 until MAX_DAYS_BACK) {
+            // 2025-10-26 요청 시 -> 26일, 25일, 24일... 순으로 DB 조회
+            currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, currentDate)
+            if (currencyRate != null) {
+                break // DB에 있으면 바로 사용
+            }
+
+            // [NEW LOGIC START] DB에 없고, 과거 날짜인 경우 API에 직접 요청합니다.
+
+            val dayOfWeek = currentDate.dayOfWeek
+            val isWeekday = dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY
+
+            // 1) 과거 날짜이고, 2) 평일인 경우에만 API 호출을 시도합니다.
+            if (currentDate.isBefore(LocalDate.now()) && isWeekday) {
+                try {
+                    // API 호출 및 DB 저장 시도
+                    // fetchAndSaveExchangeRate는 해당 날짜의 모든 통화코드를 DB에 저장합니다.
+                    fetchAndSaveExchangeRate(currentDate)
+
+                    // API 호출 성공 후 DB에 저장되었으므로 다시 DB에서 조회하여 사용
+                    currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, currentDate)
+
+                    if (currencyRate != null) {
+                        break
+                    }
+                } catch (e: Exception) {
+                    log.warn("Failed to fetch historical rate for {}: {}", currentDate, e.message)
+                    // API 호출에 문제가 있더라도, 계속 날짜를 거슬러 올라가기 위해 break하지 않습니다.
+                }
+            }
+            // [NEW LOGIC END]
+
+            currentDate = currentDate.minusDays(1)
+        }
+
+        // 환율을 찾지 못했으면 예외 발생
+        if (currencyRate == null) {
+            log.error("Exchange rate not found for {} on or before {}", currencyCode, expense.paymentDate)
+            throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
+        }
 
         val exchangeRate = currencyRate.exchangeRate
 
         // 금액 * 환율 = KRW 금액
         return amount.multiply(exchangeRate)
             .setScale(SCALE, RoundingMode.HALF_UP)
+    }
+
+    /**
+     * [수정됨] 메서드에 open 키워드를 추가하여 Spring AOP가 오버라이드할 수 있게 합니다.
+     * 특정 날짜의 환율을 API에서 조회하고, DB에 저장한 후 Currency 객체를 반환합니다.
+     */
+    @Transactional
+    internal open fun fetchAndSaveExchangeRate(date: LocalDate): Currency? {
+        val dateString = date.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
+
+        // 1. 환율 조회 API 호출
+        val exchanges = try {
+            val response = exchangeRateClient.findExchange(authKey, dateString) // API 호출
+
+            // [추가된 로그] API 응답 크기 로깅
+            log.info("API Response received for date {}: {} items", date, response.size)
+
+            response
+        } catch (e: Exception) {
+            log.error("Historical API call failed for date {}: {}", date, e.message)
+            return null
+        }
+
+        // [추가된 로그] API 응답 데이터가 비어있는지 확인
+        if (exchanges.isEmpty()) {
+            log.warn("API returned empty list for date {}. Cannot save.", date)
+            return null
+        }
+
+        // 2. 조회된 값 중 USD, JPY만 필터링 및 BigDecimal로 변환하여 DB에 저장
+        val currenciesToSave = exchanges.mapNotNull { dto ->
+            processExchangeDto(dto, date)
+        }
+
+        if (currenciesToSave.isEmpty()) return null
+
+        // 3. DB에 저장/업데이트
+        currencyRepository.saveAll(currenciesToSave)
+        log.info("On-demand saved/updated {} exchange rates for {}", currenciesToSave.size, date)
+
+        // 4. API 호출 결과에서 첫 번째(대표) 환율 객체를 반환합니다.
+        return currenciesToSave.firstOrNull()
+    }
+
+    // ExchangeRateScheduler.kt의 processExchange 로직을 private 헬퍼 함수로 가져옵니다.
+    private fun processExchangeDto(dto: com.tribe.tribe_api.exchange.dto.ExchangeRateDto, date: LocalDate): Currency? {
+        val targetCurrency: String
+        val targetName: String
+
+        when (dto.curUnit) {
+            "JPY(100)" -> { targetCurrency = "JPY"; targetName = "일본 엔" }
+            "USD" -> { targetCurrency = "USD"; targetName = "미국 달러" }
+            else -> return null // 목표 통화가 아니면 무시
+        }
+
+        // 쉼표(,) 제거 후 BigDecimal로 파싱
+        var exchangeRate = try {
+            // 매매 기준율(deal_bas_r) 사용
+            BigDecimal(dto.dealBasR.replace(",", ""))
+        } catch (e: NumberFormatException) {
+            log.warn("Failed to parse exchange rate for {}: {}", dto.curUnit, dto.dealBasR)
+            return null
+        }
+
+        // JPY는 100단위로 받으므로 1단위로 변환
+        if (dto.curUnit == "JPY(100)") {
+            exchangeRate = exchangeRate.divide(BigDecimal("100"))
+        }
+
+        return Currency(
+            curUnit = targetCurrency,
+            curName = targetName,
+            exchangeRate = exchangeRate,
+            date = date
+        )
     }
 
     fun getDailySettlement(tripId: Long, date: LocalDate): SettlementDto.DailyResponse {
@@ -130,7 +254,19 @@ class SettlementService(
 
         val debtExchangeRate = if (debtCurrencyCode != KRW) {
             // 해당 날짜의 환율을 찾습니다. 없으면 예외 발생 (정산 전제 조건)
-            currencyRepository.findByCurUnitAndDate(debtCurrencyCode, date)?.exchangeRate ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
+            currencyRepository.findByCurUnitAndDate(debtCurrencyCode, date)?.exchangeRate
+                ?: run {
+                    // DB에 해당 날짜의 환율이 없으면, 7일 룩백 로직을 이용해 환율을 다시 찾습니다.
+                    // 이 로직은 convertToKrw에 있으므로, 여기서는 찾을 수 없으면 예외를 발생시킵니다.
+                    var currentDate = date
+                    var rate: Currency? = null
+                    for (i in 0 until 7) {
+                        rate = currencyRepository.findByCurUnitAndDate(debtCurrencyCode, currentDate)
+                        if (rate != null) break
+                        currentDate = currentDate.minusDays(1)
+                    }
+                    rate?.exchangeRate ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
+                }
         } else {
             BigDecimal.ONE // KRW는 환율 1
         }
