@@ -2,6 +2,7 @@ package com.tribe.tribe_api.common.config
 
 import com.tribe.tribe_api.common.util.jwt.JwtAuthenticationFilter
 import com.tribe.tribe_api.common.util.jwt.JwtExceptionFilter
+import com.tribe.tribe_api.common.util.logger.MDCLoggingFilter
 import com.tribe.tribe_api.common.util.oauth2.CustomOAuth2UserService
 import com.tribe.tribe_api.common.util.oauth2.OAuth2LoginSuccessHandler
 import com.tribe.tribe_api.common.util.security.CustomAuthenticationEntryPoint
@@ -24,7 +25,8 @@ class SecurityConfig(
     private val jwtExceptionFilter: JwtExceptionFilter,
     private val customOAuth2UserService: CustomOAuth2UserService,
     private val authenticationEntryPoint: CustomAuthenticationEntryPoint,
-    private val oAuth2LoginSuccessHandler: OAuth2LoginSuccessHandler
+    private val oAuth2LoginSuccessHandler: OAuth2LoginSuccessHandler,
+    private val mdcLoggingFilter: MDCLoggingFilter
 ) {
 
     @Bean
@@ -54,6 +56,7 @@ class SecurityConfig(
             }
             .addFilterBefore(jwtExceptionFilter, UsernamePasswordAuthenticationFilter::class.java)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterAfter(mdcLoggingFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }
