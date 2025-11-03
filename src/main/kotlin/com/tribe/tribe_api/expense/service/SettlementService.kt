@@ -42,10 +42,7 @@ class SettlementService(
         val currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, expense.paymentDate)
             ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
 
-        var exchangeRate = currencyRate.exchangeRate
-
-        // 💡 수정된 부분: JPY 환율 보정 로직을 완전히 제거합니다.
-        //    DB에 저장된 JPY 환율이 이미 1엔 기준 값(10)이므로 추가 나눗셈은 10배 오류를 유발합니다.
+        val exchangeRate = currencyRate.exchangeRate
 
         // 금액 * 환율 = KRW 금액
         return amount.multiply(exchangeRate)
@@ -126,8 +123,23 @@ class SettlementService(
             Pair(data.member, balance)
         }
 
-        // 4. 일별 최소 송금 관계 계산
-        val debtRelations = calculateDebtRelations(memberBalances)
+        // 4. 일별 최소 송금 관계 계산 (동적 환율 적용)
+        // 당일 지출된 외화 중 첫 번째를 대표 통화로 사용 (외화 지출이 없으면 KRW)
+        val debtCurrencyCode = dailyExpenses.firstOrNull { it.currency != KRW && it.currency != null }?.currency?.uppercase() ?: KRW
+
+        val debtExchangeRate = if (debtCurrencyCode != KRW) {
+            // 해당 날짜의 환율을 찾습니다. 없으면 예외 발생 (정산 전제 조건)
+            currencyRepository.findByCurUnitAndDate(debtCurrencyCode, date)?.exchangeRate ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
+        } else {
+            BigDecimal.ONE // KRW는 환율 1
+        }
+
+        val debtRelations = calculateDebtRelations(
+            memberBalances,
+            debtCurrencyCode,
+            debtExchangeRate
+        )
+
 
         // 5. 유효성 검사
         val totalAssignedKrw = memberSummaries.sumOf { it.assignedAmount }
@@ -205,8 +217,26 @@ class SettlementService(
             ) to Pair(data.member, balance)
         }
 
-        // 4. 최소 송금 관계 계산
-        val debtRelations = calculateDebtRelations(memberBalances.map { it.second })
+        // 4. 최소 송금 관계 계산 (동적 환율 적용)
+        // 전체 정산: 여행 국가의 통화 코드와 가장 최신 환율을 대표 환율로 사용
+        val assumedCurrencyCode = trip.country.code.uppercase()
+
+        // 여행 국가 통화 코드가 KRW인 경우 KRW를 사용 (rate 1), 아니면 해당 외화 코드를 사용
+        val debtCurrencyCode = if (assumedCurrencyCode == "KR") KRW else assumedCurrencyCode
+
+        val debtExchangeRate = if (debtCurrencyCode != KRW) {
+            // LATEST 환율을 조회합니다. (전체 정산이므로 가장 최근 환율을 대표로 사용)
+            currencyRepository.findByCurUnit(debtCurrencyCode)?.exchangeRate ?: BigDecimal.ONE // 없으면 1.0으로 폴백
+        } else {
+            BigDecimal.ONE // KRW는 환율 1
+        }
+
+        val debtRelations = calculateDebtRelations(
+            memberBalances.map { it.second },
+            debtCurrencyCode,
+            debtExchangeRate
+        )
+
 
         // 5. DTO 변환 및 반환
         val memberBalanceDtos = memberBalances.map { it.first } // MemberBalance DTO만 추출
@@ -227,8 +257,13 @@ class SettlementService(
 
     /**
      * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
+     * [수정] 대표 통화 코드와 환율을 인자로 받아 하드코딩된 값을 대체합니다.
      */
-    private fun calculateDebtRelations(balances: List<Pair<TripMember, BigDecimal>>): List<SettlementDto.DebtRelation> {
+    private fun calculateDebtRelations(
+        balances: List<Pair<TripMember, BigDecimal>>,
+        assumedCurrencyCode: String,
+        assumedExchangeRate: BigDecimal
+    ): List<SettlementDto.DebtRelation> {
         // 잔액이 0.01 이상인 멤버만 필터링
         val cleanBalances = balances
             .filter { it.second.abs().compareTo(BigDecimal("0.01")) >= 0 }
@@ -240,11 +275,9 @@ class SettlementService(
 
         val epsilon = BigDecimal("0.01")
 
-        // 🚨 NOTE: 이 로직은 정산 금액이 JPY에서 통합되었고 환율이 10이라는
-        // 테스트 컨텍스트에 의존하여 원본 금액을 계산합니다.
-        // 실제 운영 환경에서는 `balances` 목록이 원본 통화 정보를 포함해야 합니다.
-        val assumedExchangeRate = BigDecimal("10.0000") // 테스트의 JPY 환율 10 사용
-        val assumedCurrencyCode = "JPY"
+        // KRW가 아닌 통화인지 확인 (KRW는 환율이 1.0)
+        val isForeignCurrency = assumedExchangeRate.compareTo(BigDecimal.ONE) != 0
+
 
         while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
             val debtorPair = debtors.first()
@@ -258,9 +291,17 @@ class SettlementService(
             // 송금액: 채무액(음수 잔액의 절댓값)과 채권액 중 작은 값. BigDecimal.min() 사용
             val transferAmount = debtorBalance.abs().min(creditorBalance)
 
-            // 💡 추가된 로직: 원본 통화 금액 계산 (KRW 금액 / 환율 10)
+            // 💡 수정된 로직: 원본 통화 금액 계산 (KRW 금액 / 동적으로 결정된 환율)
             // 소수점 0자리로 반올림
-            val equivalentOriginalAmount = transferAmount.divide(assumedExchangeRate, 0, RoundingMode.HALF_UP)
+            val equivalentOriginalAmount = if (isForeignCurrency) {
+                // 외화인 경우: KRW 송금액을 환율로 나누어 원본 통화 금액을 역추산
+                transferAmount.divide(assumedExchangeRate, 0, RoundingMode.HALF_UP)
+            } else {
+                null
+            }
+
+            val originalCurrencyCode = if (isForeignCurrency) assumedCurrencyCode else null
+
 
             relations.add(
                 SettlementDto.DebtRelation(
@@ -270,9 +311,9 @@ class SettlementService(
                     toTripMemberId = creditor.id!!,
                     amount = transferAmount, // KRW 송금 금액
 
-                    // 💡 DTO에 `equivalentOriginalAmount`와 `originalCurrencyCode` 필드가 추가되었다고 가정
-                    equivalentOriginalAmount = equivalentOriginalAmount, // 원본 통화 금액 (예: 700 JPY)
-                    originalCurrencyCode = assumedCurrencyCode           // 원본 통화 코드 (예: "JPY")
+                    // 하드코딩된 값 대신 동적으로 계산된 값 사용
+                    equivalentOriginalAmount = equivalentOriginalAmount, // 원본 통화 금액
+                    originalCurrencyCode = originalCurrencyCode           // 원본 통화 코드
                 )
             )
 

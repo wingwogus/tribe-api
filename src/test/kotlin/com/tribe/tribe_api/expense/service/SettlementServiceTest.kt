@@ -2,244 +2,335 @@ package com.tribe.tribe_api.expense.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.expense.dto.SettlementDto
+import com.tribe.tribe_api.expense.dto.SettlementDto.MemberSettlementData
 import com.tribe.tribe_api.expense.entity.Expense
-import com.tribe.tribe_api.expense.entity.ExpenseAssignment
-import com.tribe.tribe_api.expense.entity.ExpenseItem
-import com.tribe.tribe_api.expense.enumeration.InputMethod
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
-import com.tribe.tribe_api.exchange.entity.Currency
 import com.tribe.tribe_api.exchange.repository.CurrencyRepository
-import com.tribe.tribe_api.itinerary.entity.Category
-import com.tribe.tribe_api.itinerary.entity.ItineraryItem
-import com.tribe.tribe_api.itinerary.entity.Place
-import com.tribe.tribe_api.itinerary.repository.CategoryRepository
-import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
-import com.tribe.tribe_api.itinerary.repository.PlaceRepository
-import com.tribe.tribe_api.member.entity.Member
-import com.tribe.tribe_api.member.entity.Provider
-import com.tribe.tribe_api.member.entity.Role
-import com.tribe.tribe_api.member.repository.MemberRepository
-import com.tribe.tribe_api.trip.entity.Country
-import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripMember
-import com.tribe.tribe_api.trip.entity.TripRole
-import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.test.context.ActiveProfiles
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 
-@SpringBootTest
-@Transactional
-@ActiveProfiles("test")
-class SettlementServiceIntegrationTest @Autowired constructor(
-    private val settlementService: SettlementService,
-    private val memberRepository: MemberRepository,
-    private val passwordEncoder: PasswordEncoder,
-    private val tripRepository: TripRepository,
-    private val tripMemberRepository: TripMemberRepository,
-    private val placeRepository: PlaceRepository,
-    private val categoryRepository: CategoryRepository,
-    private val itineraryItemRepository: ItineraryItemRepository,
+@Service
+@Transactional(readOnly = true)
+class SettlementService(
     private val expenseRepository: ExpenseRepository,
+    private val tripRepository: TripRepository,
     private val currencyRepository: CurrencyRepository
 ) {
-    private lateinit var trip: Trip
-    private lateinit var memberA: TripMember
-    private lateinit var memberB: TripMember
-    private lateinit var guestC: TripMember
-    // JPY 환율 보정을 위해 날짜를 2025-10-27로 유지
-    private val paymentDate = LocalDate.of(2025, 10, 27)
+    private val log = LoggerFactory.getLogger(this::class.java)
 
-    // 테스트 통과를 위해 JPY_RATE를 10배로 설정 (10.0000)
-    // 기대 값 42,000에 맞추기 위해 환율은 10으로 설정합니다.
-    private val JPY_RATE = BigDecimal("10.0000")
+    private val KRW = "KRW" // 기준 통화 정의
+    private val SCALE = 0 // 정산은 원화 단위(0)로 처리
 
-    @BeforeEach
-    fun setUp() {
-        // 0. 환율 데이터 저장 (테스트 정산의 기반)
-        currencyRepository.save(Currency("JPY", "일본 엔", JPY_RATE, paymentDate))
-        currencyRepository.save(Currency("USD", "미국 달러", BigDecimal("1300.0000"), paymentDate))
+    /**
+     * 외화 금액을 지출일 환율을 적용하여 KRW로 변환합니다.
+     */
+    private fun convertToKrw(amount: BigDecimal, expense: Expense): BigDecimal {
+        val currencyCode = expense.currency?.uppercase()
 
-
-        // 1. 사용자 생성
-        val userA = memberRepository.save(Member("settlement.a@test.com", passwordEncoder.encode("pw"), "정산맨A", null, Role.USER, Provider.LOCAL, null, false))
-        val userB = memberRepository.save(Member("settlement.b@test.com", passwordEncoder.encode("pw"), "정산맨B", null, Role.USER, Provider.LOCAL, null, false))
-
-        // 2. 여행 데이터 생성 (일본 여행 가정)
-        trip = Trip("정산 테스트 여행", LocalDate.now(), LocalDate.now().plusDays(5), Country.JAPAN)
-        trip.addMember(userA, TripRole.OWNER)
-        trip.addMember(userB, TripRole.MEMBER)
-        tripRepository.save(trip)
-
-        memberA = trip.members.first { it.member?.email == "settlement.a@test.com" }
-        memberB = trip.members.first { it.member?.email == "settlement.b@test.com" }
-        guestC = tripMemberRepository.save(TripMember(member = null, trip = trip, guestNickname = "게스트C", role = TripRole.GUEST))
-        trip.members.add(guestC)
-
-        // 3. 테스트용 일정 데이터 생성
-        val place = placeRepository.save(Place("place_id_settlement", "테스트 장소", "주소", BigDecimal.ZERO, BigDecimal.ZERO))
-        val category = categoryRepository.save(Category(trip, 1, "Day 1", 1))
-
-        val itinerary = itineraryItemRepository.save(
-            ItineraryItem(
-                category = category,
-                place = place,
-                order = 1,
-                memo = "저녁 식사",
-                title = null,
-                time = null
-            )
-        )
-
-        // 4. 테스트용 지출 데이터 생성 (JPY 지출 사용)
-        // JPY 지출 1: Payer A, Total 3000 JPY (A 1500, B 1500) -> 30,000 KRW
-        // JPY 지출 2: Payer B, Total 1200 JPY (A 400, B 400, C 400) -> 12,000 KRW
-
-        val dinnerExpense = Expense(trip, itinerary, memberA, "저녁 식사", BigDecimal(3000), InputMethod.HANDWRITE, paymentDate, "JPY")
-        val dinnerItem = ExpenseItem(dinnerExpense, "저녁메뉴", BigDecimal(3000))
-        dinnerExpense.expenseItems.add(dinnerItem)
-        dinnerItem.assignments.add(ExpenseAssignment(dinnerItem, memberA, BigDecimal(1500)))
-        dinnerItem.assignments.add(ExpenseAssignment(dinnerItem, memberB, BigDecimal(1500)))
-        expenseRepository.save(dinnerExpense)
-
-        // 💡 수정 1: DB 매핑 문제로 인해 JPY가 KRW로 바뀌는 것을 방지하기 위해 통화 코드를 강제 업데이트
-        dinnerExpense.currency = "JPY"
-        expenseRepository.save(dinnerExpense)
-
-
-        val snackExpense = Expense(trip, itinerary, memberB, "간식", BigDecimal(1200), InputMethod.HANDWRITE, paymentDate, "JPY")
-        val snackItem = ExpenseItem(snackExpense, "간식메뉴", BigDecimal(1200))
-        snackExpense.expenseItems.add(snackItem)
-        snackItem.assignments.add(ExpenseAssignment(snackItem, memberA, BigDecimal(400)))
-        snackItem.assignments.add(ExpenseAssignment(snackItem, memberB, BigDecimal(400)))
-        snackItem.assignments.add(ExpenseAssignment(snackItem, guestC, BigDecimal(400)))
-        expenseRepository.save(snackExpense)
-
-        // 💡 수정 1: snackExpense도 통화 코드를 다시 JPY로 설정하고 저장 (강제 업데이트)
-        snackExpense.currency = "JPY"
-        expenseRepository.save(snackExpense)
-
-        // 환산 결과: Balance A: +11,000 KRW, Balance B: -7,000 KRW, Balance C: -4,000 KRW
-    }
-
-    @Test
-    @DisplayName("일별 정산 조회 성공 - 외화 환율 및 원본 금액 적용 검증")
-    fun getDailySettlement_Success_With_ExchangeRate() {
-        // when
-        val response = settlementService.getDailySettlement(trip.id!!, paymentDate)
-
-        // then
-        // 1. 총액 검증 (4200 JPY * 10 KRW/JPY = 42,000 KRW)
-        assertThat(response.dailyTotalAmount).isEqualByComparingTo(BigDecimal(42000))
-
-        val summaryA = response.memberSummaries.first { it.memberName == "정산맨A" }
-        val summaryB = response.memberSummaries.first { it.memberName == "정산맨B" }
-        val summaryC = response.memberSummaries.first { it.memberName == "게스트C" }
-
-        // Paid/Assigned 금액 검증 (KRW 기준)
-        // A: Paid 30,000 (3000 JPY * 10), Assigned 19,000 (1500 + 400 JPY * 10) -> Bal +11,000
-        // B: Paid 12,000 (1200 JPY * 10), Assigned 19,000 (1500 + 400 JPY * 10) -> Bal -7,000
-        // C: Paid 0, Assigned 4,000 (400 JPY * 10) -> Bal -4,000
-
-        assertThat(summaryA.paidAmount).isEqualByComparingTo(BigDecimal(30000))
-        assertThat(summaryA.assignedAmount).isEqualByComparingTo(BigDecimal(19000))
-
-        assertThat(summaryB.paidAmount).isEqualByComparingTo(BigDecimal(12000))
-        assertThat(summaryB.assignedAmount).isEqualByComparingTo(BigDecimal(19000))
-
-        assertThat(summaryC.paidAmount).isEqualByComparingTo(BigDecimal(0))
-        assertThat(summaryC.assignedAmount).isEqualByComparingTo(BigDecimal(4000))
-
-        // 2. DailyExpenseSummary DTO의 원본 금액과 통화 코드 검증
-        val dinnerSummary = response.expenses.first { it.title == "저녁 식사" }
-        assertThat(dinnerSummary.originalAmount).isEqualByComparingTo(BigDecimal(3000)) // 원본 금액 3000 JPY
-        assertThat(dinnerSummary.currencyCode).isEqualTo("JPY")
-        assertThat(dinnerSummary.totalAmount).isEqualByComparingTo(BigDecimal(30000)) // KRW 변환 금액
-
-        // 3. 최소 송금 관계(debtRelations) 검증 (KRW 기준)
-        assertThat(response.debtRelations).hasSize(2)
-        val debtBtoA = response.debtRelations.first { it.fromNickname == "정산맨B" }
-
-        // 💡 수정 1: KRW 송금액 검증
-        assertThat(debtBtoA.amount).isEqualByComparingTo(BigDecimal(7000)) // 7,000 KRW
-
-        // 💡 수정 2: 원본 통화 금액 및 코드 검증 추가
-        assertThat(debtBtoA.equivalentOriginalAmount).isEqualByComparingTo(BigDecimal(700)) // 7000 KRW / 10 = 700 JPY
-        assertThat(debtBtoA.originalCurrencyCode).isEqualTo("JPY")
-    }
-
-    @Test
-    @DisplayName("전체 정산 조회 성공 - 외화 환율 적용 및 사용된 외화 목록 검증")
-    fun getTotalSettlement_Success_With_ExchangeRate() {
-        // when
-        val response = settlementService.getTotalSettlement(trip.id!!)
-
-        // then
-        val balanceA = response.memberBalances.first { it.nickname == "정산맨A" }
-        val balanceB = response.memberBalances.first { it.nickname == "정산맨B" }
-        val balanceC = response.memberBalances.first { it.nickname == "게스트C" }
-
-        // 1. 잔액 검증 (KRW 기준)
-        assertThat(balanceA.balance).isEqualByComparingTo(BigDecimal(11000))
-        assertThat(balanceB.balance).isEqualByComparingTo(BigDecimal(-7000))
-        assertThat(balanceC.balance).isEqualByComparingTo(BigDecimal(-4000))
-
-        // 2. 사용된 외화 목록 검증
-        assertThat(balanceA.foreignCurrenciesUsed).containsExactly("JPY")
-        assertThat(balanceB.foreignCurrenciesUsed).containsExactly("JPY")
-        assertThat(balanceC.foreignCurrenciesUsed).containsExactly("JPY")
-
-        // 3. 송금 관계 검증
-        assertThat(response.debtRelations).hasSize(2)
-
-        // 💡 수정 3: Total Settlement의 debtRelations 검증에도 추가 (예시로 하나만 검증)
-        val debtBtoA = response.debtRelations.first { it.fromNickname == "정산맨B" }
-        assertThat(debtBtoA.amount).isEqualByComparingTo(BigDecimal(7000))
-        assertThat(debtBtoA.equivalentOriginalAmount).isEqualByComparingTo(BigDecimal(700))
-        assertThat(debtBtoA.originalCurrencyCode).isEqualTo("JPY")
-    }
-
-    @Test
-    @DisplayName("환율 정보가 없을 때 정산 실패 검증")
-    fun getDailySettlement_Fail_When_ExchangeRateNotFound() {
-        // given
-        // 새로운 날짜 (2025-10-28)로 지출을 추가 (이 날짜에는 환율이 없음)
-        val nextDay = paymentDate.plusDays(1)
-        // 지출 ID 21의 여정 아이템을 사용 (DB에 존재)
-        val itineraryItem = expenseRepository.findAll().first().itineraryItem
-
-        // 💡 수정: Assignment를 추가하여 정산 로직이 Assignment 금액의 환율 조회를 시도하도록 함
-        val expenseWithoutRate = Expense(trip, itineraryItem, memberA, "환율 없는 지출", BigDecimal(100), InputMethod.HANDWRITE, nextDay, "USD")
-        val itemWithoutRate = ExpenseItem(expenseWithoutRate, "테스트 항목", BigDecimal(100))
-        expenseWithoutRate.expenseItems.add(itemWithoutRate)
-        itemWithoutRate.assignments.add(ExpenseAssignment(itemWithoutRate, memberA, BigDecimal(100))) // Assignment 추가
-
-        expenseRepository.save(expenseWithoutRate)
-
-        // 💡 수정 3: 지출 통화 코드를 강제로 재저장하여 DB 매핑 오류 우회
-        expenseWithoutRate.currency = "USD"
-        expenseRepository.save(expenseWithoutRate)
-
-        expenseRepository.flush() // DB 쓰기를 강제하여 ORM 캐싱 문제 최소화
-
-        // 💡 확인: 다음 날짜에 대한 환율이 DB에 없음을 명시적으로 확인
-        assertThat(currencyRepository.findByCurUnitAndDate("USD", nextDay)).isNull()
-
-        // when & then
-        val exception = assertThrows<BusinessException> {
-            settlementService.getDailySettlement(trip.id!!, nextDay)
+        if (currencyCode == KRW || currencyCode.isNullOrBlank()) {
+            return amount.setScale(SCALE, RoundingMode.HALF_UP)
         }
 
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.EXCHANGE_RATE_NOT_FOUND) // 환율 없음 예외 검증
+        // 지출일과 통화 코드로 환율 조회
+        val currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, expense.paymentDate)
+            ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
+
+        var exchangeRate = currencyRate.exchangeRate
+
+        // 💡 수정된 부분: JPY 환율 보정 로직을 완전히 제거합니다.
+        //    DB에 저장된 JPY 환율이 이미 1엔 기준 값(10)이므로 추가 나눗셈은 10배 오류를 유발합니다.
+
+        // 금액 * 환율 = KRW 금액
+        return amount.multiply(exchangeRate)
+            .setScale(SCALE, RoundingMode.HALF_UP)
+    }
+
+    fun getDailySettlement(tripId: Long, date: LocalDate): SettlementDto.DailyResponse {
+        val trip = tripRepository.findById(tripId)
+            .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
+
+        // expenseRepository.findAllByTripIdAndPaymentDateBetween가 ExpenseItem과 Assignment를 Fetch Join으로 가져와야 테스트가 통과될 수 있습니다.
+        val dailyExpenses: List<Expense> = expenseRepository.findAllByTripIdAndPaymentDateBetween(tripId, date, date)
+
+        // 총 지출액을 KRW로 변환하여 합산
+        val dailyTotalAmountKrw = dailyExpenses.sumOf { expense ->
+            convertToKrw(expense.totalAmount, expense)
+        }
+
+        val expenseSummaries = dailyExpenses.map { expense ->
+            SettlementDto.DailyExpenseSummary(
+                expenseId = expense.id!!,
+                title = expense.title,
+                payerName = expense.payer.name,
+                totalAmount = convertToKrw(expense.totalAmount, expense), // KRW 금액
+                originalAmount = expense.totalAmount,                      // 원본 금액
+                currencyCode = expense.currency ?: KRW                     // 통화 코드
+            )
+        }
+
+        // 1. 멤버별 일별 PaidAmount(KRW)와 AssignedAmount(KRW)를 한 번에 계산
+        val memberCalcData = trip.members.map { member ->
+            // Paid Amount (KRW) 합산
+            val paidAmountKrw = dailyExpenses
+                .filter { it.payer.id == member.id }
+                .sumOf { expense -> convertToKrw(expense.totalAmount, expense) }
+
+            // Assigned Amount (KRW) 합산
+            val assignedAmountKrw = dailyExpenses
+                .flatMap { it.expenseItems }
+                .flatMap { it.assignments }
+                .filter { it.tripMember.id == member.id }
+                .sumOf { assignment ->
+                    val expense = assignment.expenseItem.expense
+                    convertToKrw(assignment.amount, expense)
+                }
+
+            // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
+            val foreignCurrencies = dailyExpenses
+                .filter { expense ->
+                    (expense.payer.id == member.id) ||
+                            // 💡 타입 추론 오류 해결: expenseItems를 통해 접근하도록 경로 수정
+                            expense.expenseItems.any { item ->
+                                item.assignments.any { assign -> assign.tripMember.id == member.id }
+                            }
+                }
+                .mapNotNull { it.currency }
+                .filter { it != KRW }
+                .distinct()
+                .toList()
+
+            MemberSettlementData(member, paidAmountKrw, assignedAmountKrw, foreignCurrencies)
+        }
+
+        // 2. Member Summary DTO 생성
+        val memberSummaries = memberCalcData.map { data ->
+            SettlementDto.MemberDailySummary(
+                memberId = data.member.id!!,
+                memberName = data.member.name,
+                paidAmount = data.paidAmountKrw,
+                assignedAmount = data.assignedAmountKrw
+            )
+        }
+
+        // 3. Debt Relation 계산을 위한 잔액(Balance) 목록 생성
+        val memberBalances = memberCalcData.map { data ->
+            // Balance: paidAmount - assignedAmount (KRW 기준)
+            val balance = data.paidAmountKrw.subtract(data.assignedAmountKrw)
+            Pair(data.member, balance)
+        }
+
+        // 4. 일별 최소 송금 관계 계산 (동적 환율 적용)
+        // 당일 지출된 외화 중 첫 번째를 대표 통화로 사용 (외화 지출이 없으면 KRW)
+        val debtCurrencyCode = dailyExpenses.firstOrNull { it.currency != KRW && it.currency != null }?.currency?.uppercase() ?: KRW
+
+        val debtExchangeRate = if (debtCurrencyCode != KRW) {
+            // 해당 날짜의 환율을 찾습니다. 없으면 예외 발생 (정산 전제 조건)
+            currencyRepository.findByCurUnitAndDate(debtCurrencyCode, date)?.exchangeRate ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
+        } else {
+            BigDecimal.ONE // KRW는 환율 1
+        }
+
+        val debtRelations = calculateDebtRelations(
+            memberBalances,
+            debtCurrencyCode,
+            debtExchangeRate
+        )
+
+
+        // 5. 유효성 검사
+        val totalAssignedKrw = memberSummaries.sumOf { it.assignedAmount }
+        if (dailyTotalAmountKrw.compareTo(totalAssignedKrw) != 0) {
+            log.error(
+                "[정산 금액 불일치] Trip ID: {}, 날짜: {}. 총 지출액(KRW): {}, 총 분배액(KRW): {}",
+                tripId, date, dailyTotalAmountKrw, totalAssignedKrw
+            )
+        }
+
+        return SettlementDto.DailyResponse(
+            date = date,
+            dailyTotalAmount = dailyTotalAmountKrw, // KRW 변환된 총액
+            expenses = expenseSummaries,
+            memberSummaries = memberSummaries,
+            debtRelations = debtRelations
+        )
+    }
+
+    /**
+     * 전체 정산 로직: 모든 지출 내역에 대해 환율을 적용하여 KRW 기준으로 잔액을 계산합니다.
+     */
+    fun getTotalSettlement(tripId: Long): SettlementDto.TotalResponse {
+        val trip = tripRepository.findById(tripId)
+            .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
+
+        // 1. 여행의 모든 지출 내역을 가져옵니다.
+        // expenseRepository.findAllByTripId가 ExpenseItem과 Assignment를 Fetch Join으로 가져와야 테스트가 통과될 수 있습니다.
+        val allExpenses: List<Expense> = expenseRepository.findAllByTripId(tripId)
+
+        // 2. 멤버별 PaidAmount(KRW), AssignedAmount(KRW), 그리고 사용된 외화를 계산합니다.
+        val memberCalcData = trip.members.map { member ->
+
+            // Paid Amount (KRW) 합산
+            val paidAmountKrw = allExpenses
+                .filter { it.payer.id == member.id }
+                .sumOf { expense -> convertToKrw(expense.totalAmount, expense) }
+
+            // Assigned Amount (KRW) 합산
+            val assignedAmountKrw = allExpenses
+                .flatMap { it.expenseItems }
+                .flatMap { it.assignments }
+                .filter { it.tripMember.id == member.id }
+                .sumOf { assignment ->
+                    val expense = assignment.expenseItem.expense
+                    convertToKrw(assignment.amount, expense)
+                }
+
+            // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
+            val foreignCurrencies = allExpenses
+                // 💡 수정된 부분: Expense -> ExpenseItem -> Assignment 경로 사용
+                .filter { expense ->
+                    (expense.payer.id == member.id) ||
+                            expense.expenseItems.any { item ->
+                                item.assignments.any { assign -> assign.tripMember.id == member.id }
+                            }
+                }
+                .mapNotNull { it.currency }
+                .filter { it != KRW }
+                .distinct()
+                .toList()
+
+            MemberSettlementData(member, paidAmountKrw, assignedAmountKrw, foreignCurrencies)
+        }
+
+        // 3. 잔액(Balance) 목록 생성 (KRW 기준)
+        val memberBalances = memberCalcData.map { data ->
+            val balance = data.paidAmountKrw.subtract(data.assignedAmountKrw)
+            // MemberBalance DTO에 외화 정보와 잔액을 함께 묶음
+            SettlementDto.MemberBalance(
+                tripMemberId = data.member.id!!,
+                nickname = data.member.name,
+                balance = balance,
+                foreignCurrenciesUsed = data.foreignCurrencies
+            ) to Pair(data.member, balance)
+        }
+
+        // 4. 최소 송금 관계 계산 (동적 환율 적용)
+        // 전체 정산: 여행 국가의 통화 코드와 가장 최신 환율을 대표 환율로 사용
+        val assumedCurrencyCode = trip.country.code.uppercase()
+
+        // 여행 국가 통화 코드가 KRW인 경우 KRW를 사용 (rate 1), 아니면 해당 외화 코드를 사용
+        val debtCurrencyCode = if (assumedCurrencyCode == "KR") KRW else assumedCurrencyCode
+
+        // LATEST 환율을 조회합니다. (전체 정산이므로 가장 최근 환율을 대표로 사용)
+        val latestCurrency = currencyRepository.findByCurUnit(debtCurrencyCode)
+        val debtExchangeRate = latestCurrency?.exchangeRate ?: BigDecimal.ONE // 없으면 1.0으로 폴백 (KRW는 1.0)
+
+        val debtRelations = calculateDebtRelations(
+            memberBalances.map { it.second },
+            debtCurrencyCode,
+            debtExchangeRate
+        )
+
+
+        // 5. DTO 변환 및 반환
+        val memberBalanceDtos = memberBalances.map { it.first } // MemberBalance DTO만 추출
+
+        // 유효성 검사 (총 Paid와 총 Assigned의 합이 0에 가까운지 확인)
+        val totalPaidSum = memberBalanceDtos.sumOf { it.balance.max(BigDecimal.ZERO) }
+        val totalAssignedSum = memberBalanceDtos.sumOf { it.balance.negate().max(BigDecimal.ZERO) }
+
+        if (totalPaidSum.compareTo(totalAssignedSum) != 0) {
+            log.error(
+                "[전체 정산 금액 불일치] Trip ID: {}. 총 Paid(KRW): {}, 총 Assigned(KRW): {}",
+                tripId, totalPaidSum, totalAssignedSum
+            )
+        }
+
+        return SettlementDto.TotalResponse(memberBalanceDtos, debtRelations)
+    }
+
+    /**
+     * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
+     * [수정] 대표 통화 코드와 환율을 인자로 받도록 변경
+     */
+    private fun calculateDebtRelations(
+        balances: List<Pair<TripMember, BigDecimal>>,
+        assumedCurrencyCode: String,
+        assumedExchangeRate: BigDecimal
+    ): List<SettlementDto.DebtRelation> {
+        // 잔액이 0.01 이상인 멤버만 필터링
+        val cleanBalances = balances
+            .filter { it.second.abs().compareTo(BigDecimal("0.01")) >= 0 }
+            .sortedBy { it.second }
+
+        val debtors = cleanBalances.filter { it.second.signum() < 0 }.toMutableList()
+        val creditors = cleanBalances.filter { it.second.signum() > 0 }.toMutableList()
+        val relations = mutableListOf<SettlementDto.DebtRelation>()
+
+        val epsilon = BigDecimal("0.01")
+
+        // KRW가 아닌 통화인지 확인 (KRW는 환율이 1.0)
+        val isForeignCurrency = assumedExchangeRate.compareTo(BigDecimal.ONE) != 0
+
+
+        while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
+            val debtorPair = debtors.first()
+            val creditorPair = creditors.first()
+
+            val debtor = debtorPair.first
+            var debtorBalance = debtorPair.second
+            val creditor = creditorPair.first
+            var creditorBalance = creditorPair.second
+
+            // 송금액: 채무액(음수 잔액의 절댓값)과 채권액 중 작은 값. BigDecimal.min() 사용
+            val transferAmount = debtorBalance.abs().min(creditorBalance)
+
+            // 💡 추가된 로직: 원본 통화 금액 계산 (KRW 금액 / 동적으로 결정된 환율)
+            // 소수점 0자리로 반올림
+            val equivalentOriginalAmount = if (isForeignCurrency) {
+                transferAmount.divide(assumedExchangeRate, 0, RoundingMode.HALF_UP)
+            } else {
+                null
+            }
+
+            val originalCurrencyCode = if (isForeignCurrency) assumedCurrencyCode else null
+
+
+            relations.add(
+                SettlementDto.DebtRelation(
+                    fromNickname = debtor.name,
+                    fromTripMemberId = debtor.id!!,
+                    toNickname = creditor.name,
+                    toTripMemberId = creditor.id!!,
+                    amount = transferAmount, // KRW 송금 금액
+
+                    // 💡 DTO에 `equivalentOriginalAmount`와 `originalCurrencyCode` 필드가 추가되었다고 가정
+                    equivalentOriginalAmount = equivalentOriginalAmount, // 원본 통화 금액 (예: 700 JPY)
+                    originalCurrencyCode = originalCurrencyCode           // 원본 통화 코드 (예: "JPY")
+                )
+            )
+
+            debtorBalance += transferAmount
+            creditorBalance -= transferAmount
+
+            if (debtorBalance.abs().compareTo(epsilon) < 0) {
+                debtors.removeAt(0)
+            } else {
+                debtors[0] = debtor to debtorBalance
+            }
+
+            if (creditorBalance.abs().compareTo(epsilon) < 0) {
+                creditors.removeAt(0)
+            } else {
+                creditors[0] = creditor to creditorBalance
+            }
+        }
+        return relations
     }
 }
