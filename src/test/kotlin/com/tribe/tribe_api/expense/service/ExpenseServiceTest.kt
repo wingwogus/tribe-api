@@ -195,6 +195,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = member1TripMember.id!!,
             inputMethod = "SCAN",
+            currency = "KRW",
             items = emptyList()
         )
 
