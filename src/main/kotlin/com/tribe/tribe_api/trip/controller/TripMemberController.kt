@@ -6,7 +6,10 @@ import com.tribe.tribe_api.trip.service.TripMemberService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1/expenses")
@@ -17,7 +20,7 @@ class TripMemberController (
     @PostMapping("/guest")
     fun addGuest(
         @Valid @RequestBody request: TripMemberDto.AddGuestRequest
-    ): ResponseEntity<ApiResponse<TripMemberDto.Info>> {
+    ): ResponseEntity<ApiResponse<TripMemberDto.Simple>> {
         // DTO에 포함된 tripId를 서비스 메서드로 전달
         val response = tripMemberService.addGuest(request)
         return ResponseEntity

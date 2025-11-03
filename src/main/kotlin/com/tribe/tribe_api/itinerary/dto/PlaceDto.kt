@@ -12,7 +12,7 @@ object PlaceDto {
         val longitude: Double
     ) {
         companion object {
-            fun fromGoogle(googlePlace: GoogleDto.GoogleApiResponse.PlaceResult): Simple {
+            fun fromGoogle(googlePlace: GoogleDto.PlacesResponse.PlaceResult): Simple {
                 return Simple(
                     externalPlaceId = googlePlace.id,
                     placeName = googlePlace.displayName?.text ?: "이름 없음",

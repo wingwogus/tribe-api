@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.itinerary.dto
 
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
+import com.tribe.tribe_api.trip.dto.TripMemberDto
 import org.springframework.data.domain.Page
 import java.math.BigDecimal
 
@@ -13,16 +14,13 @@ object WishlistDto {
         val address: String?,
         val latitude: BigDecimal,
         val longitude: BigDecimal,
-        val adderTripMemberId: Long,
-        val adderName: String
+        val adder: TripMemberDto.Details,
     ) {
         companion object {
             fun from(entity: WishlistItem): WishlistItemDto {
                 val place = entity.place
                 val adder = entity.adder
-                val displayName = adder.member?.nickname
-                    ?: adder.guestNickname
-                    ?: "알 수 없는 사용자"
+
                 return WishlistItemDto(
                     wishlistItemId = entity.id!!,
                     placeId = place.id!!,
@@ -30,8 +28,7 @@ object WishlistDto {
                     address = place.address,
                     latitude = place.latitude,
                     longitude = place.longitude,
-                    adderTripMemberId = adder.id!!,
-                    adderName = displayName
+                    adder = TripMemberDto.Details.from(adder)
                 )
             }
         }

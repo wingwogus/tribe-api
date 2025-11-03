@@ -18,6 +18,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     NO_BELONG_TRIP(HttpStatus.BAD_REQUEST, "해당 카테고리는 현재 여행에 속해있지 않습니다."),
     DUPLICATE_CATEGORY_ID_REQUEST(HttpStatus.BAD_REQUEST, "카테고리 ID는 중복될 수 없습니다."),
     DUPLICATE_ORDER_REQUEST(HttpStatus.BAD_REQUEST, "카테고리의 순서가 중복입니다."),
+    CATEGORY_DAY_MISMATCH(HttpStatus.BAD_REQUEST, "카테고리의 day가 맞지 않습니다"),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),
@@ -50,6 +51,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
 
 
     // 500 INTERNAL_SERVER_ERROR
+    EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "외부 API 호출에 실패했습니다."),
     AI_RESPONSE_PARSING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,  "AI 응답 파싱에 실패했습니다."),
     SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부에 문제가 발생했습니다."),
     CODE_GENERATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "코드 생성 중 오류가 발생했습니다."),
