@@ -12,8 +12,8 @@ interface TripReviewRepository:  JpaRepository<TripReview, Long>{
 
     @Query("""
             SELECT t FROM TripReview t 
-            JOIN FETCH t.recommendedPlaces rp
-            JOIN FETCH rp.place p
+            LEFT JOIN FETCH t.recommendedPlaces rp
+            LEFT JOIN FETCH rp.place p
             WHERE t.id = :tripReviewId
         """)
     fun findTripReviewWithRecommendedPlacesById(tripReviewId:Long): TripReview?
