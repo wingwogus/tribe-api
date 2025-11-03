@@ -3,8 +3,8 @@ package com.tribe.tribe_api.expense.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
-import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
+import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
@@ -16,6 +16,7 @@ import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import org.slf4j.LoggerFactory
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -34,6 +35,8 @@ class ExpenseService(
     private val cloudinaryUploadService: CloudinaryUploadService,
     private val objectMapper: ObjectMapper
 ) {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     private fun findExpenseById(expenseId: Long): Expense {
         return expenseRepository.findById(expenseId)
@@ -143,6 +146,7 @@ class ExpenseService(
         }
 
         val savedExpense = expenseRepository.save(expense)
+        logger.info("Expense created. Expense ID: {}, Trip ID: {}", savedExpense.id, tripId)
         return ExpenseDto.CreateResponse.from(savedExpense)
     }
 
@@ -231,6 +235,7 @@ class ExpenseService(
 
         updateExpenseItems(expense, request.items)
 
+        logger.info("Expense updated. Expense ID: {}, Trip ID: {}", expenseId, tripId)
         return ExpenseDto.DetailResponse.from(expense)
     }
 
@@ -321,7 +326,8 @@ class ExpenseService(
                 }
             }
         }
-
+            
+        logger.info("Participants assigned for expense ID: {}. Number of items assigned: {}", expenseId, request.items.size)
         return ExpenseDto.DetailResponse.from(expense)
     }
 
@@ -348,6 +354,7 @@ class ExpenseService(
     fun deleteExpense(expenseId: Long) {
         val expense = findExpenseById(expenseId)
         expenseRepository.delete(expense)
+        logger.info("Expense deleted. Expense ID: {}", expenseId)
     }
 
     // 특정 지출 항목의 배분 내역 삭제
@@ -368,6 +375,7 @@ class ExpenseService(
             expenseItem.assignments.clear()
         }
 
+        logger.info("Expense assignments cleared for expense ID: {}. Number of items cleared: {}", expenseId, request.itemIds.size)
         return ExpenseDto.DetailResponse.from(expense)
     }
 }

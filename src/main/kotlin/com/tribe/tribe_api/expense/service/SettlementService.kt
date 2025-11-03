@@ -19,7 +19,7 @@ class SettlementService(
     private val expenseRepository: ExpenseRepository,
     private val tripRepository: TripRepository
 ) {
-    private val log = LoggerFactory.getLogger(this::class.java)
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     fun getDailySettlement(tripId: Long, date: LocalDate): SettlementDto.DailyResponse {
         val trip = tripRepository.findById(tripId)
@@ -59,7 +59,7 @@ class SettlementService(
 
         val totalAssigned = memberSummaries.sumOf { it.assignedAmount }
         if (dailyTotalAmount.compareTo(totalAssigned) != 0) {
-            log.error(
+            logger.error(
                 "[정산 금액 불일치] Trip ID: {}, 날짜: {}. 총 지출액: {}, 총 분배액: {}",
                 tripId, date, dailyTotalAmount, totalAssigned
             )

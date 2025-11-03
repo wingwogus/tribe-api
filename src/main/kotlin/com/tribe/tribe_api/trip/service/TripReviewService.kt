@@ -14,6 +14,7 @@ import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripReview
 import com.tribe.tribe_api.trip.repository.TripRepository
 import com.tribe.tribe_api.trip.repository.TripReviewRepository
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.security.access.prepost.PreAuthorize
@@ -31,6 +32,8 @@ class TripReviewService(
     private val placeRepository: PlaceRepository,
     private val recommendedPlaceRepository: RecommendedPlaceRepository,
 ) {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createReview(
@@ -60,7 +63,7 @@ class TripReviewService(
             )
         }
 
-
+        logger.info("Trip review created for Trip Id: {}. Review ID: {}", tripId, review.id)
         return TripReviewResponse.ReviewDetail.from(review)
     }
 

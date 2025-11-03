@@ -6,6 +6,7 @@ import com.tribe.tribe_api.itinerary.dto.CategoryDto
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
@@ -17,6 +18,8 @@ class CategoryService (
     private val categoryRepository: CategoryRepository,
     private val tripRepository: TripRepository,
 ){
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createCategory(tripId: Long, request: CategoryDto.CreateRequest): CategoryDto.CategoryResponse {
         val trip = tripRepository.findById(tripId).orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
@@ -27,6 +30,7 @@ class CategoryService (
             order = request.order
         )
         val savedCategory = categoryRepository.save(category)
+        logger.info("Category created. Category ID: {}, Trip ID: {}", savedCategory.id, tripId)
         return CategoryDto.CategoryResponse.from(savedCategory)
     }
 
@@ -65,6 +69,7 @@ class CategoryService (
         request.order?.let { category.order = it }
         request.memo?.let { category.memo = it }
 
+        logger.info("Category updated. Category ID: {}, Trip ID: {}", categoryId, tripId)
         return CategoryDto.CategoryResponse.from(category)
     }
 
@@ -75,6 +80,7 @@ class CategoryService (
             throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
         }
         categoryRepository.deleteById(categoryId)
+        logger.info("Category deleted. Category ID: {}, Trip ID: {}", categoryId, tripId)
     }
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
@@ -117,6 +123,7 @@ class CategoryService (
             category.updateOrder(newOrder)
         }
         //순서가 변경된 카테고리 목록을 다시 조회하여 반환
+        logger.info("Category order updated for tripId: {}. Number of categories updated: {}", tripId, categoriesToUpdate.size)
         return categoriesToUpdate
             .sortedBy { it.order }
             .map { CategoryDto.CategoryResponse.from(it) }

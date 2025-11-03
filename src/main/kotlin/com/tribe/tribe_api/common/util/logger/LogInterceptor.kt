@@ -18,7 +18,7 @@ class LogInterceptor : HandlerInterceptor {
         request.setAttribute("startTime", System.currentTimeMillis())
 
         // MDC(traceId, userId)가 이미 찍히기 때문에 메소드, URI, Client 코드만 넘김
-        log.info("[REQ START] {} {}, client={}", request.method, request.requestURI, getClientIP(request))
+        log.info("[REQ START] {} {}, client: {}", request.method, request.requestURI, getClientIP(request))
         return true
     }
 
@@ -37,13 +37,13 @@ class LogInterceptor : HandlerInterceptor {
         if (status >= 400) {
             // 4xx, 5xx 에러 (JwtExceptionFilter, EntryPoint, GlobalExceptionHandler 모두 포함)
             log.warn(
-                "[REQ END] {} {}, status={}, duration={}ms, client={}",
+                "[REQ END] {} {}, status: {}, duration: {}ms, client: {}",
                 request.method, request.requestURI, status, duration, clientIP
             )
         } else {
             // 2xx, 3xx 성공
             log.info(
-                "[REQ END] {} {}, status={}, duration={}ms, client={}",
+                "[REQ END] {} {}, status: {}, duration: {}ms, client: {}",
                 request.method, request.requestURI, status, duration, clientIP
             )
         }
