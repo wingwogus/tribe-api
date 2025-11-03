@@ -82,7 +82,11 @@ class ExpenseService(
                     ?: throw BusinessException(ErrorCode.INVALID_INPUT_VALUE) //수기 입력시 필수 입력
                 ExpenseDto.OcrResponse(
                     totalAmount = totalAmount,
-                    items = request.items.map { ExpenseDto.OcrItem(it.itemName, it.price) }
+                    items = request.items.map { ExpenseDto.OcrItem(it.itemName, it.price) },
+                    subtotal = null,
+                    tax = null,
+                    tip = null,
+                    discount = null
                 )
             }
             else -> throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
@@ -91,11 +95,6 @@ class ExpenseService(
         var imageUrl: String? = null
         if (imageFile != null && !imageFile.isEmpty) {
             imageUrl = cloudinaryUploadService.upload(imageFile)
-        }
-
-        val itemsTotal = processedData.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
-        if (processedData.totalAmount.compareTo(itemsTotal) != 0) {
-            throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
         }
 
         val expense = Expense(
@@ -110,6 +109,7 @@ class ExpenseService(
             currency = request.currency.uppercase() // 통화 코드 저장 (예: KRW, USD, JPY)
         )
 
+        var itemsTotal = BigDecimal.ZERO
         processedData.items.forEach { itemDto ->
             val expenseItem = ExpenseItem(
                 expense = expense,
@@ -117,6 +117,30 @@ class ExpenseService(
                 price = itemDto.price
             )
             expense.addExpenseItem(expenseItem)
+            itemsTotal = itemsTotal.add(itemDto.price)
+        }
+
+        // '최종 총액'과 '항목 합계'의 차액 계산
+        val remainder = processedData.totalAmount.subtract(itemsTotal)
+        val zero = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+
+        // 차액이 있다면 '세금/팁/기타' 또는 '할인' 항목으로 자동 추가
+        if (remainder.compareTo(zero) > 0) {
+            // 팁, 세금 등으로 인해 총액이 더 큰 경우
+            val remainderItem = ExpenseItem(
+                expense = expense,
+                name = "세금 / 팁 / 기타",
+                price = remainder
+            )
+            expense.addExpenseItem(remainderItem)
+        } else if (remainder < zero) {
+            // 할인 등으로 인해 총액이 더 작은 경우
+            val discountItem = ExpenseItem(
+                expense = expense,
+                name = "할인",
+                price = remainder // 마이너스 값으로 저장
+            )
+            expense.addExpenseItem(discountItem)
         }
 
         val savedExpense = expenseRepository.save(expense)
@@ -126,16 +150,30 @@ class ExpenseService(
     private fun processReceipt(imageFile: MultipartFile): ExpenseDto.OcrResponse {
         val base64Image = java.util.Base64.getEncoder().encodeToString(imageFile.bytes)
         val prompt = """
-            이 영수증 이미지에서 지출 총액(totalAmount)과 모든 지출 항목(items)을 추출해줘.
-            각 항목은 이름(itemName)과 가격(price)을 가져야 해.
+            너는 영수증 분석 AI야. 이 영수증 이미지에서 다음 항목들을 추출해줘.
+            
+            1. 'totalAmount': 최종 결제 총액 (필수)
+            2. 'items': 구매한 개별 항목과 가격 목록 (itemName, price)
+               - !!가장 중요!! 'itemName'은 반드시 **한국어(Korean)로 번역**해서 제공해줘.
+               - (예: 'Chicken Burger' -> '치킨 버거', 'Kaffee' -> '커피')
+            3. 'subtotal': 항목들의 합계 (소계)
+            4. 'tax': 세금
+            5. 'tip': 팁 또는 봉사료
+            6. 'discount': 할인액
+
             결과는 반드시 아래와 같은 JSON 형식으로만 응답해줘.
+            항목이 식별되지 않으면 0 또는 null로 처리해줘.
             
             {
-              "totalAmount": 15000,
+              "totalAmount": 130.00,
               "items": [
-                { "itemName": "아메리카노", "price": 4500 },
-                { "itemName": "카페라떼", "price": 5000 }
-              ]
+                { "itemName": "치킨 버거", "price": 95.00 },
+                { "itemName": "콜라", "price": 15.00 }
+              ],
+              "subtotal": 110.00,
+              "tax": 10.00,
+              "tip": 10.00,
+              "discount": 0
             }
         """.trimIndent()
 

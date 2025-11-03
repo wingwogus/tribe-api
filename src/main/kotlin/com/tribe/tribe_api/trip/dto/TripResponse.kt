@@ -1,8 +1,6 @@
 package com.tribe.tribe_api.trip.dto
 
 import com.tribe.tribe_api.trip.entity.Trip
-import com.tribe.tribe_api.trip.entity.TripMember
-import com.tribe.tribe_api.trip.entity.TripRole
 import java.time.LocalDate
 
 sealed class TripResponse {
@@ -39,7 +37,7 @@ sealed class TripResponse {
         val startDate: LocalDate,
         val endDate: LocalDate,
         val country: String,
-        val members: List<TripMemberInfo>
+        val members: List<TripMemberDto.Details>
     ) {
         companion object {
             fun from(trip: Trip): TripDetail {
@@ -49,29 +47,7 @@ sealed class TripResponse {
                     startDate = trip.startDate,
                     endDate = trip.endDate,
                     country = trip.country.code,
-                    members = trip.members.map { TripMemberInfo.from(it) }
-                )
-            }
-        }
-    }
-
-    data class TripMemberInfo(
-        val memberId: Long?,
-        val nickname: String,
-        val avatar: String?,
-        val role: TripRole
-    ) {
-        companion object {
-            fun from(tripMember: TripMember): TripMemberInfo {
-                val displayName = tripMember.member?.nickname ?: tripMember.guestNickname ?: "게스트"
-                val memberId = tripMember.id
-                val avatar = tripMember.member?.avatar
-
-                return TripMemberInfo(
-                    memberId,
-                    displayName,
-                    avatar,
-                    tripMember.role
+                    members = trip.members.map { TripMemberDto.Details.from(it) }
                 )
             }
         }

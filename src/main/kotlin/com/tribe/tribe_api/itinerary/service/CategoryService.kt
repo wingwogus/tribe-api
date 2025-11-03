@@ -2,14 +2,12 @@ package com.tribe.tribe_api.itinerary.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
-import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.itinerary.dto.CategoryDto
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
-import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.EntityNotFoundException
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,8 +16,8 @@ import org.springframework.transaction.annotation.Transactional
 class CategoryService (
     private val categoryRepository: CategoryRepository,
     private val tripRepository: TripRepository,
-    private val tripMemberRepository: TripMemberRepository
 ){
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createCategory(tripId: Long, request: CategoryDto.CreateRequest): CategoryDto.CategoryResponse {
         val trip = tripRepository.findById(tripId).orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
         val category = Category(
@@ -33,12 +31,14 @@ class CategoryService (
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("@tripSecurityService.isTripMember(#categoryId)")
     fun getCategory(categoryId: Long): CategoryDto.CategoryResponse {
         val category = categoryRepository.findById(categoryId).orElseThrow { BusinessException(ErrorCode.CATEGORY_NOT_FOUND) }
         return CategoryDto.CategoryResponse.from(category)
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun getAllCategories(tripId: Long, day: Int?): List<CategoryDto.CategoryResponse> {
         val categories: List<Category> = if (day != null) {
             categoryRepository.findAllByTripIdAndDayOrderByOrderAsc(tripId, day)
@@ -48,20 +48,17 @@ class CategoryService (
         return categories.map { CategoryDto.CategoryResponse.from(it) }
     }
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun updateCategory(
+        tripId: Long,
         categoryId: Long,
         request: CategoryDto.UpdateRequest
     ): CategoryDto.CategoryResponse {
 
-        val memberId = SecurityUtil.getCurrentMemberId()
 
         val category = categoryRepository.findByIdOrNull(categoryId)
             ?: throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
 
-        val isTripMember = tripMemberRepository.existsByTripIdAndMemberId(category.trip.id!!, memberId)
-        if (!isTripMember) {
-            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
-        }
 
         request.name?.let { category.name = it }
         request.day?.let { category.day = it }
@@ -71,17 +68,57 @@ class CategoryService (
         return CategoryDto.CategoryResponse.from(category)
     }
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun deleteCategory(tripId : Long ,categoryId: Long) {
-        val memberId = SecurityUtil.getCurrentMemberId()
-
-        val isTripMember = tripMemberRepository.existsByTripIdAndMemberId(tripId, memberId)
-        if (!isTripMember) {
-            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
-        }
 
         if (!categoryRepository.existsById(categoryId)) {
             throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
         }
         categoryRepository.deleteById(categoryId)
+    }
+
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
+    fun orderUpdateCategory(tripId: Long, request : CategoryDto.OrderUpdate) : List<CategoryDto.CategoryResponse> {
+        val requestItems = request.items
+
+        val categoryIds = request.items.map { it.categoryId }
+
+        // 요청받은 ID와 새 order 값을 Map으로 변환
+        val newOrderMap = request.items.associateBy({ it.categoryId }, { it.order })
+
+        if (newOrderMap.size != requestItems.size) {
+            throw BusinessException(ErrorCode.DUPLICATE_CATEGORY_ID_REQUEST)
+        }
+
+        val uniqueOrders = newOrderMap.values.toSet()
+        if (uniqueOrders.size != newOrderMap.size) {
+            throw BusinessException(ErrorCode.DUPLICATE_ORDER_REQUEST)
+        }
+
+        // DB에서 해당 여행(tripId)에 속한 카테고리 중, 요청받은 ID 목록에 해당하는 것들만 조회
+        val categoriesToUpdate: List<Category> =
+            // day가 있는 경우: tripId, id 목록 모두 일치하는 것 조회
+            categoryRepository.findAllByTripIdAndIdIn(tripId, categoryIds)
+
+        categoriesToUpdate.firstOrNull()?.day?.let { firstDay ->
+            // day가 다른 항목을 하나라도 찾으면 즉시 true를 반환하고 중단
+            if (categoriesToUpdate.any { it.day != firstDay }) {
+                throw BusinessException(ErrorCode.CATEGORY_DAY_MISMATCH)
+            }
+        }
+
+        if (categoriesToUpdate.size != newOrderMap.size) {
+            throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
+        }
+
+        // 조회된 카테고리들의 order 값을 Map에 있는 새 order 값으로 업데이트
+        categoriesToUpdate.forEach { category ->
+            val newOrder = newOrderMap[category.id]!!
+            category.updateOrder(newOrder)
+        }
+        //순서가 변경된 카테고리 목록을 다시 조회하여 반환
+        return categoriesToUpdate
+            .sortedBy { it.order }
+            .map { CategoryDto.CategoryResponse.from(it) }
     }
 }

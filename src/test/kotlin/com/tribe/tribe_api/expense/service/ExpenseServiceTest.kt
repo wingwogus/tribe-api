@@ -38,7 +38,6 @@ import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.test.annotation.DirtiesContext
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
@@ -55,12 +54,14 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     private val categoryRepository: CategoryRepository,
     private val itineraryItemRepository: ItineraryItemRepository,
     private val objectMapper: ObjectMapper,
+    // [수정] MockkBean이 아닌 실제 TripSecurityService를 주입받습니다.
     private val tripSecurityService: TripSecurityService
 ){
     @MockkBean
     private lateinit var geminiApiClient: GeminiApiClient
     @MockkBean
     private lateinit var cloudinaryUploadService: CloudinaryUploadService
+    // [수정] TripSecurityService에 대한 MockkBean 선언을 제거합니다.
 
     private lateinit var owner: Member
     private lateinit var member1: Member
@@ -145,13 +146,18 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             items = emptyList()
         )
 
-        // Gemini API가 정상적으로 총액과 품목을 반환하는 상황을 모의
+        // Gemini API가 할인이 적용된 총액을 반환하는 상황 모의
+        // (항목 합계 = 1000, 총액 = 800 -> 차액 -200 발생)
         val fakeOcrResponse = ExpenseDto.OcrResponse(
-            totalAmount = BigDecimal("1000"),
+            totalAmount = BigDecimal("800.00"),
             items = listOf(
-                ExpenseDto.OcrItem("과자", BigDecimal("700")),
-                ExpenseDto.OcrItem("음료수", BigDecimal("300"))
-            )
+                ExpenseDto.OcrItem("우유", BigDecimal("300.00")),
+                ExpenseDto.OcrItem("빵", BigDecimal("700.00"))
+            ),
+            subtotal = BigDecimal("1000.00"),
+            tax = BigDecimal.ZERO,
+            tip = BigDecimal.ZERO,
+            discount = BigDecimal("200.00") // 할인이 200 적용됨
         )
         val fakeGeminiJson = objectMapper.writeValueAsString(fakeOcrResponse)
         every { geminiApiClient.generateContentFromImage(any(), any(), any()) } returns fakeGeminiJson
@@ -159,7 +165,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         // when: 지출 생성
         val response = expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, imageFile)
 
-        // then: OCR 결과대로 지출이 생성되었는지 검증
+        // then: 차액(-200)이 "할인" 항목으로 자동 추가되어야 함
         val savedExpense = expenseRepository.findById(response.expenseId).get()
         assertThat(savedExpense.title).isEqualTo("편의점 간식")
         assertThat(savedExpense.totalAmount).isEqualByComparingTo("1000")
@@ -168,6 +174,52 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         assertThat(savedExpense.expenseItems.first { it.name == "과자" }.price).isEqualByComparingTo("700")
         assertThat(savedExpense.expenseItems.first { it.name == "음료수" }.price).isEqualByComparingTo("300")
         assertThat(savedExpense.currency).isEqualTo("USD") // 💡 통화 코드 검증 성공
+        assertThat(savedExpense.totalAmount).isEqualByComparingTo("800.00") // AI가 준 총액
+        assertThat(savedExpense.expenseItems).hasSize(3) // 기존 2개 + 할인 1개
+        assertThat(savedExpense.expenseItems.first { it.name == "우유" }.price).isEqualByComparingTo("300.00")
+        assertThat(savedExpense.expenseItems.first { it.name == "빵" }.price).isEqualByComparingTo("700.00")
+        assertThat(savedExpense.expenseItems.first { it.name == "할인" }.price).isEqualByComparingTo("-200.00") // 차액 (800 - 1000)
+    }
+
+    // ▼▼▼ [추가된 테스트] ▼▼▼
+    @Test
+    @DisplayName("지출 생성 성공 - 스캔(SCAN) - 항목명 번역 검증")
+    fun createExpense_Success_Scan_With_Translation() {
+        // given: '멤버1'이 로그인
+        setAuthentication(member1)
+        val imageFile = MockMultipartFile("image", "receipt.jpg", "image/jpeg", "test image data".toByteArray())
+        val request = ExpenseDto.CreateRequest(
+            tripId = trip.id!!,
+            expenseTitle = "해외 영수증",
+            totalAmount = null,
+            itineraryItemId = itineraryItem.id!!,
+            payerId = member1TripMember.id!!,
+            inputMethod = "SCAN",
+            items = emptyList()
+        )
+
+        // Gemini API가 영어 항목명을 "한국어"로 번역해서 반환하는 상황 모의
+        val fakeOcrResponse = ExpenseDto.OcrResponse(
+            totalAmount = BigDecimal("15.00"),
+            items = listOf(
+                ExpenseDto.OcrItem("커피", BigDecimal("15.00")) // "Coffee"가 "커피"로 번역됨
+            ),
+            subtotal = BigDecimal("15.00"),
+            tax = BigDecimal.ZERO,
+            tip = BigDecimal.ZERO,
+            discount = BigDecimal.ZERO
+        )
+        val fakeGeminiJson = objectMapper.writeValueAsString(fakeOcrResponse)
+        every { geminiApiClient.generateContentFromImage(any(), any(), any()) } returns fakeGeminiJson
+
+        // when: 지출 생성
+        val response = expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, imageFile)
+
+        // then: "커피"라는 번역된 이름으로 저장되었는지 검증
+        val savedExpense = expenseRepository.findById(response.expenseId).get()
+        assertThat(savedExpense.totalAmount).isEqualByComparingTo("15.00")
+        assertThat(savedExpense.expenseItems).hasSize(1) // 차액 0
+        assertThat(savedExpense.expenseItems.first().name).isEqualTo("커피") // 번역된 이름 확인
     }
 
     @Test

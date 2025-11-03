@@ -4,6 +4,7 @@ package com.tribe.tribe_api.itinerary.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
+import com.tribe.tribe_api.common.util.service.TripSecurityService
 import com.tribe.tribe_api.itinerary.dto.WishlistDto
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
@@ -14,6 +15,7 @@ import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -24,10 +26,11 @@ class WishlistService(
     private val placeRepository: PlaceRepository,
     private val tripMemberRepository: TripMemberRepository,
     private val tripRepository: TripRepository,
-    private val memberRepository: MemberRepository
+    private val memberRepository: MemberRepository,
 ) {
 
     // 위시리스트에 장소 추가
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun addWishList(
         tripId : Long,
         request : WishlistDto.WishListAddRequest
@@ -36,7 +39,16 @@ class WishlistService(
         val memberId = SecurityUtil.getCurrentMemberId()
         val member = memberRepository.findByIdOrNull(memberId) ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
         val trip = tripRepository.findByIdOrNull(tripId) ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
-        val tripMember = tripMemberRepository.findByTripAndMember(trip, member) ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
+        val tripMember = tripMemberRepository.findByTripAndMember(trip, member)!!
+
+        val alreadyExists = wishlistItemRepository.existsByTrip_IdAndPlace_ExternalPlaceId(
+            tripId,
+            request.externalPlaceId
+        )
+
+        if (alreadyExists) {
+            throw BusinessException(ErrorCode.WISHLIST_ITEM_ALREADY_EXISTS)
+        }
 
         val place = placeRepository.findByExternalPlaceId(request.externalPlaceId)
             ?: run {
@@ -63,32 +75,65 @@ class WishlistService(
     }
 
     // 위시리스트 내에서 장소 검색
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     @Transactional(readOnly = true)
     fun searchWishList(tripId: Long, query: String, pageable: Pageable): WishlistDto.WishlistSearchResponse {
+        val memberId = SecurityUtil.getCurrentMemberId()
+        // 멤버 검증
+        memberRepository.findByIdOrNull(memberId)
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+        // 여행 검증
+        tripRepository.findByIdOrNull(tripId)
+            ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
         val wishlistPage = wishlistItemRepository.findAllByTrip_IdAndPlace_NameContainingIgnoreCase(tripId, query, pageable)
         return WishlistDto.WishlistSearchResponse.from(wishlistPage)
     }
 
-    // 위시리스트 목록 조회 (페이지 네이션)
+    // 위시리스트 목록 조회
     @Transactional(readOnly = true)
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun getWishList(tripId: Long, pageable: Pageable): WishlistDto.WishlistSearchResponse {
+        val memberId = SecurityUtil.getCurrentMemberId()
+
+        // 멤버 검증
+        memberRepository.findByIdOrNull(memberId)
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+        // 여행 검증
+        tripRepository.findByIdOrNull(tripId)
+            ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
+        // 위시리스트 조회
         val wishlistPage = wishlistItemRepository.findAllByTrip_Id(tripId, pageable)
         return WishlistDto.WishlistSearchResponse.from(wishlistPage)
     }
 
     // 위시리스트 장소 제거
-    fun deleteWishlistItems(wishlistItemIds: List<Long>) {
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
+    fun deleteWishlistItems(tripId: Long,wishlistItemIds: List<Long>) {
 
+        val memberId = SecurityUtil.getCurrentMemberId()
+
+        // 멤버 검증
+        memberRepository.findByIdOrNull(memberId)
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+        // 여행 검증
+        tripRepository.findByIdOrNull(tripId)
+            ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
+        // 중복 아이디 검증
         val requestedIds = wishlistItemIds.distinct()
         if (requestedIds.isEmpty()) return
 
-        val existingIds = wishlistItemRepository.findExistingIds(requestedIds)
+        // 존재하지 않는 아이디 검증
+        val existingIdsInTrip = wishlistItemRepository.findIdsByTripIdAndIdIn(tripId, requestedIds)
 
-        val missingIds = requestedIds.filterNot { it in existingIds }
-
+        // 위시리스트 아이템 검증
+        val missingIds = requestedIds.filterNot { it in existingIdsInTrip }
         if (missingIds.isNotEmpty()) {
             throw BusinessException(ErrorCode.WISHLIST_ITEM_NOT_FOUND)
         }
-        wishlistItemRepository.deleteAllByIdInBatch(requestedIds)
+
+        wishlistItemRepository.deleteAllByIdInBatch(existingIdsInTrip)
     }
 }

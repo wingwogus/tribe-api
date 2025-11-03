@@ -20,7 +20,7 @@ class TripMemberService(
     //특정 여행에 임시 참여자(게스트)를 추가
     @Transactional
     @PreAuthorize("@tripSecurityService.isTripMember(tripId)")
-    fun addGuest(request: TripMemberDto.AddGuestRequest): TripMemberDto.Info {
+    fun addGuest(request: TripMemberDto.AddGuestRequest): TripMemberDto.Simple {
         val tripId = request.tripId
 
         val trip = tripRepository.findById(tripId)
@@ -35,6 +35,6 @@ class TripMemberService(
         trip.members.add(newGuest)
 
         val savedGuest = tripMemberRepository.save(newGuest)
-        return TripMemberDto.Info.from(savedGuest)
+        return TripMemberDto.Simple.from(savedGuest)
     }
 }
