@@ -12,16 +12,10 @@ import com.tribe.tribe_api.member.entity.Role
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.entity.Trip
-import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
-import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -34,11 +28,9 @@ import java.time.LocalDate
 @Transactional
 class CategoryServiceIntegrationTest @Autowired constructor(
     private val categoryService: CategoryService,
-
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
     private val tripRepository: TripRepository,
-    private val tripMemberRepository: TripMemberRepository,
     private val categoryRepository: CategoryRepository
 ) {
     private lateinit var member1: Member
@@ -48,7 +40,6 @@ class CategoryServiceIntegrationTest @Autowired constructor(
     private lateinit var category2_day1: Category
     private lateinit var category3_day2: Category
     private lateinit var category4_day2: Category
-    private lateinit var category5_nullDay: Category
 
     @BeforeEach
     fun setUp() {
@@ -68,9 +59,8 @@ class CategoryServiceIntegrationTest @Autowired constructor(
 
         trip = Trip("테스트 여행", LocalDate.now(), LocalDate.now().plusDays(5), Country.JAPAN)
 
-        // 연관관계 메서드가 없다면, TripMember를 직접 저장
+        trip.addMember(member1, TripRole.OWNER)
         tripRepository.save(trip)
-        tripMemberRepository.save(TripMember(member1, trip, null, TripRole.OWNER))
 
         // 3. 카테고리 5개 생성 (엔티티 생성자 순서 준수)
         category1_day1 = categoryRepository.save(Category(trip, 1, "숙소 (Day 1)", 1))
@@ -119,7 +109,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             val exception = assertThrows<BusinessException> {
                 categoryService.createCategory(nonExistentTripId, request)
             }
-            assertThat(exception.errorCode).isEqualTo(ErrorCode.TRIP_NOT_FOUND)
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
         }
     }
 
@@ -129,11 +119,13 @@ class CategoryServiceIntegrationTest @Autowired constructor(
         @Test
         @DisplayName("단건 조회 성공")
         fun getCategory_success() {
-            // given (조회는 권한 검사 없음)
+            setAuthentication(member1)
+
+            // given
             val categoryId = category1_day1.id!!
 
             // when
-            val response = categoryService.getCategory(categoryId)
+            val response = categoryService.getCategory(trip.id!!, categoryId)
 
             // then
             assertThat(response.categoryId).isEqualTo(categoryId)
@@ -143,6 +135,8 @@ class CategoryServiceIntegrationTest @Autowired constructor(
         @Test
         @DisplayName("목록 조회 성공 - 특정 'day' 기준")
         fun getAllCategories_byDay_success() {
+            setAuthentication(member1)
+
             // when
             val responses = categoryService.getAllCategories(trip.id!!, 1)
 
@@ -154,6 +148,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
         @Test
         @DisplayName("목록 조회 성공 - 'day'가 null인 경우 (전체)")
         fun getAllCategories_allDays_success() {
+            setAuthentication(member1)
             // when
             val responses = categoryService.getAllCategories(trip.id!!, null)
 
@@ -164,9 +159,11 @@ class CategoryServiceIntegrationTest @Autowired constructor(
         @Test
         @DisplayName("단건 조회 실패 - 카테고리를 찾을 수 없음")
         fun getCategory_fail_categoryNotFound() {
+            setAuthentication(member1)
+
             // when & then
             val exception = assertThrows<BusinessException> {
-                categoryService.getCategory(999L)
+                categoryService.getCategory(trip.id!!, 999L)
             }
             assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_NOT_FOUND)
         }
@@ -184,7 +181,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             val request = CategoryDto.UpdateRequest(name = "수정된 숙소", day = 2, memo = "메모 변경")
 
             // when
-            val response = categoryService.updateCategory(categoryId, request)
+            val response = categoryService.updateCategory(trip.id!!, categoryId, request)
 
             // then
             assertThat(response.name).isEqualTo("수정된 숙소")
@@ -206,7 +203,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
 
             // when & then
             val exception = assertThrows<BusinessException> {
-                categoryService.updateCategory(categoryId, request)
+                categoryService.updateCategory(trip.id!!, categoryId, request)
             }
             assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
         }
@@ -263,7 +260,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             )
 
             // when
-            val response = categoryService.orderUpdateCategory(trip.id!!, 1, request)
+            val response = categoryService.orderUpdateCategory(trip.id!!, request)
 
             // then
             // 1. 반환된 DTO가 새 순서(1, 2)대로 정렬되었는지 확인
@@ -288,7 +285,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
 
             // when & then
             val exception = assertThrows<BusinessException> {
-                categoryService.orderUpdateCategory(trip.id!!, 1, request)
+                categoryService.orderUpdateCategory(trip.id!!, request)
             }
             assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
         }
@@ -306,7 +303,7 @@ class CategoryServiceIntegrationTest @Autowired constructor(
             )
             // when & then
             val exception = assertThrows<BusinessException> {
-                categoryService.orderUpdateCategory(trip.id!!, 1, request)
+                categoryService.orderUpdateCategory(trip.id!!, request)
             }
             assertThat(exception.errorCode).isEqualTo(ErrorCode.DUPLICATE_CATEGORY_ID_REQUEST)
         }
@@ -326,9 +323,9 @@ class CategoryServiceIntegrationTest @Autowired constructor(
 
             // when & then
             val exception = assertThrows<BusinessException> {
-                categoryService.orderUpdateCategory(trip.id!!, 1, request)
+                categoryService.orderUpdateCategory(trip.id!!, request)
             }
-            assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_NOT_FOUND)
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.CATEGORY_DAY_MISMATCH)
         }
     }
 }
