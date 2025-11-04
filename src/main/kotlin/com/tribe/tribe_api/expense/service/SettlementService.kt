@@ -292,8 +292,9 @@ class SettlementService(
         }
 
         val debtExchangeRate = if (debtCurrencyCode != KRW) {
-            // [수정 필요]: findTopByCurUnitOrderByDateDesc를 사용해야 합니다.
-            currencyRepository.findTopByCurUnitOrderByDateDesc(debtCurrencyCode)?.exchangeRate ?: BigDecimal.ONE
+            // [수정]: 최신 환율이 없을 경우 BigDecimal.ONE 대신 예외를 발생시켜 정산 오류를 방지
+            currencyRepository.findTopByCurUnitOrderByDateDesc(debtCurrencyCode)?.exchangeRate
+                ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
         } else {
             BigDecimal.ONE // KRW는 환율 1
         }

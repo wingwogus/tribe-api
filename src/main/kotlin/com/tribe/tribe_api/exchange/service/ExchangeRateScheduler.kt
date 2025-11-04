@@ -26,8 +26,8 @@ class ExchangeRateScheduler(
      * 월 ~ 금 14시 00분 부터 5분 주기로 55분까지 (12회) 진행합니다.
      * 한국수출입은행의 업데이트 시점에 맞춰 호출합니다.
      */
-//    @Scheduled(cron = "0 0/5 14 * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작으로 수정
-    @Scheduled(cron = "0 * * * * MON-FRI", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0/5 14 * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작으로 수정
+//    @Scheduled(cron = "0 * * * * MON-FRI", zone = "Asia/Seoul")
     @Transactional
     fun updateCurrency() {
         try {

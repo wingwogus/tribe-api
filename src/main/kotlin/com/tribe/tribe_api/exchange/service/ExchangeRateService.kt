@@ -11,6 +11,7 @@ import com.tribe.tribe_api.exchange.repository.CurrencyRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -27,7 +28,7 @@ class ExchangeRateService(
      * 특정 날짜의 환율을 API에서 조회하고, DB에 저장합니다.
      * 이 메서드는 외부 트랜잭션과 독립적으로 실행됩니다.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun fetchAndSaveExchangeRate(date: LocalDate): Currency? {
         val dateString = date.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
 

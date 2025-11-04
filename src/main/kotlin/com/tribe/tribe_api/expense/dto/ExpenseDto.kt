@@ -29,7 +29,7 @@ object ExpenseDto {
 
         // 통화 필드 추가 (USD, JPY 등)
         @field:NotBlank(message = "통화 정보는 필수입니다.")
-        val currency: String,
+        val currency: String = "KRW",
 
         @field:Valid
         val items: List<ItemCreate> = emptyList()
