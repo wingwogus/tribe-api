@@ -97,7 +97,7 @@ class ExpenseService(
 
         var imageUrl: String? = null
         if (imageFile != null && !imageFile.isEmpty) {
-            imageUrl = cloudinaryUploadService.upload(imageFile)
+            imageUrl = cloudinaryUploadService.upload(imageFile, "receipts")
         }
 
         val expense = Expense(

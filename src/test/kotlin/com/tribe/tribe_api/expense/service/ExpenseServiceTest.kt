@@ -91,7 +91,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         val place = placeRepository.save(Place("place_id_settlement", "테스트 장소", "주소", BigDecimal.ZERO, BigDecimal.ZERO))
         itineraryItem = itineraryItemRepository.save(ItineraryItem(category, place, "저녁 식사", null, 1, null))
 
-        every { cloudinaryUploadService.upload(any()) } returns "https://mock.cloudinary.com/image.jpg"
+        every { cloudinaryUploadService.upload(any() , any()) } returns "https://mock.cloudinary.com/image.jpg"
     }
 
     private fun setAuthentication(member: Member) {
