@@ -5,11 +5,7 @@ import com.ninjasquad.springmockk.MockkBean
 import com.tribe.tribe_api.common.util.service.GoogleMapService
 import com.tribe.tribe_api.common.util.service.RedisService
 import com.tribe.tribe_api.itinerary.dto.GoogleDto
-import io.mockk.every
-import io.mockk.just
-import io.mockk.mockk
-import io.mockk.runs
-import io.mockk.verify
+import io.mockk.*
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -41,17 +37,17 @@ class GoogleMapServiceTest {
     private val searchKey = "$query-$region-$language"
     private val cacheKey = "search_cache:$searchKey"
 
-    private val mockPlace = GoogleDto.GoogleApiResponse.PlaceResult(
+    private val mockPlace = GoogleDto.PlacesResponse.PlaceResult(
         id = "place123",
-        displayName = GoogleDto.GoogleApiResponse.DisplayName(text = "이치란 라멘", languageCode = "ko"),
+        displayName = GoogleDto.PlacesResponse.DisplayName(text = "이치란 라멘", languageCode = "ko"),
         formattedAddress = "일본 오사카 어딘가",
-        location = GoogleDto.GoogleApiResponse.Location(latitude = 34.6684, longitude = 135.5023)
+        location = GoogleDto.PlacesResponse.Location(latitude = 34.6684, longitude = 135.5023)
     )
-    private val mockApiResponse = GoogleDto.GoogleApiResponse(places = listOf(mockPlace))
-    private val emptyApiResponse = GoogleDto.GoogleApiResponse(places = null)
+    private val mockApiResponse = GoogleDto.PlacesResponse(places = listOf(mockPlace))
+    private val emptyApiResponse = GoogleDto.PlacesResponse(places = null)
 
-    private lateinit var mockMono: Mono<GoogleDto.GoogleApiResponse>
-    private lateinit var mockMonoError: Mono<GoogleDto.GoogleApiResponse>
+    private lateinit var mockMono: Mono<GoogleDto.PlacesResponse>
+    private lateinit var mockMonoError: Mono<GoogleDto.PlacesResponse>
 
     @BeforeEach
     fun setUp() {
@@ -65,7 +61,7 @@ class GoogleMapServiceTest {
                 .header(any(), any())
                 .bodyValue(any())
                 .retrieve()
-                .bodyToMono(GoogleDto.GoogleApiResponse::class.java)
+                .bodyToMono(GoogleDto.PlacesResponse::class.java)
                 .doOnError(any())
                 .onErrorReturn(any())
         } returns mockMono
@@ -78,7 +74,7 @@ class GoogleMapServiceTest {
         val cachedData = """{"places": [...]}"""
         every { redisService.getValues(cacheKey) } returns cachedData
         every {
-            objectMapper.readValue(eq(cachedData), eq(GoogleDto.GoogleApiResponse::class.java))
+            objectMapper.readValue(eq(cachedData), eq(GoogleDto.PlacesResponse::class.java))
         } returns mockApiResponse
 
         // when
@@ -93,7 +89,7 @@ class GoogleMapServiceTest {
         assertThat(result[0].placeName).isEqualTo("이치란 라멘")
 
         verify(exactly = 1) { redisService.getValues(cacheKey) }
-        verify(exactly = 1) { objectMapper.readValue(eq(cachedData), eq(GoogleDto.GoogleApiResponse::class.java)) }
+        verify(exactly = 1) { objectMapper.readValue(eq(cachedData), eq(GoogleDto.PlacesResponse::class.java)) }
         verify(exactly = 0) { webClient.post() }
         verify(exactly = 0) { redisService.setGoogleApiData(any(), any()) }
     }
@@ -104,7 +100,7 @@ class GoogleMapServiceTest {
         // given
         every { redisService.getValues(cacheKey) } returns null
         every { mockMono.block() } returns mockApiResponse
-        every { redisService.setGoogleApiData(eq(searchKey), any<GoogleDto.GoogleApiResponse>()) } just runs
+        every { redisService.setGoogleApiData(eq(searchKey), any<GoogleDto.PlacesResponse>()) } just runs
 
         // when
         val result = googleMapService.searchPlaces(query, language, region)
@@ -134,7 +130,7 @@ class GoogleMapServiceTest {
                 .header(any(), any())
                 .bodyValue(any())
                 .retrieve()
-                .bodyToMono(GoogleDto.GoogleApiResponse::class.java)
+                .bodyToMono(GoogleDto.PlacesResponse::class.java)
                 .doOnError(any())
                 .onErrorReturn(any())
         } returns mockMonoError

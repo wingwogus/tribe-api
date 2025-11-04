@@ -19,11 +19,7 @@ import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.PageRequest
@@ -75,9 +71,10 @@ class WishlistServiceTest @Autowired constructor(
         trip = tripRepository.save(
             Trip("위시리스트 여행", LocalDate.now(), LocalDate.now().plusDays(3), Country.JAPAN)
         )
-        tripMember = tripMemberRepository.save(
-            TripMember(member, trip, null, TripRole.OWNER)
-        )
+        trip.addMember(member, TripRole.OWNER)
+
+        tripMember = tripMemberRepository.findByTripIdAndMemberId(trip.id!!, member.id!!)!!
+
         existingPlace = placeRepository.save(
             Place("existing_place_1", "오사카성", "오사카 주소", BigDecimal.TEN, BigDecimal.TEN)
         )
@@ -119,8 +116,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(placeRepository.findByExternalPlaceId("new_google_place_1")).isNotNull
 
             // 'member'('위시리스트멤버')가 추가했는지 확인
-            assertThat(result.adderTripMemberId).isEqualTo(tripMember.id!!)
-            assertThat(result.adderName).isEqualTo(member.nickname)
+            assertThat(result.adder.memberId).isEqualTo(tripMember.id)
         }
 
         @Test
@@ -148,8 +144,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(placeRepository.count()).isEqualTo(initialPlaceCount)
             assertThat(wishlistItemRepository.count()).isEqualTo(initialWishlistCount + 1)
 
-            assertThat(result.adderTripMemberId).isEqualTo(tripMember.id!!)
-            assertThat(result.adderName).isEqualTo(member.nickname)
+            assertThat(result.adder.memberId).isEqualTo(tripMember.id)
         }
 
 
@@ -175,7 +170,7 @@ class WishlistServiceTest @Autowired constructor(
             val exception = assertThrows<BusinessException> {
                 wishlistService.addWishList(nonExistingTripId, request)
             }
-            assertThat(exception.errorCode).isEqualTo(ErrorCode.TRIP_NOT_FOUND)
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
         }
 
         @Test
@@ -216,8 +211,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(result.content[0].name).isEqualTo("오사카성")
 
 
-            assertThat(result.content[0].adderTripMemberId).isEqualTo(tripMember.id!!)
-            assertThat(result.content[0].adderName).isEqualTo(member.nickname)
+            assertThat(result.content[0].adder.memberId).isEqualTo(tripMember.id)
         }
 
         @Test
@@ -234,8 +228,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(result.content).hasSize(1)
             assertThat(result.content[0].name).isEqualTo("오사카성")
 
-            assertThat(result.content[0].adderTripMemberId).isEqualTo(tripMember.id!!)
-            assertThat(result.content[0].adderName).isEqualTo(member.nickname)
+            assertThat(result.content[0].adder.memberId).isEqualTo(tripMember.id)
         }
 
         @Test
@@ -281,7 +274,7 @@ class WishlistServiceTest @Autowired constructor(
             val exception = assertThrows<BusinessException> {
                 wishlistService.searchWishList(nonExistingTripId, "오사카", PageRequest.of(0, 10))
             }
-            assertThat(exception.errorCode).isEqualTo(ErrorCode.TRIP_NOT_FOUND)
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
         }
     }
 

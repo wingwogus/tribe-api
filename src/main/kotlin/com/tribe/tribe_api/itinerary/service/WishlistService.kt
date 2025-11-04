@@ -4,7 +4,6 @@ package com.tribe.tribe_api.itinerary.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
-import com.tribe.tribe_api.common.util.service.TripSecurityService
 import com.tribe.tribe_api.itinerary.dto.WishlistDto
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
@@ -13,6 +12,7 @@ import com.tribe.tribe_api.itinerary.repository.WishlistItemRepository
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.access.prepost.PreAuthorize
@@ -28,6 +28,8 @@ class WishlistService(
     private val tripRepository: TripRepository,
     private val memberRepository: MemberRepository,
 ) {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     // 위시리스트에 장소 추가
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
@@ -71,6 +73,7 @@ class WishlistService(
         trip.wishlistItems.add(savedWishlistItem)
         tripMember.wishlistItems.add(savedWishlistItem)
 
+        logger.info("Wishlist item added. Item ID: {}, Trip ID: {}, Place Name: {}", savedWishlistItem.id, tripId, request.placeName)
         return WishlistDto.WishlistItemDto.from(savedWishlistItem)
     }
 
@@ -135,5 +138,6 @@ class WishlistService(
         }
 
         wishlistItemRepository.deleteAllByIdInBatch(existingIdsInTrip)
+        logger.info("Wishlist items deleted. Trip ID: {}, Deleted Item IDs: {}", tripId, existingIdsInTrip)
     }
 }

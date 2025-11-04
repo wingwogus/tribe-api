@@ -22,7 +22,7 @@ class TripMemberController (
         @Valid @RequestBody request: TripMemberDto.AddGuestRequest
     ): ResponseEntity<ApiResponse<TripMemberDto.Simple>> {
         // DTO에 포함된 tripId를 서비스 메서드로 전달
-        val response = tripMemberService.addGuest(request)
+        val response = tripMemberService.addGuest(request.tripId, request)
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse.success("게스트 추가 성공", response))

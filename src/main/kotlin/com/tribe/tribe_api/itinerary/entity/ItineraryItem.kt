@@ -35,6 +35,4 @@ class ItineraryItem(
     @OneToMany(mappedBy = "itineraryItem", cascade = [CascadeType.ALL])
     var expenses: MutableList<Expense> = mutableListOf()
 
-    @OneToMany(mappedBy = "itineraryItem", cascade = [CascadeType.ALL])
-    var communityPosts: MutableList<CommunityPost> = mutableListOf()
 }

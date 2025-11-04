@@ -29,18 +29,18 @@ class ItineraryService(
     private val googleMapService: GoogleMapService,
 ) {
 
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     fun createItinerary(categoryId: Long, request: ItineraryRequest.Create): ItineraryResponse.ItineraryDetail {
-        log.info("일정 생성 요청. Category ID: {}", categoryId)
+        logger.info("Itinerary creation requested. Category ID: {}", categoryId)
         val memberId = SecurityUtil.getCurrentMemberId()
         val category = categoryRepository.findById(categoryId)
             .orElseThrow { BusinessException(ErrorCode.CATEGORY_NOT_FOUND) }
 
         validateTripMember(category.trip.id!!, memberId)
 
-        var place: Place? = null
-        var title: String? = null
+        var place: Place?
+        var title: String?
 
         if (request.placeId != null) {
             // placeId가 있는 경우, 장소 기반 일정
@@ -67,7 +67,10 @@ class ItineraryService(
             memo = request.memo
         )
 
-        return ItineraryResponse.ItineraryDetail.from(itineraryItemRepository.save(newItem))
+        val savedItem = itineraryItemRepository.save(newItem)
+        logger.info("Itinerary item created. Item ID: {}", savedItem.id)
+
+        return ItineraryResponse.ItineraryDetail.from(savedItem)
     }
 
     // 카테고리별 모든 일정 조회
@@ -75,7 +78,6 @@ class ItineraryService(
     @Transactional(readOnly = true)
     // tripId를 파라미터로 추가
     fun getItinerariesByCategory(tripId: Long, categoryId: Long): List<ItineraryResponse.ItineraryDetail> {
-
         val memberId = SecurityUtil.getCurrentMemberId()
         validateTripMember(tripId, memberId)
 
@@ -103,6 +105,7 @@ class ItineraryService(
             this.time = request.time
             this.memo = request.memo
         }
+        logger.info("Itinerary item updated. Item ID: {}", item.id)
         return ItineraryResponse.ItineraryDetail.from(item)
     }
 
@@ -115,6 +118,7 @@ class ItineraryService(
         validateTripMember(item.category.trip.id!!, memberId)
 
         itineraryItemRepository.delete(item)
+        logger.info("Itinerary item deleted. Item ID: {}", itemId)
     }
 
     // 전체 일정 순서 일괄 변경
@@ -161,6 +165,7 @@ class ItineraryService(
             item.category = newCategory
         }
 
+        logger.info("Itinerary order updated for tripId: {}. Number of items updated: {}", tripId, itemsToUpdate.size)
         return itemsToUpdate.sortedBy { it.order }.map { ItineraryResponse.ItineraryDetail.from(it) }
     }
 
@@ -221,7 +226,7 @@ class ItineraryService(
         // 1. API 응답 상태 확인 OK일때만 실행
         if (routeDetails.status != "OK") {
             // ZERO_RESULTS 일 떄 null을 반환하여 호출할 때 처리                                                        │
-            log.warn("Google API returned status: {} for origin: {}, destination: {}, mode: {}",
+            logger.warn("Google API returned status: {} for origin: {}, destination: {}, mode: {}",
                 routeDetails.status,
                 originPlace.name,
                 destinationPlace.name,

@@ -11,6 +11,8 @@ services:
     networks:
       - npm-net
     restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
 
 networks:
   npm-net:
