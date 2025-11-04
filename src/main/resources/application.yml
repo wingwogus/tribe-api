@@ -87,7 +87,7 @@ key:
 
 exchange:
   rate:
-    api-url: https://www.koreaexim.go.kr
+    api-url: https://oapi.koreaexim.go.kr
 
 server:
   port: 8083

@@ -230,13 +230,13 @@ class SettlementService(
      * 전체 정산 로직: 모든 지출 내역에 대해 환율을 적용하여 KRW 기준으로 잔액을 계산합니다.
      */
     fun getTotalSettlement(tripId: Long): SettlementDto.TotalResponse {
+        entityManager.clear()
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
         val allExpenses: List<Expense> = expenseRepository.findAllByTripId(tripId)
 
         val memberCalcData = trip.members.map { member ->
-
             // Paid Amount (KRW) 합산
             val paidAmountKrw = allExpenses
                 .filter { it.payer.id == member.id }

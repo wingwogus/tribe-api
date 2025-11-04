@@ -7,9 +7,11 @@ import java.time.LocalDate
 
 interface ExpenseRepository : JpaRepository<Expense, Long> {
 
-    // 💡 수정: ExpenseItem과 Assignment 모두 LEFT JOIN FETCH (Set으로 변경했으므로 가능)
+    // Paid, Assigned 계산에 필요한 Trip, Payer 정보를 확실히 가져오도록 Fetch Join 추가 (일별 정산용)
     @Query("""
         SELECT DISTINCT e FROM Expense e 
+        JOIN FETCH e.trip t 
+        JOIN FETCH e.payer p 
         LEFT JOIN FETCH e.expenseItems items 
         LEFT JOIN FETCH items.assignments a
         WHERE e.trip.id = :tripId 
@@ -17,9 +19,11 @@ interface ExpenseRepository : JpaRepository<Expense, Long> {
     """)
     fun findAllByTripIdAndPaymentDateBetween(tripId: Long, startDate: LocalDate, endDate: LocalDate): List<Expense>
 
-    // 💡 수정: ExpenseItem과 Assignment 모두 LEFT JOIN FETCH (Set으로 변경했으므로 가능)
+    // Paid, Assigned 계산에 필요한 Trip, Payer 정보를 확실히 가져오도록 Fetch Join 추가 (전체 정산용)
     @Query("""
         SELECT DISTINCT e FROM Expense e 
+        JOIN FETCH e.trip t 
+        JOIN FETCH e.payer p 
         LEFT JOIN FETCH e.expenseItems items 
         LEFT JOIN FETCH items.assignments a
         WHERE e.trip.id = :tripId

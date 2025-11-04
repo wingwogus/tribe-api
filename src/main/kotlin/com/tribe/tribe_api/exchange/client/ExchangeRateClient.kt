@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam
     url = "\${exchange.rate.api-url}"
 )
 interface ExchangeRateClient {
-    // [수정됨] 나머지 전체 API 경로를 여기에 명시합니다.
+
     @GetMapping("/site/program/financial/exchangeJSON")
     fun findExchange(
         @RequestParam("authkey") authKey: String,
