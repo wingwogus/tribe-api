@@ -26,7 +26,8 @@ class ExchangeRateScheduler(
      * 월 ~ 금 14시 00분 부터 5분 주기로 55분까지 (12회) 진행합니다.
      * 한국수출입은행의 업데이트 시점에 맞춰 호출합니다.
      */
-    @Scheduled(cron = "0 0/5 14 * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작으로 수정
+//    @Scheduled(cron = "0 0/5 14 * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작으로 수정
+    @Scheduled(cron = "0 * * * * MON-FRI", zone = "Asia/Seoul")
     @Transactional
     fun updateCurrency() {
         try {
@@ -35,10 +36,9 @@ class ExchangeRateScheduler(
             val apiDate = DateUtils.parseApiDate(todayString)
 
             // 1. 환율 조회 API 호출
-            // ExchangeRateClient.kt에서 data=AP01 파라미터를 추가했으므로, 여기서는 searchdate와 authkey만 전달합니다.
             val exchanges = exchangeRateClient.findExchange(authKey, todayString)
 
-            // 2. 조회된 값 중 USD, JPY만 필터링 및 BigDecimal로 변환
+            // 2. 필터링 로직 없이 모든 통화를 처리하도록 수정
             val currenciesToSave = exchanges.mapNotNull { dto ->
                 processExchange(dto, apiDate)
             }
@@ -53,20 +53,27 @@ class ExchangeRateScheduler(
     }
 
     /**
-     * 특정 통화(USD, JPY)만 필터링하고, JPY(100)을 JPY(1)로 변환하여 Currency 엔티티를 생성합니다.
-     * 모든 금액 처리는 BigDecimal로 수행하여 정밀도 오류를 방지합니다.
+     * 통화 필터링 로직을 제거하고, 100단위 통화만 1단위로 변환하여 Currency 엔티티를 생성합니다.
      */
     private fun processExchange(dto: ExchangeRateDto, date: LocalDate): Currency? {
-        val targetCurrency: String
-        val targetName: String
+        val rawCurrencyUnit = dto.curUnit
 
-        when (dto.curUnit) {
-            "JPY(100)" -> { targetCurrency = "JPY"; targetName = "일본 엔" }
-            "USD" -> { targetCurrency = "USD"; targetName = "미국 달러" }
-            else -> return null // 목표 통화가 아니면 무시
+        // 1. 통화 코드 결정 및 100단위 처리 여부 확인
+        val is100Unit = rawCurrencyUnit.endsWith("(100)")
+        val targetCurrency: String = if (is100Unit) {
+            rawCurrencyUnit.substringBefore('(') // JPY(100) -> JPY
+        } else if (rawCurrencyUnit.contains('(') || rawCurrencyUnit.contains(')')) {
+            return null // 알 수 없는 괄호 형식은 무시
+        } else {
+            rawCurrencyUnit // USD, EUR 등 일반 통화
         }
 
-        // 쉼표(,) 제거 후 BigDecimal로 파싱
+        // 한국 원화(KRW)는 KRW/KRW이므로 저장할 필요 없습니다.
+        if (targetCurrency == "KRW") {
+            return null
+        }
+
+        // 2. 쉼표(,) 제거 후 BigDecimal로 파싱
         var exchangeRate = try {
             // 매매 기준율(deal_bas_r) 사용
             BigDecimal(dto.dealBasR.replace(",", ""))
@@ -75,14 +82,14 @@ class ExchangeRateScheduler(
             return null
         }
 
-        // JPY는 100단위로 받으므로 1단위로 변환
-        if (dto.curUnit == "JPY(100)") {
+        // 3. 100단위로 받은 경우 1단위로 변환 (JPY(100) 등)
+        if (is100Unit) {
             exchangeRate = exchangeRate.divide(BigDecimal("100"))
         }
 
         return Currency(
             curUnit = targetCurrency,
-            curName = targetName,
+            curName = dto.curName,
             exchangeRate = exchangeRate,
             date = date
         )

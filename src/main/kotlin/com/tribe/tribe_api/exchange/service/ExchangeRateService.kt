@@ -37,7 +37,6 @@ class ExchangeRateService(
             log.info("API Response received for date {}: {} items", date, response.size)
             response
         } catch (e: Exception) {
-            // Server redirected too many times 오류가 여기서 로그에 남습니다.
             log.error("Historical API call failed for date {}: {}", date, e.message)
             return null
         }
@@ -47,7 +46,7 @@ class ExchangeRateService(
             return null
         }
 
-        // 2. 조회된 값 중 USD, JPY만 필터링 및 BigDecimal로 변환하여 DB에 저장
+        // 2. 필터링 로직 없이 모든 통화를 처리하도록 수정
         val currenciesToSave = exchanges.mapNotNull { dto ->
             processExchangeDto(dto, date)
         }
@@ -62,18 +61,28 @@ class ExchangeRateService(
         return currenciesToSave.firstOrNull()
     }
 
-    // ExchangeRateScheduler.kt의 processExchange 로직을 그대로 사용
+    /**
+     * 통화 필터링 로직을 제거하고, 100단위 통화만 1단위로 변환하여 Currency 엔티티를 생성합니다.
+     */
     private fun processExchangeDto(dto: ExchangeRateDto, date: LocalDate): Currency? {
-        val targetCurrency: String
-        val targetName: String
+        val rawCurrencyUnit = dto.curUnit
 
-        when (dto.curUnit) {
-            "JPY(100)" -> { targetCurrency = "JPY"; targetName = "일본 엔" }
-            "USD" -> { targetCurrency = "USD"; targetName = "미국 달러" }
-            else -> return null // 목표 통화가 아니면 무시
+        // 1. 통화 코드 결정 및 100단위 처리 여부 확인
+        val is100Unit = rawCurrencyUnit.endsWith("(100)")
+        val targetCurrency: String = if (is100Unit) {
+            rawCurrencyUnit.substringBefore('(') // JPY(100) -> JPY
+        } else if (rawCurrencyUnit.contains('(') || rawCurrencyUnit.contains(')')) {
+            return null // 알 수 없는 괄호 형식은 무시
+        } else {
+            rawCurrencyUnit // USD, EUR 등 일반 통화
         }
 
-        // 쉼표(,) 제거 후 BigDecimal로 파싱
+        // 한국 원화(KRW)는 KRW/KRW이므로 저장할 필요 없습니다.
+        if (targetCurrency == "KRW") {
+            return null
+        }
+
+        // 2. 쉼표(,) 제거 후 BigDecimal로 파싱
         var exchangeRate = try {
             BigDecimal(dto.dealBasR.replace(",", ""))
         } catch (e: NumberFormatException) {
@@ -81,14 +90,14 @@ class ExchangeRateService(
             return null
         }
 
-        // JPY는 100단위로 받으므로 1단위로 변환
-        if (dto.curUnit == "JPY(100)") {
+        // 3. 100단위로 받은 경우 1단위로 변환 (JPY(100) 등)
+        if (is100Unit) {
             exchangeRate = exchangeRate.divide(BigDecimal("100"))
         }
 
         return Currency(
             curUnit = targetCurrency,
-            curName = targetName,
+            curName = dto.curName,
             exchangeRate = exchangeRate,
             date = date
         )

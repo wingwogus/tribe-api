@@ -140,6 +140,7 @@ class SettlementService(
             val assignedAmountKrw = dailyExpenses
                 .flatMap { it.expenseItems }
                 .flatMap { it.assignments }
+                .distinct() // 👈 FIX: Fetch Join으로 인한 중복 엔티티 제거
                 .filter { it.tripMember.id == member.id }
                 .sumOf { assignment ->
                     val expense = assignment.expenseItem.expense
@@ -246,6 +247,7 @@ class SettlementService(
             val assignedAmountKrw = allExpenses
                 .flatMap { it.expenseItems }
                 .flatMap { it.assignments }
+                .distinct() // 👈 FIX: Fetch Join으로 인한 중복 엔티티 제거
                 .filter { it.tripMember.id == member.id }
                 .sumOf { assignment ->
                     val expense = assignment.expenseItem.expense
