@@ -11,6 +11,7 @@ import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
 import com.tribe.tribe_api.member.entity.Role
 import com.tribe.tribe_api.member.repository.MemberRepository
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder
@@ -32,6 +33,7 @@ class AuthService(
     @Value("\${spring.mail.auth-code-expiration-millis}")
     private val authCodeExpirationMillis: Long
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     companion object {
         private const val AUTH_CODE_PREFIX = "AuthCode "
         private const val VERIFIED_EMAIL_PREFIX = "VerifiedEmail "
@@ -40,12 +42,16 @@ class AuthService(
     fun login(request: AuthDto.LoginRequest): JwtToken {
         val authenticationToken = UsernamePasswordAuthenticationToken(request.email, request.password)
         val authentication = authenticationManagerBuilder.`object`.authenticate(authenticationToken)
-        return jwtTokenProvider.generateToken(authentication)
+        val token = jwtTokenProvider.generateToken(authentication)
+        logger.info("User logged in successfully. Email hashcode: {}", request.email.hashCode())
+        return token
     }
 
     fun reissue(request: AuthDto.ReissueRequest): JwtToken {
         jwtTokenProvider.validateToken(request.refreshToken)
-        return jwtTokenProvider.reissueToken(request.accessToken, request.refreshToken)
+        val newToken = jwtTokenProvider.reissueToken(request.accessToken, request.refreshToken)
+        logger.info("Token reissued successfully")
+        return newToken
     }
 
     fun signUp(request: AuthDto.SignUpRequest) {
@@ -69,6 +75,7 @@ class AuthService(
             isFirstLogin = false
         )
         memberRepository.save(member)
+        logger.info("User signed up successfully. Email: hashcode {}", request.email.hashCode())
     }
 
     fun sendCodeToEmail(toEmail: String) {
@@ -77,6 +84,7 @@ class AuthService(
         val authCode = createCode()
         mailService.sendEmail(toEmail, title, authCode)
         redisService.setValues("$AUTH_CODE_PREFIX$toEmail", authCode, Duration.ofMillis(authCodeExpirationMillis))
+        logger.info("Authentication code sent to email: {}", toEmail.hashCode())
     }
 
     fun logout(email: String) {
@@ -84,6 +92,7 @@ class AuthService(
             throw BusinessException(ErrorCode.ALREADY_LOGGED_OUT)
         }
         redisService.deleteValues("RT:$email")
+        logger.info("User logged out successfully. Email hashcode: {}", email.hashCode())
     }
 
     fun checkDuplicatedNickname(request: AuthDto.VerifiedNicknameRequest) {
@@ -103,6 +112,7 @@ class AuthService(
         }
 
         redisService.setValues("$VERIFIED_EMAIL_PREFIX$email", "true")
+        logger.info("Email verified successfully for Email hashcode: {}", email.hashCode())
     }
 
     private fun checkDuplicatedEmail(email: String) {

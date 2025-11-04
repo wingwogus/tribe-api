@@ -12,6 +12,7 @@ import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -38,6 +39,8 @@ class TripService(
         private val INVITE_EXPIRATION = Duration.ofDays(7)
     }
 
+    val logger = LoggerFactory.getLogger(javaClass)
+
     fun createTrip(request: TripRequest.Create): TripResponse.TripDetail {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
 
@@ -45,7 +48,10 @@ class TripService(
 
         return request.toEntity()
             .apply { addMember(member, TripRole.OWNER) }
-            .also { tripRepository.save(it) }
+            .also {
+                val save = tripRepository.save(it)
+                logger.info("Trip created, Trip Id: {} ", save.id)
+            }
             .let { TripResponse.TripDetail.from(it) }
     }
 
@@ -59,6 +65,8 @@ class TripService(
                 request.endDate,
                     request.country
                 )
+
+                logger.info("Trip updated, Trip Id: {}", this.id)
             }
             .let { TripResponse.TripDetail.from(it) }
     }
@@ -68,6 +76,8 @@ class TripService(
         tripRepository.findByIdOrNull(tripId)
             ?.let { tripRepository.delete(it) }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
+        logger.info("Trip deleted, Trip Id: {}", tripId)
     }
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
@@ -92,6 +102,7 @@ class TripService(
 
         val token = generateInvitationToken()
         redisService.setValues("$INVITE_TOKEN_PREFIX$token", tripId.toString(), INVITE_EXPIRATION)
+        logger.info("Invitation created for Trip Id: {}", tripId)
         return TripResponse.Invitation("$appUrl$INVITE_PATH$token")
     }
 
@@ -110,6 +121,8 @@ class TripService(
         val trip = findTripWithMembers(tripId)
 
         trip.addMember(member, TripRole.MEMBER)
+
+        logger.info("Trip joined successfully, Trip Id: {}, Member Id: {}", trip.id, currentMemberId)
 
         return TripResponse.TripDetail.from(trip)
     }
