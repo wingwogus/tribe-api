@@ -43,14 +43,14 @@ class AuthService(
         val authenticationToken = UsernamePasswordAuthenticationToken(request.email, request.password)
         val authentication = authenticationManagerBuilder.`object`.authenticate(authenticationToken)
         val token = jwtTokenProvider.generateToken(authentication)
-        logger.info("User logged in successfully. Email: {}", request.email)
+        logger.info("User logged in successfully. Email hashcode: {}", request.email.hashCode())
         return token
     }
 
     fun reissue(request: AuthDto.ReissueRequest): JwtToken {
         jwtTokenProvider.validateToken(request.refreshToken)
         val newToken = jwtTokenProvider.reissueToken(request.accessToken, request.refreshToken)
-        logger.info("Token reissued successfully for accessToken: {}", request.accessToken)
+        logger.info("Token reissued successfully")
         return newToken
     }
 
@@ -75,7 +75,7 @@ class AuthService(
             isFirstLogin = false
         )
         memberRepository.save(member)
-        logger.info("User signed up successfully. Email: {}", request.email)
+        logger.info("User signed up successfully. Email: hashcode {}", request.email.hashCode())
     }
 
     fun sendCodeToEmail(toEmail: String) {
@@ -84,7 +84,7 @@ class AuthService(
         val authCode = createCode()
         mailService.sendEmail(toEmail, title, authCode)
         redisService.setValues("$AUTH_CODE_PREFIX$toEmail", authCode, Duration.ofMillis(authCodeExpirationMillis))
-        logger.info("Authentication code sent to email: {}", toEmail)
+        logger.info("Authentication code sent to email: {}", toEmail.hashCode())
     }
 
     fun logout(email: String) {
@@ -92,7 +92,7 @@ class AuthService(
             throw BusinessException(ErrorCode.ALREADY_LOGGED_OUT)
         }
         redisService.deleteValues("RT:$email")
-        logger.info("User logged out successfully. Email: {}", email)
+        logger.info("User logged out successfully. Email hashcode: {}", email.hashCode())
     }
 
     fun checkDuplicatedNickname(request: AuthDto.VerifiedNicknameRequest) {
@@ -112,7 +112,7 @@ class AuthService(
         }
 
         redisService.setValues("$VERIFIED_EMAIL_PREFIX$email", "true")
-        logger.info("Email verified successfully for: {}", email)
+        logger.info("Email verified successfully for Email hashcode: {}", email.hashCode())
     }
 
     private fun checkDuplicatedEmail(email: String) {

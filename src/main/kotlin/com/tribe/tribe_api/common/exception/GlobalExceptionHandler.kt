@@ -14,8 +14,6 @@ class GlobalExceptionHandler {
 
     val logger = LoggerFactory.getLogger(javaClass)
 
-    // Java의 BusinessException.class -> Kotlin의 BusinessException::class
-    // 반환 타입을 명시적으로 선언합니다: ResponseEntity<ApiResponse<Unit>>
     @ExceptionHandler(BusinessException::class)
     fun handleBusiness(ex: BusinessException): ResponseEntity<ApiResponse<Unit>> {
         val status = ex.errorCode.status
@@ -58,8 +56,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception::class)
     fun handleAll(ex: Exception): ResponseEntity<ApiResponse<Unit>> {
-        // ex.message가 null일 수 있으므로 안전 호출(?.) 사용
-        val body = ApiResponse.error<Unit>("서버 오류가 발생했습니다: ${ex.message}")
+        val body = ApiResponse.error<Unit>("서버 오류가 발생했습니다.")
 
         // 500 에러는 ERROR 레벨
         logger.error("Unhandled exception caught:", ex)

@@ -260,11 +260,11 @@ class TripReviewServiceIntegrationTest @Autowired constructor(
             setAuthentication(member)
 
             // given: 추천 장소를 포함하는 리뷰를 미리 저장
-            val tripReview = TripReview(trip, "장소 포함 컨셉", "내용")
+            val tripReview = tripReviewRepository.save(TripReview(trip, "장소 포함 컨셉", "내용"))
             recommendedPlaceRepository.save(RecommendedPlace.from(place1, tripReview ))
             recommendedPlaceRepository.save(RecommendedPlace.from(place2, tripReview ))
 
-            val reviewWithPlaces = tripReviewRepository.save(tripReview)
+            val reviewWithPlaces = tripReview
 
             // when
             val reviewDetail = tripReviewService.getReview(trip.id!!, reviewWithPlaces.id!! )

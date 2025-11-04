@@ -102,7 +102,7 @@ class TripService(
 
         val token = generateInvitationToken()
         redisService.setValues("$INVITE_TOKEN_PREFIX$token", tripId.toString(), INVITE_EXPIRATION)
-        logger.info("Invitation created for Trip Id: {}, Token: {}", tripId, token)
+        logger.info("Invitation created for Trip Id: {}", tripId)
         return TripResponse.Invitation("$appUrl$INVITE_PATH$token")
     }
 
