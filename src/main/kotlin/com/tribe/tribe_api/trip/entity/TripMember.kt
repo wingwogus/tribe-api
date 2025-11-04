@@ -37,9 +37,6 @@ class TripMember(
     @OneToMany(mappedBy = "tripMember", cascade = [CascadeType.ALL])
     var assignments: MutableList<ExpenseAssignment> = mutableListOf()
 
-    @OneToMany(mappedBy = "author", cascade = [CascadeType.ALL])
-    var communityPosts: MutableList<CommunityPost> = mutableListOf()
-
     val name: String
         get() = this.member?.nickname ?: this.guestNickname ?: "unknown" //이름 받아오기
 
