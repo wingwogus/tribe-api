@@ -12,8 +12,10 @@ import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.entity.TripRole // [추가!] TripRole을 import합니다.
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import jakarta.persistence.Id
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -29,21 +31,14 @@ class CommunityPostService(
 ) {
 
     // 1. 게시글 생성
-    fun createPost(request: CommunityPostDto.CreateRequest, imageFile: MultipartFile?): CommunityPostDto.DetailResponse {
+    @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
+    fun createPost(tripId: Long, request: CommunityPostDto.CreateRequest, imageFile: MultipartFile?,): CommunityPostDto.DetailResponse {
         val memberId = SecurityUtil.getCurrentMemberId()
         val author = memberRepository.findById(memberId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
 
         val trip = tripRepository.findById(request.tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
-
-        // triprole이 owner만 수정가능
-        val tripMember = tripMemberRepository.findByTripAndMember(trip, author)
-            ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
-
-        if (tripMember.role != TripRole.OWNER) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_POST)
-        }
 
 
         // 이미지 처리
@@ -89,15 +84,11 @@ class CommunityPostService(
     }
 
     // 게시글 수정
+    @PreAuthorize("@tripSecurityService.isTripOwnerByPostId(#postId)")
     fun updatePost(postId: Long, request: CommunityPostDto.UpdateRequest, imageFile: MultipartFile?): CommunityPostDto.DetailResponse {
         val memberId = SecurityUtil.getCurrentMemberId()
         val post = communityPostRepository.findByIdWithDetails(postId)
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
-
-        // 게시글 작성자만 수정 가능
-        if (post.author.id != memberId) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_POST)
-        }
 
         // 내용 업데이트 (Dirty Checking)
         post.title = request.title
@@ -121,6 +112,7 @@ class CommunityPostService(
     }
 
     // 5. 게시글 삭제
+    @PreAuthorize("@tripSecurityService.isTripOwnerByPostId(#postId)")
     fun deletePost(postId: Long) {
         val memberId = SecurityUtil.getCurrentMemberId()
 
@@ -128,7 +120,7 @@ class CommunityPostService(
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
 
         if (post.author.id != memberId) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_POST)
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
         }
 
         // DB에서 삭제하기 전에 Cloudinary 이미지부터 삭제

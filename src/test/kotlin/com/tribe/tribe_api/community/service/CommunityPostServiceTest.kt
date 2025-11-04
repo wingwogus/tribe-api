@@ -118,7 +118,7 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
         every { cloudinaryUploadService.upload(imageFile, "community") } returns "http://example.com/new_image.jpg"
 
         // when
-        val response = communityPostService.createPost(request, imageFile)
+        val response = communityPostService.createPost(request.tripId,request, imageFile)
 
         // then
         assertThat(response.postId).isNotNull()
@@ -137,9 +137,9 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
 
         // when & then: NO_AUTHORITY_POST 에러가 발생하는지 검증
         val exception = assertThrows<BusinessException> {
-            communityPostService.createPost(request, null)
+            communityPostService.createPost(request.tripId, request, null)
         }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_POST)
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
 
     @Test
@@ -151,7 +151,7 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
 
         // when & then: NOT_A_TRIP_MEMBER 에러가 발생하는지 검증
         val exception = assertThrows<BusinessException> {
-            communityPostService.createPost(request, null)
+            communityPostService.createPost(request.tripId,request, null)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
     }
@@ -255,7 +255,7 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
         val exception = assertThrows<BusinessException> {
             communityPostService.updatePost(postId, request, null)
         }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_POST)
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
 
     @Test
@@ -292,7 +292,7 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
         val exception = assertThrows<BusinessException> {
             communityPostService.deletePost(postId)
         }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_POST)
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
 
         // DB에 데이터가 삭제되지 않고 남아있는지 확인
         val foundPost = communityPostRepository.findById(postId)

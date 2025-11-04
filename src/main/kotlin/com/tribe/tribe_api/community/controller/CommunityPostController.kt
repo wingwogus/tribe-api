@@ -29,7 +29,7 @@ class CommunityPostController(
         @Valid @RequestPart("request") request: CommunityPostDto.CreateRequest,
         @RequestPart(value = "image", required = false) imageFile: MultipartFile?
     ): ResponseEntity<ApiResponse<CommunityPostDto.DetailResponse>> {
-        val response = communityPostService.createPost(request, imageFile)
+        val response = communityPostService.createPost(request.tripId, request, imageFile)
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse.success("게시글이 성공적으로 공유되었습니다.", response))
