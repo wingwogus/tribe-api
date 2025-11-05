@@ -27,7 +27,7 @@ class ExchangeRateScheduler(
      * 한국수출입은행의 업데이트 시점에 맞춰 호출합니다.
      */
     @Scheduled(cron = "0 0/5 14 * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작으로 수정
-//    @Scheduled(cron = "0 * * * * MON-FRI", zone = "Asia/Seoul")
+//    @Scheduled(cron = "0 * * * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작했을때 못받았을때 이거 쓰면됨. 이걸로 하면은 아무때나해도 db에 들어가짐
     @Transactional
     fun updateCurrency() {
         try {
