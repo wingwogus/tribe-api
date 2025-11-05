@@ -9,9 +9,10 @@ import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.exchange.entity.Currency
 import com.tribe.tribe_api.exchange.repository.CurrencyRepository
 import com.tribe.tribe_api.exchange.service.ExchangeRateService
+import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.EntityManager // [필수 추가] EntityManager import
+import jakarta.persistence.EntityManager
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -27,17 +28,17 @@ class SettlementService(
     private val tripRepository: TripRepository,
     private val currencyRepository: CurrencyRepository,
     private val exchangeRateService: ExchangeRateService,
-    private val entityManager: EntityManager // [추가됨] EntityManager 주입
+    private val entityManager: EntityManager
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
     private val KRW = "KRW" // 기준 통화 정의
     private val SCALE = 0 // 정산은 원화 단위(0)로 처리
-    private val EPSILON = BigDecimal("1.00") // 💡 추가: 1 KRW의 허용 오차 (총액 유효성 검사 목적)
+    private val EPSILON = BigDecimal("1.00")
 
     /**
      * 외화 금액을 지출일 환율을 적용하여 KRW로 변환합니다.
-     * DB에 없으면, 최대 7일 전까지 역순으로 유효한 환율을 찾거나 API를 통해 가져옵니다.
+     * DB에 없으면, 최대 7일 전까지 역순으로 유효한 환율을 찾습니다.
      */
     private fun convertToKrw(amount: BigDecimal, expense: Expense): BigDecimal {
         val currencyCode = expense.currency?.uppercase()
@@ -68,24 +69,7 @@ class SettlementService(
                 continue // 다음 루프 실행
             }
 
-            // 4. 평일이면서 과거 날짜인 경우 API 호출 시도 (온디맨드)
-            if (currentDate.isBefore(LocalDate.now())) {
-                try {
-                    // 트랜잭션을 분리하여 API 호출 및 DB 저장
-                    exchangeRateService.fetchAndSaveExchangeRate(currentDate)
-
-                    // API 호출 성공 후 DB에 저장되었으므로 다시 DB에서 조회하여 사용
-                    currencyRate = currencyRepository.findByCurUnitAndDate(currencyCode, currentDate)
-
-                    if (currencyRate != null) {
-                        break
-                    }
-                } catch (e: Exception) {
-                    log.warn("Failed to fetch historical rate for {}: {}", currentDate, e.message)
-                }
-            }
-
-            // 5. 다음 날짜로 이동
+            // 4. 다음 날짜로 이동 (API 호출 로직이 없으므로 남은 평일 스텝)
             currentDate = currentDate.minusDays(1)
         }
 
@@ -105,7 +89,6 @@ class SettlementService(
 
     fun getDailySettlement(tripId: Long, date: LocalDate): SettlementDto.DailyResponse {
         // [핵심 추가]: JPA 영속성 컨텍스트(1차 캐시)를 무효화하여 DB에서 강제로 데이터를 읽어오도록 합니다.
-        // 수동 삽입된 데이터를 인식하도록 강제합니다.
         entityManager.clear()
 
         val trip = tripRepository.findById(tripId)
@@ -129,39 +112,8 @@ class SettlementService(
             )
         }
 
-        // 1. 멤버별 일별 PaidAmount(KRW)와 AssignedAmount(KRW)를 한 번에 계산
-        val memberCalcData = trip.members.map { member ->
-            // Paid Amount (KRW) 합산
-            val paidAmountKrw = dailyExpenses
-                .filter { it.payer.id == member.id }
-                .sumOf { expense -> convertToKrw(expense.totalAmount, expense) }
-
-            // Assigned Amount (KRW) 합산
-            val assignedAmountKrw = dailyExpenses
-                .flatMap { it.expenseItems }
-                .flatMap { it.assignments }
-                .distinct() // 👈 FIX: Fetch Join으로 인한 중복 엔티티 제거
-                .filter { it.tripMember.id == member.id }
-                .sumOf { assignment ->
-                    val expense = assignment.expenseItem.expense
-                    convertToKrw(assignment.amount, expense)
-                }
-
-            // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
-            val foreignCurrencies = dailyExpenses
-                .filter { expense ->
-                    (expense.payer.id == member.id) ||
-                            expense.expenseItems.any { item ->
-                                item.assignments.any { assign -> assign.tripMember.id == member.id }
-                            }
-                }
-                .mapNotNull { it.currency }
-                .filter { it != KRW }
-                .distinct()
-                .toList()
-
-            MemberSettlementData(member, paidAmountKrw, assignedAmountKrw, foreignCurrencies)
-        }
+        // 1. 멤버별 PaidAmount(KRW)와 AssignedAmount(KRW) 계산 (추출된 메서드 사용)
+        val memberCalcData = calculateMemberSettlementData(trip, dailyExpenses)
 
         // 2. Member Summary DTO 생성
         val memberSummaries = memberCalcData.map { data ->
@@ -181,7 +133,6 @@ class SettlementService(
         }
 
         // 4. 일별 최소 송금 관계 계산 (동적 환율 적용)
-        // 당일 지출된 외화 중 첫 번째를 대표 통화로 사용 (외화 지출이 없으면 KRW)
         val debtCurrencyCode = dailyExpenses.firstOrNull { it.currency != KRW && it.currency != null }?.currency?.uppercase() ?: KRW
 
         val debtExchangeRate = if (debtCurrencyCode != KRW) {
@@ -237,38 +188,8 @@ class SettlementService(
 
         val allExpenses: List<Expense> = expenseRepository.findAllByTripId(tripId)
 
-        val memberCalcData = trip.members.map { member ->
-            // Paid Amount (KRW) 합산
-            val paidAmountKrw = allExpenses
-                .filter { it.payer.id == member.id }
-                .sumOf { expense -> convertToKrw(expense.totalAmount, expense) }
-
-            // Assigned Amount (KRW) 합산
-            val assignedAmountKrw = allExpenses
-                .flatMap { it.expenseItems }
-                .flatMap { it.assignments }
-                .distinct() // 👈 FIX: Fetch Join으로 인한 중복 엔티티 제거
-                .filter { it.tripMember.id == member.id }
-                .sumOf { assignment ->
-                    val expense = assignment.expenseItem.expense
-                    convertToKrw(assignment.amount, expense)
-                }
-
-            // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
-            val foreignCurrencies = allExpenses
-                .filter { expense ->
-                    (expense.payer.id == member.id) ||
-                            expense.expenseItems.any { item ->
-                                item.assignments.any { assign -> assign.tripMember.id == member.id }
-                            }
-                }
-                .mapNotNull { it.currency }
-                .filter { it != KRW }
-                .distinct()
-                .toList()
-
-            MemberSettlementData(member, paidAmountKrw, assignedAmountKrw, foreignCurrencies)
-        }
+        // 1. 멤버별 PaidAmount(KRW)와 AssignedAmount(KRW) 계산 (추출된 메서드 사용)
+        val memberCalcData = calculateMemberSettlementData(trip, allExpenses)
 
         // 3. 잔액(Balance) 목록 생성 (KRW 기준)
         val memberBalances = memberCalcData.map { data ->
@@ -292,7 +213,7 @@ class SettlementService(
         }
 
         val debtExchangeRate = if (debtCurrencyCode != KRW) {
-            // [수정]: 최신 환율이 없을 경우 BigDecimal.ONE 대신 예외를 발생시켜 정산 오류를 방지
+            // 최신 환율이 없을 경우 BigDecimal.ONE 대신 예외를 발생시켜 정산 오류를 방지
             currencyRepository.findTopByCurUnitOrderByDateDesc(debtCurrencyCode)?.exchangeRate
                 ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
         } else {
@@ -322,6 +243,45 @@ class SettlementService(
 
         return SettlementDto.TotalResponse(memberBalanceDtos, debtRelations)
     }
+
+    /**
+     * 특정 지출 목록을 기반으로 멤버별 정산 데이터를 계산합니다. (PaidAmount/AssignedAmount/ForeignCurrencies)
+     */
+    private fun calculateMemberSettlementData(trip: Trip, expenses: List<Expense>): List<MemberSettlementData> {
+        return trip.members.map { member ->
+            // Paid Amount (KRW) 합산
+            val paidAmountKrw = expenses
+                .filter { it.payer.id == member.id }
+                .sumOf { expense -> convertToKrw(expense.totalAmount, expense) }
+
+            // Assigned Amount (KRW) 합산
+            val assignedAmountKrw = expenses
+                .flatMap { it.expenseItems }
+                .flatMap { it.assignments }
+                .distinct() // 👈 FIX: Fetch Join으로 인한 중복 엔티티 제거
+                .filter { it.tripMember.id == member.id }
+                .sumOf { assignment ->
+                    val expense = assignment.expenseItem.expense
+                    convertToKrw(assignment.amount, expense)
+                }
+
+            // New: 해당 멤버가 지출했거나 분담받은 모든 외화 통화 코드 수집
+            val foreignCurrencies = expenses
+                .filter { expense ->
+                    (expense.payer.id == member.id) ||
+                            expense.expenseItems.any { item ->
+                                item.assignments.any { assign -> assign.tripMember.id == member.id }
+                            }
+                }
+                .mapNotNull { it.currency }
+                .filter { it != KRW }
+                .distinct()
+                .toList()
+
+            MemberSettlementData(member, paidAmountKrw, assignedAmountKrw, foreignCurrencies)
+        }
+    }
+
 
     /**
      * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
@@ -377,8 +337,6 @@ class SettlementService(
                     toNickname = creditor.name,
                     toTripMemberId = creditor.id!!,
                     amount = transferAmount, // KRW 송금 금액
-
-                    // 하드코딩된 값 대신 동적으로 계산된 값 사용
                     equivalentOriginalAmount = equivalentOriginalAmount, // 원본 통화 금액
                     originalCurrencyCode = originalCurrencyCode           // 원본 통화 코드
                 )
