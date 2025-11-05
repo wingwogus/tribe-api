@@ -48,7 +48,7 @@ class Expense(
     val id: Long? = null
 
     @OneToMany(mappedBy = "expense", cascade = [CascadeType.ALL], orphanRemoval = true)
-    var expenseItems: MutableList<ExpenseItem> = mutableListOf()
+    var expenseItems: MutableSet<ExpenseItem> = mutableSetOf()
 
     fun addExpenseItem(expenseItem: ExpenseItem) {
         this.expenseItems.add(expenseItem)

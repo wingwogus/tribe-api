@@ -20,7 +20,7 @@ import java.time.LocalDate
 class ExchangeRateService(
     private val exchangeRateClient: ExchangeRateClient,
     private val currencyRepository: CurrencyRepository,
-    @Value("\${key.exchange-rate.key}") private val authKey: String
+    @Value("\${exchange.rate.key}") private val authKey: String
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 

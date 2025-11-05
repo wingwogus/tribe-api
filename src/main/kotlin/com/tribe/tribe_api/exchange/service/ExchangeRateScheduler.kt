@@ -17,7 +17,7 @@ import java.time.LocalDate
 class ExchangeRateScheduler(
     private val exchangeRateClient: ExchangeRateClient,
     private val currencyRepository: CurrencyRepository,
-    @Value("\${key.exchange-rate.key}")
+    @Value("\${exchange.rate.key}")
     private val authKey: String
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
