@@ -17,15 +17,17 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     open-in-view: false
-    show-sql: true
 
     properties:
       hibernate:
         default_batch_fetch_size: 100
-        format_sql: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
 
   security:
     oauth2:
