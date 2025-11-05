@@ -20,5 +20,5 @@ class ExpenseItem(
 
     // 💡 수정: List를 Set으로 변경하여 MultipleBagFetchException 및 Lazy Loading 문제 해결 시도
     @OneToMany(mappedBy = "expenseItem", cascade = [CascadeType.ALL], orphanRemoval = true)
-    var assignments: MutableSet<ExpenseAssignment> = mutableSetOf()
+    var assignments: MutableList<ExpenseAssignment> = mutableListOf()
 }

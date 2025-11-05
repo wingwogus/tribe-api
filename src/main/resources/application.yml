@@ -81,13 +81,10 @@ gemini:
     key: ${GEMINI_API_KEY} # 환경변수에서 API 키를 가져옵니다.
     url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
-key:
-  exchange-rate:
-    key: ${EXCHANGE_RATE_API_KEY}
-
 exchange:
   rate:
     api-url: https://oapi.koreaexim.go.kr
+    key: ${EXCHANGE_RATE_API_KEY}
 
 server:
   port: 8083
