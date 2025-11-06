@@ -11,8 +11,8 @@ interface ExpenseRepository : JpaRepository<Expense, Long> {
         SELECT DISTINCT e FROM Expense e 
         JOIN FETCH e.trip t 
         JOIN FETCH e.payer p 
-        JOIN FETCH e.itineraryItem ii  // 👈 ItineraryItem Fetch Join 추가
-        JOIN FETCH ii.category c       // 👈 Category Fetch Join 추가
+        JOIN FETCH e.itineraryItem ii
+        JOIN FETCH ii.category c
         LEFT JOIN FETCH e.expenseItems items 
         LEFT JOIN FETCH items.assignments a
         WHERE e.trip.id = :tripId
