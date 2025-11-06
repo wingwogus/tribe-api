@@ -1,9 +1,5 @@
 package com.tribe.tribe_api
 
-import com.tribe.tribe_api.expense.entity.Expense
-import com.tribe.tribe_api.expense.entity.ExpenseAssignment
-import com.tribe.tribe_api.expense.entity.ExpenseItem
-import com.tribe.tribe_api.expense.enumeration.InputMethod
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
@@ -17,7 +13,6 @@ import com.tribe.tribe_api.member.entity.Role
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.entity.Trip
-import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
