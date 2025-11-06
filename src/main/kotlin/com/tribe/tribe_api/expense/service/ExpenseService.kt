@@ -108,7 +108,8 @@ class ExpenseService(
             totalAmount = processedData.totalAmount,
             entryMethod = InputMethod.valueOf(request.inputMethod.uppercase()),
             paymentDate = paymentDate,
-            receiptImageUrl = imageUrl
+            receiptImageUrl = imageUrl,
+            currency = request.currency.uppercase() // 통화 코드 저장 (예: KRW, USD, JPY)
         )
 
         var itemsTotal = BigDecimal.ZERO
