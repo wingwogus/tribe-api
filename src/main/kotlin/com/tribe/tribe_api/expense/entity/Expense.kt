@@ -37,14 +37,18 @@ class Expense(
     @Column(name = "receipt_image_url", nullable = true)
     var receiptImageUrl: String? = null,
 
-) : BaseTimeEntity() {
+    // 통화 정보 필드 추가
+    @Column(name = "currency", nullable = true)
+    var currency: String? = null,
+
+    ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "expense_id")
     val id: Long? = null
 
     @OneToMany(mappedBy = "expense", cascade = [CascadeType.ALL], orphanRemoval = true)
-    var expenseItems: MutableList<ExpenseItem> = mutableListOf()
+    var expenseItems: MutableSet<ExpenseItem> = mutableSetOf()
 
     fun addExpenseItem(expenseItem: ExpenseItem) {
         this.expenseItems.add(expenseItem)

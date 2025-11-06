@@ -39,6 +39,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.multipart.MultipartFile // 👈 import 추가
 import java.math.BigDecimal
 
 @SpringBootTest
@@ -91,6 +92,8 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         val place = placeRepository.save(Place("place_id_settlement", "테스트 장소", "주소", BigDecimal.ZERO, BigDecimal.ZERO))
         itineraryItem = itineraryItemRepository.save(ItineraryItem(category, place, "저녁 식사", null, 1, null))
 
+        // Mocking Cloudinary
+        // 💡 수정: any()를 명시적으로 any<MultipartFile>()로 지정하여 MockK 타입 추론 강화
         every { cloudinaryUploadService.upload(any() , any()) } returns "https://mock.cloudinary.com/image.jpg"
     }
 
@@ -112,6 +115,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = ownerTripMember.id!!,
             inputMethod = "HANDWRITE",
+            currency = "KRW",
             items = listOf(
                 ExpenseDto.ItemCreate("라멘", BigDecimal("20000")),
                 ExpenseDto.ItemCreate("맥주", BigDecimal("30000"))
@@ -124,6 +128,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         // then: 성공적으로 생성됨
         assertThat(response.expenseTitle).isEqualTo("저녁 식사")
         assertThat(response.totalAmount).isEqualByComparingTo("50000")
+        assertThat(response.items).hasSize(2)
     }
 
     @Test
@@ -139,6 +144,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = member1TripMember.id!!,
             inputMethod = "SCAN",
+            currency = "USD",
             items = emptyList()
         )
 
@@ -150,10 +156,10 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
                 ExpenseDto.OcrItem("파스타", BigDecimal("700.00")),
                 ExpenseDto.OcrItem("와인", BigDecimal("300.00"))
             ),
-            subtotal = BigDecimal("1000.00"), // 새 DTO 필드
-            tax = BigDecimal("100.00"),       // 새 DTO 필드
-            tip = BigDecimal("100.00"),       // 새 DTO 필드
-            discount = BigDecimal.ZERO       // 새 DTO 필드
+            subtotal = BigDecimal("1000.00"),
+            tax = BigDecimal("100.00"),
+            tip = BigDecimal("100.00"),
+            discount = BigDecimal.ZERO
         )
         val fakeGeminiJson = objectMapper.writeValueAsString(fakeOcrResponse)
         every { geminiApiClient.generateContentFromImage(any(), any(), any()) } returns fakeGeminiJson
@@ -169,6 +175,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         assertThat(savedExpense.expenseItems.first { it.name == "파스타" }.price).isEqualByComparingTo("700.00")
         assertThat(savedExpense.expenseItems.first { it.name == "와인" }.price).isEqualByComparingTo("300.00")
         assertThat(savedExpense.expenseItems.first { it.name == "세금 / 팁 / 기타" }.price).isEqualByComparingTo("200.00") // 차액(1200 - 1000)
+        assertThat(savedExpense.receiptImageUrl).isEqualTo("https://mock.cloudinary.com/image.jpg")
     }
 
     @Test
@@ -184,6 +191,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = member1TripMember.id!!,
             inputMethod = "SCAN",
+            currency = "USD",
             items = emptyList()
         )
 
@@ -198,7 +206,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             subtotal = BigDecimal("1000.00"),
             tax = BigDecimal.ZERO,
             tip = BigDecimal.ZERO,
-            discount = BigDecimal("200.00") // 할인이 200 적용됨
+            discount = BigDecimal("200.00")
         )
         val fakeGeminiJson = objectMapper.writeValueAsString(fakeOcrResponse)
         every { geminiApiClient.generateContentFromImage(any(), any(), any()) } returns fakeGeminiJson
@@ -215,7 +223,6 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         assertThat(savedExpense.expenseItems.first { it.name == "할인" }.price).isEqualByComparingTo("-200.00") // 차액 (800 - 1000)
     }
 
-    // ▼▼▼ [추가된 테스트] ▼▼▼
     @Test
     @DisplayName("지출 생성 성공 - 스캔(SCAN) - 항목명 번역 검증")
     fun createExpense_Success_Scan_With_Translation() {
@@ -229,6 +236,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = member1TripMember.id!!,
             inputMethod = "SCAN",
+            currency = "USD",
             items = emptyList()
         )
 
@@ -252,7 +260,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         // then: "커피"라는 번역된 이름으로 저장되었는지 검증
         val savedExpense = expenseRepository.findById(response.expenseId).get()
         assertThat(savedExpense.totalAmount).isEqualByComparingTo("15.00")
-        assertThat(savedExpense.expenseItems).hasSize(1) // 차액 0
+        assertThat(savedExpense.expenseItems).hasSize(1)
         assertThat(savedExpense.expenseItems.first().name).isEqualTo("커피") // 번역된 이름 확인
     }
 
@@ -280,6 +288,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
 
         // then: 성공적으로 수정됨
         assertThat(response.totalAmount).isEqualByComparingTo("40000")
+        assertThat(response.items[0].itemName).isEqualTo("수정된 아이템")
     }
 
     @Test
@@ -337,11 +346,41 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
     }
 
+    @Test
+    @DisplayName("지출 생성 실패 - 여정 아이템이 해당 여행에 속하지 않는 경우")
+    fun createExpense_Fail_ItineraryItemNotInTrip() {
+        // given: '방장'으로 로그인
+        setAuthentication(owner)
+
+        // 다른 여행 데이터 생성
+        val anotherTrip = tripRepository.save(Trip("다른 여행", java.time.LocalDate.now(), java.time.LocalDate.now().plusDays(1), Country.USA))
+        val anotherCategory = categoryRepository.save(Category(anotherTrip, 1, "다른 여행 카테고리", 1))
+        val anotherItineraryItem = itineraryItemRepository.save(ItineraryItem(anotherCategory, null, "다른 일정", null, 1, null))
+
+        val request = ExpenseDto.CreateRequest(
+            tripId = trip.id!!, // 원래 여행 ID
+            expenseTitle = "저녁 식사",
+            totalAmount = BigDecimal("10000"),
+            itineraryItemId = anotherItineraryItem.id!!, // 👈 다른 여행의 아이템 ID 사용
+            payerId = ownerTripMember.id!!,
+            inputMethod = "HANDWRITE",
+            currency = "KRW",
+            items = listOf(ExpenseDto.ItemCreate("테스트 아이템", BigDecimal("10000")))
+        )
+
+        // when & then
+        val exception = assertThrows<BusinessException> {
+            expenseService.createExpense(trip.id!!, anotherItineraryItem.id!!, request, null)
+        }
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
+    }
+
+
     // 테스트용 헬퍼 메서드
     private fun createTestExpense(totalAmount: BigDecimal = BigDecimal("15000")): ExpenseDto.CreateResponse {
-        // 헬퍼 메서드는 테스트의 일부이므로, 여기서도 실제 보안 검증을 통과해야 함
+        // 헬퍼 메서수는 테스트의 일부이므로, 여기서도 실제 보안 검증을 통과해야 함
         // createTestExpense를 호출하기 전에 setAuthentication이 먼저 호출되므로,
-        // 이 메서드는 항상 권한이 있는 상태에서 실행됨.
+        // 이 메서수는 항상 권한이 있는 상태에서 실행됨.
         val request = ExpenseDto.CreateRequest(
             tripId = trip.id!!,
             expenseTitle = "테스트 지출",
@@ -349,6 +388,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
             itineraryItemId = itineraryItem.id!!,
             payerId = ownerTripMember.id!!,
             inputMethod = "HANDWRITE",
+            currency = "JPY",
             items = listOf(ExpenseDto.ItemCreate("테스트 아이템", totalAmount))
         )
         return expenseService.createExpense(trip.id!!, itineraryItem.id!!, request, null)
