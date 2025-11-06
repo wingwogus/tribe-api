@@ -3,7 +3,6 @@ package com.tribe.tribe_api.expense.repository
 import com.tribe.tribe_api.expense.entity.Expense
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
-import java.time.LocalDate
 
 interface ExpenseRepository : JpaRepository<Expense, Long> {
 
