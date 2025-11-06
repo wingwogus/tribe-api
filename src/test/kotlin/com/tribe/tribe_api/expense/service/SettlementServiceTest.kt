@@ -107,7 +107,7 @@ class SettlementServiceIntegrationTest @Autowired constructor(
         // 4. 테스트용 지출 데이터 생성 (JPY 지출 사용)
 
         // [지출 1: Payer A, Total 3000 JPY] -> (A 1500, B 1500) 분담
-        val dinnerExpense = Expense(trip, itinerary, memberA, "저녁 식사", BigDecimal(3000), InputMethod.HANDWRITE, paymentDate, null, "JPY")
+        val dinnerExpense = Expense(trip, itinerary, memberA, "저녁 식사", BigDecimal(3000), InputMethod.HANDWRITE,  null, "JPY")
         val dinnerItem = ExpenseItem(dinnerExpense, "저녁메뉴", BigDecimal(3000))
         dinnerExpense.expenseItems.add(dinnerItem)
         dinnerItem.assignments.add(ExpenseAssignment(dinnerItem, memberA, BigDecimal(1500)))
@@ -116,7 +116,7 @@ class SettlementServiceIntegrationTest @Autowired constructor(
 
 
         // [지출 2: Payer B, Total 1200 JPY] -> (A 400, B 400, C 400) 분담
-        val snackExpense = Expense(trip, itinerary, memberB, "간식", BigDecimal(1200), InputMethod.HANDWRITE, paymentDate, null, "JPY")
+        val snackExpense = Expense(trip, itinerary, memberB, "간식", BigDecimal(1200), InputMethod.HANDWRITE,  null, "JPY")
         val snackItem = ExpenseItem(snackExpense, "간식메뉴", BigDecimal(1200))
         snackExpense.expenseItems.add(snackItem)
         snackItem.assignments.add(ExpenseAssignment(snackItem, memberA, BigDecimal(400)))
@@ -225,7 +225,7 @@ class SettlementServiceIntegrationTest @Autowired constructor(
         val itineraryItem = expenseRepository.findAll().first().itineraryItem
 
         // 🚨 FIX 16: DB에 없는 EUR을 사용하도록 수정 (USD는 다른 테스트에 의해 존재할 수 있음)
-        val expenseWithoutRate = Expense(trip, itineraryItem, memberA, "환율 없는 지출", BigDecimal(100), InputMethod.HANDWRITE, nextDay, null, "EUR")
+        val expenseWithoutRate = Expense(trip, itineraryItem, memberA, "환율 없는 지출", BigDecimal(100), InputMethod.HANDWRITE,  null, "EUR")
         val itemWithoutRate = ExpenseItem(expenseWithoutRate, "테스트 항목", BigDecimal(100))
         expenseWithoutRate.expenseItems.add(itemWithoutRate)
         itemWithoutRate.assignments.add(ExpenseAssignment(itemWithoutRate, memberA, BigDecimal(100)))
