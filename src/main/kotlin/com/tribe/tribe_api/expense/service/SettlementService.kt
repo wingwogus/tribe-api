@@ -102,16 +102,20 @@ class SettlementService(
     private fun convertToKrw(amount: BigDecimal, expense: Expense): BigDecimal {
         val currencyCode = expense.currency?.uppercase()
 
+        val tripStartDate = expense.trip.startDate
+        val categoryDay = expense.itineraryItem.category.day
+        var currentDate = tripStartDate.plusDays(categoryDay.toLong() - 1) // paymentDate 대체
+
         if (currencyCode == KRW || currencyCode.isNullOrBlank()) {
             return amount.setScale(SCALE, RoundingMode.HALF_UP)
         }
 
         // [수정] 가장 가까운 환율을 찾는 헬퍼 함수 호출로 대체
-        val currencyRate = findClosestRate(currencyCode, expense.paymentDate)
+        val currencyRate = findClosestRate(currencyCode, currentDate)
 
         // 환율을 찾지 못했으면 예외 발생
         if (currencyRate == null) {
-            log.error("Exchange rate not found for {} on or near {}", currencyCode, expense.paymentDate)
+            log.error("Exchange rate not found for {} on or near {}", currencyCode, currentDate)
             throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
         }
 
@@ -130,7 +134,15 @@ class SettlementService(
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
-        val dailyExpenses: List<Expense> = expenseRepository.findAllByTripIdAndPaymentDateBetween(tripId, date, date)
+        val allExpensesWithDetails: List<Expense> = expenseRepository.findAllWithDetailsByTripId(tripId)
+
+        val dailyExpenses: List<Expense> = allExpensesWithDetails.filter { expense ->
+            val tripStartDate = expense.trip.startDate
+            val categoryDay = expense.itineraryItem.category.day
+            // 실시간 날짜 계산: (여행 시작일) + (일차 - 1)
+            val expenseDate = tripStartDate.plusDays(categoryDay.toLong() - 1)
+            expenseDate == date
+        }
 
         // 총 지출액을 KRW로 변환하여 합산
         val dailyTotalAmountKrw = dailyExpenses.sumOf { expense ->
@@ -270,7 +282,7 @@ class SettlementService(
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
-        val allExpenses: List<Expense> = expenseRepository.findAllByTripId(tripId)
+        val allExpenses: List<Expense> = expenseRepository.findAllWithDetailsByTripId(tripId)
 
         // 1. 멤버별 PaidAmount(KRW)와 AssignedAmount(KRW) 계산 (추출된 메서드 사용)
         val memberCalcData = calculateMemberSettlementData(trip, allExpenses)
@@ -502,7 +514,7 @@ class SettlementService(
             // 소수점 0자리로 반올림
             val equivalentOriginalAmount = if (isForeignCurrency) {
                 // 외화인 경우: KRW 송금액을 환율로 나누어 원본 통화 금액을 역추산
-                transferAmount.divide(assumedExchangeRate, 0, RoundingMode.HALF_UP)
+                transferAmount.divide(assumedExchangeRate, SCALE, RoundingMode.HALF_UP)
             } else {
                 null
             }
