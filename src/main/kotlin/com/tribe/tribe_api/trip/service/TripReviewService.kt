@@ -2,29 +2,38 @@ package com.tribe.tribe_api.trip.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
-import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
+import com.tribe.tribe_api.common.util.service.GoogleMapService
+import com.tribe.tribe_api.itinerary.entity.Place
+import com.tribe.tribe_api.itinerary.entity.RecommendedPlace
+import com.tribe.tribe_api.itinerary.repository.PlaceRepository
+import com.tribe.tribe_api.itinerary.repository.RecommendedPlaceRepository
 import com.tribe.tribe_api.trip.dto.TripReviewRequest
 import com.tribe.tribe_api.trip.dto.TripReviewResponse
 import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripReview
-import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripRepository
 import com.tribe.tribe_api.trip.repository.TripReviewRepository
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Service
 @Transactional
 class TripReviewService(
     private val tripRepository: TripRepository,
     private val tripReviewRepository: TripReviewRepository,
-    private val geminiApiClient: GeminiApiClient
+    private val geminiApiClient: GeminiApiClient,
+    private val googleMapService: GoogleMapService,
+    private val placeRepository: PlaceRepository,
+    private val recommendedPlaceRepository: RecommendedPlaceRepository,
 ) {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createReview(
@@ -38,12 +47,27 @@ class TripReviewService(
         val aiFeedback = geminiApiClient.getFeedback(prompt)
             ?: throw BusinessException(ErrorCode.AI_FEEDBACK_ERROR)
 
-        val review = TripReview(trip, request.concept, aiFeedback)
+        // 분리된 부분들을 따로 저장
+        val (reviewContent, placePart) = splitAiResponse(aiFeedback)
+        val review = TripReview(trip, request.concept, reviewContent)
+
+        // aiFeedback 장소 추출 후 저장된 Place 객체들
+        val parsedPlaces = parseAndRetrievePlaces(placePart,trip.country.code)
+
         tripReviewRepository.save(review)
 
+        // 추천 장소로 변환 후 저장
+        parsedPlaces.forEach{
+            recommendedPlaceRepository.save(
+                RecommendedPlace.from(it, review)
+            )
+        }
+
+        logger.info("Trip review created for Trip Id: {}. Review ID: {}", tripId, review.id)
         return TripReviewResponse.ReviewDetail.from(review)
     }
 
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun getAllReviews(tripId: Long, pageable: Pageable): Page<TripReviewResponse.SimpleReviewInfo> {
         return tripReviewRepository.findTripReviewsByTripId(tripId, pageable)
             .map { TripReviewResponse.SimpleReviewInfo.from(it) }
@@ -51,7 +75,7 @@ class TripReviewService(
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun getReview(tripId: Long, reviewId: Long): TripReviewResponse.ReviewDetail {
-        val review = tripReviewRepository.findByIdOrNull(reviewId)
+        val review = tripReviewRepository.findTripReviewWithRecommendedPlacesById(reviewId)
             ?: throw BusinessException(ErrorCode.TRIP_REVIEW_NOT_FOUND)
 
         if (review.trip.id != tripId) {
@@ -59,6 +83,43 @@ class TripReviewService(
         }
 
         return TripReviewResponse.ReviewDetail.from(review)
+    }
+
+    /**
+     * AI 리뷰 결과에서 장소 이름 추출 후 GoogleMap API를 통해 검색 후 반환
+     * @param placesPart AI 리뷰에서 추출된 추천 장소 부분
+     * @param countryCode 검색할 나라 코드(Google 기준)
+     */
+    private fun parseAndRetrievePlaces(placesPart: String, countryCode: String): List<Place> {
+        // 장소 이름 추출 후
+        val placeNames = placesPart.lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+        // Google Map API를 통해 장소 이름으로 검색 후 첫번째 검색 결과로 변환해서 반환
+        return placeNames.mapNotNull { placeName ->
+            val searchResults = googleMapService.searchPlaces(placeName, "ko", countryCode)
+            searchResults.firstOrNull()?.let { searchResult ->
+                // 외부 placeId로 검색 후 존재하지 않으면 새로 생성
+                placeRepository.findByExternalPlaceId(searchResult.externalPlaceId)
+                    ?: placeRepository.save(Place(
+                        searchResult.externalPlaceId,
+                        searchResult.placeName,
+                        searchResult.address,
+                        BigDecimal.valueOf(searchResult.latitude),
+                        BigDecimal.valueOf(searchResult.longitude)
+                    ))
+            }
+        }
+    }
+
+    // --- 추천 장소 ---를 기준으로 위아래로 분리
+    private fun splitAiResponse(content: String): Pair<String, String> {
+        val separator = "---추천 장소 목록---"
+        val contentParts = content.split(separator)
+        val reviewContent = contentParts[0].trim()
+        val placesPart = if (contentParts.size > 1) contentParts[1] else ""
+        return Pair(reviewContent, placesPart)
     }
 
     private fun createPromptFromTrip(trip: Trip, concept: String?): String {
@@ -113,7 +174,14 @@ class TripReviewService(
            '1단계', '유효성 검증' 같은 단어는 **절대 사용하지 말고**, 아래 구조로 바로 상세 리뷰를 시작합니다.
            * **제목:** `## [여행 제목] 상세 검토 및 제안`
            * **상세 검토 본문:** 2단계에서 분석한 동선 효율성, 일정 현실성, 그리고 콘셉트에 맞는 명소 및 맛집 추천 등을 날짜별로 상세하게 작성하여 완전한 리뷰를 제공합니다.
-                
+        **4. 추천 장소 목록
+           리뷰 본문이 끝난 후, 반드시 줄바꿈을 하고 `---추천 장소 목록---` 구분자를 추가하세요
+           그 다음 줄부터, 본문에서 추천한 모든 장소(식당, 명소 등)의 이름을 한 줄에 하나씩 정확하게 나열해야 합니다
+           - 예시:
+           ---추천 장소 목록---
+           오사카 성
+           킨류 라멘
+           도톤보리
         ---
         
         [여행 정보]

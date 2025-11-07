@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.common.exception
 
 import com.tribe.tribe_api.common.util.ApiResponse
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
@@ -11,12 +12,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
-    // Java의 BusinessException.class -> Kotlin의 BusinessException::class
-    // 반환 타입을 명시적으로 선언합니다: ResponseEntity<ApiResponse<Unit>>
+    val logger = LoggerFactory.getLogger(javaClass)
+
     @ExceptionHandler(BusinessException::class)
     fun handleBusiness(ex: BusinessException): ResponseEntity<ApiResponse<Unit>> {
         val status = ex.errorCode.status
         val body = ApiResponse.error<Unit>(ex.errorCode.message)
+
+        // 4xx/5xx 비즈니스 예외에 따라 레벨 분리
+        if (status.is5xxServerError) {
+            // 5xx 에러는 스택 트레이스까지 ERROR로
+            logger.error(ex.errorCode.message, ex)
+        } else {
+            // 4xx 에러는 WARN 레벨
+            logger.warn(ex.errorCode.message)
+        }
+
         return ResponseEntity.status(status).body(body)
     }
 
@@ -26,19 +37,30 @@ class GlobalExceptionHandler {
             ?: "잘못된 요청입니다."
 
         val body = ApiResponse.error<Unit>(message)
+
+        // Validation 실패 400 에러는 WARN 레벨
+        logger.warn("Validation failed: {}", message)
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body)
     }
 
     @ExceptionHandler(BadCredentialsException::class)
     fun handleBadCredentials(ex: BadCredentialsException): ResponseEntity<ApiResponse<Unit>> {
         val body = ApiResponse.error<Unit>("아이디와 비밀번호를 확인해주세요")
+
+        // 인증 실패 401 에러는 WARN 레벨
+        logger.warn("Login failed: {}", ex.message)
+
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body)
     }
 
     @ExceptionHandler(Exception::class)
     fun handleAll(ex: Exception): ResponseEntity<ApiResponse<Unit>> {
-        // ex.message가 null일 수 있으므로 안전 호출(?.) 사용
-        val body = ApiResponse.error<Unit>("서버 오류가 발생했습니다: ${ex.message}")
+        val body = ApiResponse.error<Unit>("서버 오류가 발생했습니다.")
+
+        // 500 에러는 ERROR 레벨
+        logger.error("Unhandled exception caught:", ex)
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body)
     }
 }

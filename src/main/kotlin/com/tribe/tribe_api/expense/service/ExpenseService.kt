@@ -3,9 +3,8 @@ package com.tribe.tribe_api.expense.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
-import com.tribe.tribe_api.common.util.security.SecurityUtil
-import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
+import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
@@ -17,6 +16,8 @@ import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
+import org.slf4j.LoggerFactory
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -35,25 +36,22 @@ class ExpenseService(
     private val objectMapper: ObjectMapper
 ) {
 
-    private fun verifyTripIdParticipation(tripId: Long){
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
+    private val logger = LoggerFactory.getLogger(javaClass)
 
-        if(!tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)){
-            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
-        }
+    private fun findExpenseById(expenseId: Long): Expense {
+        return expenseRepository.findById(expenseId)
+            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
     }
 
-    private fun findExpenseAndValidate(expenseId: Long, tripId: Long): Expense {
-        val expense = expenseRepository.findById(expenseId)
-            .orElseThrow { BusinessException(ErrorCode.EXPENSE_NOT_FOUND) }
-
-        if (expense.trip.id != tripId) { throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP) }
-
-        return expense
+    private fun isPayer(tripMember: TripMember, tripId: Long){
+        if (tripMember.trip.id != tripId) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
     }
 
     //특정 일정에 대한 새로운 비용(지출) 내역을 등록
     @Transactional
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createExpense(
         tripId: Long,
         itineraryItemId: Long,
@@ -61,14 +59,18 @@ class ExpenseService(
         imageFile: MultipartFile?
     ): ExpenseDto.CreateResponse {
 
-        verifyTripIdParticipation(tripId)
 
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        isPayer(payer, tripId)
+
         val itineraryItem = itineraryItemRepository.findById(itineraryItemId)
             .orElseThrow { BusinessException(ErrorCode.ITINERARY_ITEM_NOT_FOUND) }
+        if (itineraryItem.category.trip.id != tripId) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
 
         val dayNumber = itineraryItem.category.day
         val paymentDate = trip.startDate.plusDays(dayNumber.toLong() - 1) //날짜 확인
@@ -83,7 +85,11 @@ class ExpenseService(
                     ?: throw BusinessException(ErrorCode.INVALID_INPUT_VALUE) //수기 입력시 필수 입력
                 ExpenseDto.OcrResponse(
                     totalAmount = totalAmount,
-                    items = request.items.map { ExpenseDto.OcrItem(it.itemName, it.price) }
+                    items = request.items.map { ExpenseDto.OcrItem(it.itemName, it.price) },
+                    subtotal = null,
+                    tax = null,
+                    tip = null,
+                    discount = null
                 )
             }
             else -> throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
@@ -91,12 +97,7 @@ class ExpenseService(
 
         var imageUrl: String? = null
         if (imageFile != null && !imageFile.isEmpty) {
-            imageUrl = cloudinaryUploadService.upload(imageFile)
-        }
-
-        val itemsTotal = processedData.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
-        if (processedData.totalAmount.compareTo(itemsTotal) != 0) {
-            throw BusinessException(ErrorCode.EXPENSE_TOTAL_AMOUNT_MISMATCH)
+            imageUrl = cloudinaryUploadService.upload(imageFile, "receipts")
         }
 
         val expense = Expense(
@@ -107,9 +108,11 @@ class ExpenseService(
             totalAmount = processedData.totalAmount,
             entryMethod = InputMethod.valueOf(request.inputMethod.uppercase()),
             paymentDate = paymentDate,
-            receiptImageUrl = imageUrl
+            receiptImageUrl = imageUrl,
+            currency = request.currency.uppercase() // 통화 코드 저장 (예: KRW, USD, JPY)
         )
 
+        var itemsTotal = BigDecimal.ZERO
         processedData.items.forEach { itemDto ->
             val expenseItem = ExpenseItem(
                 expense = expense,
@@ -117,25 +120,64 @@ class ExpenseService(
                 price = itemDto.price
             )
             expense.addExpenseItem(expenseItem)
+            itemsTotal = itemsTotal.add(itemDto.price)
+        }
+
+        // '최종 총액'과 '항목 합계'의 차액 계산
+        val remainder = processedData.totalAmount.subtract(itemsTotal)
+        val zero = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+
+        // 차액이 있다면 '세금/팁/기타' 또는 '할인' 항목으로 자동 추가
+        if (remainder.compareTo(zero) > 0) {
+            // 팁, 세금 등으로 인해 총액이 더 큰 경우
+            val remainderItem = ExpenseItem(
+                expense = expense,
+                name = "세금 / 팁 / 기타",
+                price = remainder
+            )
+            expense.addExpenseItem(remainderItem)
+        } else if (remainder < zero) {
+            // 할인 등으로 인해 총액이 더 작은 경우
+            val discountItem = ExpenseItem(
+                expense = expense,
+                name = "할인",
+                price = remainder // 마이너스 값으로 저장
+            )
+            expense.addExpenseItem(discountItem)
         }
 
         val savedExpense = expenseRepository.save(expense)
+        logger.info("Expense created. Expense ID: {}, Trip ID: {}", savedExpense.id, tripId)
         return ExpenseDto.CreateResponse.from(savedExpense)
     }
 
     private fun processReceipt(imageFile: MultipartFile): ExpenseDto.OcrResponse {
         val base64Image = java.util.Base64.getEncoder().encodeToString(imageFile.bytes)
         val prompt = """
-            이 영수증 이미지에서 지출 총액(totalAmount)과 모든 지출 항목(items)을 추출해줘.
-            각 항목은 이름(itemName)과 가격(price)을 가져야 해.
+            너는 영수증 분석 AI야. 이 영수증 이미지에서 다음 항목들을 추출해줘.
+            
+            1. 'totalAmount': 최종 결제 총액 (필수)
+            2. 'items': 구매한 개별 항목과 가격 목록 (itemName, price)
+               - !!가장 중요!! 'itemName'은 반드시 **한국어(Korean)로 번역**해서 제공해줘.
+               - (예: 'Chicken Burger' -> '치킨 버거', 'Kaffee' -> '커피')
+            3. 'subtotal': 항목들의 합계 (소계)
+            4. 'tax': 세금
+            5. 'tip': 팁 또는 봉사료
+            6. 'discount': 할인액
+
             결과는 반드시 아래와 같은 JSON 형식으로만 응답해줘.
+            항목이 식별되지 않으면 0 또는 null로 처리해줘.
             
             {
-              "totalAmount": 15000,
+              "totalAmount": 130.00,
               "items": [
-                { "itemName": "아메리카노", "price": 4500 },
-                { "itemName": "카페라떼", "price": 5000 }
-              ]
+                { "itemName": "치킨 버거", "price": 95.00 },
+                { "itemName": "콜라", "price": 15.00 }
+              ],
+              "subtotal": 110.00,
+              "tax": 10.00,
+              "tip": 10.00,
+              "discount": 0
             }
         """.trimIndent()
 
@@ -163,27 +205,22 @@ class ExpenseService(
 
     //특정 비용 상세 조회
     @Transactional(readOnly = true)
-    fun getExpenseDetail(tripId: Long, expenseId: Long): ExpenseDto.DetailResponse {
-        val expense = findExpenseAndValidate(expenseId, tripId)
-
-        expense.trip.id?.let { tripId ->
-            verifyTripIdParticipation(tripId)
-        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
-
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun getExpenseDetail(expenseId: Long): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
         return ExpenseDto.DetailResponse.from(expense)
     }
 
     //특정 비용 수정
     @Transactional
-    fun updateExpense(tripId: Long, expenseId: Long, request: ExpenseDto.UpdateRequest): ExpenseDto.DetailResponse {
-        val expense = findExpenseAndValidate(expenseId, tripId)
-
-        expense.trip.id?.let { tripId ->
-            verifyTripIdParticipation(tripId)
-        } ?: throw BusinessException(ErrorCode.SERVER_ERROR)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun updateExpense(expenseId: Long, request: ExpenseDto.UpdateRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
+        val tripId = expense.trip.id!!
 
         val payer = tripMemberRepository.findById(request.payerId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        isPayer(payer, tripId)
 
         // 요청된 아이템들의 가격 합계를 계산합니다.
         val itemsTotal = request.items.fold(BigDecimal.ZERO) { acc, item -> acc + item.price }
@@ -199,6 +236,7 @@ class ExpenseService(
 
         updateExpenseItems(expense, request.items)
 
+        logger.info("Expense updated. Expense ID: {}, Trip ID: {}", expenseId, tripId)
         return ExpenseDto.DetailResponse.from(expense)
     }
 
@@ -246,10 +284,10 @@ class ExpenseService(
 
     // 멤버별 배분 정보 등록/수정
     @Transactional
-    fun assignParticipants(tripId: Long, expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
-        val expense = findExpenseAndValidate(expenseId, tripId)
-
-        verifyTripIdParticipation(tripId)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun assignParticipants(expenseId: Long, request: ExpenseDto.ParticipantAssignRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
+        val tripId = expense.trip.id!!
 
         val expenseItemsById = expense.expenseItems.associateBy { it.id }
 
@@ -268,6 +306,12 @@ class ExpenseService(
                 throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
             }
 
+            participants.forEach { participant ->
+                if (participant.trip.id != tripId) {
+                    throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+                }
+            }
+
             // N빵 계산
             if (participants.isNotEmpty()) {
                 val amounts = calculateFairShare(expenseItem.price, participants)
@@ -283,7 +327,8 @@ class ExpenseService(
                 }
             }
         }
-
+            
+        logger.info("Participants assigned for expense ID: {}. Number of items assigned: {}", expenseId, request.items.size)
         return ExpenseDto.DetailResponse.from(expense)
     }
 
@@ -306,17 +351,18 @@ class ExpenseService(
 
     // 지출 내역 삭제
     @Transactional
-    fun deleteExpense(tripId: Long, expenseId: Long) {
-        verifyTripIdParticipation(tripId)
-        val expense = findExpenseAndValidate(expenseId, tripId)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun deleteExpense(expenseId: Long) {
+        val expense = findExpenseById(expenseId)
         expenseRepository.delete(expense)
+        logger.info("Expense deleted. Expense ID: {}", expenseId)
     }
 
     // 특정 지출 항목의 배분 내역 삭제
     @Transactional
-    fun clearExpenseAssignments(tripId: Long, expenseId: Long, request: ExpenseDto.AssignmentClearRequest): ExpenseDto.DetailResponse {
-        verifyTripIdParticipation(tripId)
-        val expense = findExpenseAndValidate(expenseId, tripId)
+    @PreAuthorize("@tripSecurityService.isTripMemberByExpenseId(#expenseId)")
+    fun clearExpenseAssignments(expenseId: Long, request: ExpenseDto.AssignmentClearRequest): ExpenseDto.DetailResponse {
+        val expense = findExpenseById(expenseId)
 
         val expenseItemsById = expense.expenseItems.associateBy { it.id }
 
@@ -330,6 +376,7 @@ class ExpenseService(
             expenseItem.assignments.clear()
         }
 
+        logger.info("Expense assignments cleared for expense ID: {}. Number of items cleared: {}", expenseId, request.itemIds.size)
         return ExpenseDto.DetailResponse.from(expense)
     }
 }

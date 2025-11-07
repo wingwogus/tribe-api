@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.itinerary.dto
 
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
+import com.tribe.tribe_api.trip.dto.TripMemberDto
 import org.springframework.data.domain.Page
 import java.math.BigDecimal
 
@@ -12,35 +13,33 @@ object WishlistDto {
         val name: String,
         val address: String?,
         val latitude: BigDecimal,
-        val longitude: BigDecimal
+        val longitude: BigDecimal,
+        val adder: TripMemberDto.Details,
     ) {
         companion object {
             fun from(entity: WishlistItem): WishlistItemDto {
-                val place = entity.place // 가독성을 위해 Place 엔티티를 변수로 추출
+                val place = entity.place
+                val adder = entity.adder
+
                 return WishlistItemDto(
                     wishlistItemId = entity.id!!,
                     placeId = place.id!!,
                     name = place.name,
                     address = place.address,
                     latitude = place.latitude,
-                    longitude = place.longitude
+                    longitude = place.longitude,
+                    adder = TripMemberDto.Details.from(adder)
                 )
             }
         }
     }
 
     data class WishListAddRequest(
-        val placeId: String,
+        val externalPlaceId: String,
         val placeName: String,
-        val address: String,
+        val address: String?,
         val latitude: BigDecimal,
         val longitude: BigDecimal
-    )
-
-    data class WishListAddResponse(
-        val placeId: String,
-        val placeName: String,
-        val address: String
     )
 
     data class WishlistSearchResponse(

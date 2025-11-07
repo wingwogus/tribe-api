@@ -9,6 +9,10 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  cloud: # Spring Cloud 설정 블록 추가
+    compatibility-verifier:
+      enabled: false
+
   data:
     redis:
       host: ${REDIS_HOST}
@@ -17,15 +21,17 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     open-in-view: false
-    show-sql: false
 
     properties:
       hibernate:
         default_batch_fetch_size: 100
-        format_sql: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
 
   security:
     oauth2:
@@ -77,6 +83,11 @@ gemini:
     key: ${GEMINI_API_KEY} # 환경변수에서 API 키를 가져옵니다.
     url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
+exchange:
+  rate:
+    api-url: https://oapi.koreaexim.go.kr
+    key: ${EXCHANGE_RATE_API_KEY}
+
 server:
   port: 8083
 
@@ -85,4 +96,13 @@ app:
 
 cloudinary:
   url: ${CLOUDINARY_URL}
+
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000  # 연결 시도 타임아웃 (5초)
+        readTimeout: 10000
+
 

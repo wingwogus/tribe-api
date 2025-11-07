@@ -20,7 +20,7 @@ class ItineraryController(
         @PathVariable tripId: Long,
         @PathVariable categoryId: Long, // 이 값을
         @Valid @RequestBody request: ItineraryRequest.Create
-    ): ResponseEntity<ApiResponse<ItineraryResponse>> {
+    ): ResponseEntity<ApiResponse<ItineraryResponse.ItineraryDetail>> {
         // 서비스 호출 시, categoryId를 첫 번째 인자로 전달
         val response = itineraryService.createItinerary(categoryId, request)
         return ResponseEntity
@@ -32,7 +32,7 @@ class ItineraryController(
     fun getItinerariesByCategory(
         @PathVariable categoryId: Long,
         @PathVariable tripId: Long
-    ): ResponseEntity<ApiResponse<List<ItineraryResponse>>> {
+    ): ResponseEntity<ApiResponse<List<ItineraryResponse.ItineraryDetail>>> {
         val response = itineraryService.getItinerariesByCategory(tripId, categoryId)
         return ResponseEntity.ok(ApiResponse.success("카테고리별 일정 조회 성공", response))
     }
@@ -42,7 +42,7 @@ class ItineraryController(
         @PathVariable itemId: Long,
         @PathVariable tripId: Long,
         @Valid @RequestBody request: ItineraryRequest.Update
-    ): ResponseEntity<ApiResponse<ItineraryResponse>> {
+    ): ResponseEntity<ApiResponse<ItineraryResponse.ItineraryDetail>> {
         val response = itineraryService.updateItinerary(itemId, request)
         return ResponseEntity.ok(ApiResponse.success("일정 수정 성공", response))
     }
@@ -60,9 +60,18 @@ class ItineraryController(
     fun updateItineraryOrder(
         @PathVariable tripId: Long,
         @Valid @RequestBody request: ItineraryRequest.OrderUpdate
-    ): ResponseEntity<ApiResponse<List<ItineraryResponse>>> {
+    ): ResponseEntity<ApiResponse<List<ItineraryResponse.ItineraryDetail>>> {
         val response = itineraryService.updateItineraryOrder(tripId, request)
         return ResponseEntity.ok(ApiResponse.success("일정 순서 변경 성공", response))
+    }
+
+    @GetMapping("/itineraries/directions/all")
+    fun getAllDirections(
+        @PathVariable tripId: Long,
+        @RequestParam mode: String
+    ): ResponseEntity<ApiResponse<List<ItineraryResponse.RouteDetails>>> {
+        val response = itineraryService.getAllDirectionsForTrip(tripId, mode)
+        return ResponseEntity.ok(ApiResponse.success("전체 경로 조회 성공", response))
     }
 }
 

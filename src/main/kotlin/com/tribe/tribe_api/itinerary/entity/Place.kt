@@ -1,7 +1,6 @@
 package com.tribe.tribe_api.itinerary.entity
 
 import jakarta.persistence.*
-import org.apache.logging.log4j.util.BiConsumer
 import java.math.BigDecimal
 
 @Entity
@@ -28,4 +27,7 @@ class Place(
 
     @OneToMany(mappedBy = "place")
     var itineraryItems: MutableList<ItineraryItem> = mutableListOf()
+
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "place", cascade = [CascadeType.ALL], orphanRemoval = true)
+    val recommendedPlaces: MutableList<RecommendedPlace> = mutableListOf()
 }

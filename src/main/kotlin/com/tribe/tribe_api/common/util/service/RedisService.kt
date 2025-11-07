@@ -17,7 +17,7 @@ class RedisService(
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
-    fun setGoogleApiData(searchKey: String, apiResponse: GoogleDto.GoogleApiResponse) {
+    fun setGoogleApiData(searchKey: String, apiResponse: GoogleDto.PlacesResponse) {
         val key = "search_cache:$searchKey"
 
         val data = objectMapper.writeValueAsString(apiResponse)

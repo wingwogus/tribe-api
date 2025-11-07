@@ -5,6 +5,7 @@ import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.member.dto.MemberDto
 import com.tribe.tribe_api.member.repository.MemberRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 class MemberService(
     private val memberRepository: MemberRepository
 ) {
+    val logger = LoggerFactory.getLogger(javaClass)
 
     fun getMemberInfo(): MemberDto.Response {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
@@ -38,6 +40,8 @@ class MemberService(
         member.nickname = request.nickname
 
         val responseDto = MemberDto.Response.from(member)
+
+        logger.info("Nickname updated. Member Id {}", member.id)
 
         return responseDto
     }

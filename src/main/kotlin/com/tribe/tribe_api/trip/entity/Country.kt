@@ -1,10 +1,6 @@
 package com.tribe.tribe_api.trip.entity
 
-import lombok.AllArgsConstructor
-import lombok.Getter
 
-@AllArgsConstructor
-@Getter
 enum class Country(
     val code: String,
     val koreanName: String,

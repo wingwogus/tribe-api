@@ -3,10 +3,13 @@ package com.tribe.tribe_api.itinerary.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
+import com.tribe.tribe_api.common.util.service.GoogleMapService
 import com.tribe.tribe_api.itinerary.dto.ItineraryRequest
 import com.tribe.tribe_api.itinerary.dto.ItineraryResponse
+import com.tribe.tribe_api.itinerary.dto.PlaceDto
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.itinerary.entity.Place
+import com.tribe.tribe_api.itinerary.entity.TravelMode
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
@@ -21,21 +24,22 @@ class ItineraryService(
     private val itineraryItemRepository: ItineraryItemRepository,
     private val categoryRepository: CategoryRepository,
     private val placeRepository: PlaceRepository,
-    private val tripMemberRepository: TripMemberRepository
+    private val tripMemberRepository: TripMemberRepository,
+    private val googleMapService: GoogleMapService,
 ) {
 
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun createItinerary(categoryId: Long, request: ItineraryRequest.Create): ItineraryResponse {
-        log.info("일정 생성 요청. Category ID: {}", categoryId)
+    fun createItinerary(categoryId: Long, request: ItineraryRequest.Create): ItineraryResponse.ItineraryDetail {
+        logger.info("Itinerary creation requested. Category ID: {}", categoryId)
         val memberId = SecurityUtil.getCurrentMemberId()
         val category = categoryRepository.findById(categoryId)
             .orElseThrow { BusinessException(ErrorCode.CATEGORY_NOT_FOUND) }
 
         validateTripMember(category.trip.id!!, memberId)
 
-        var place: Place? = null
-        var title: String? = null
+        var place: Place?
+        var title: String?
 
         if (request.placeId != null) {
             // placeId가 있는 경우, 장소 기반 일정
@@ -62,15 +66,17 @@ class ItineraryService(
             memo = request.memo
         )
 
-        return ItineraryResponse.from(itineraryItemRepository.save(newItem))
+        val savedItem = itineraryItemRepository.save(newItem)
+        logger.info("Itinerary item created. Item ID: {}", savedItem.id)
+
+        return ItineraryResponse.ItineraryDetail.from(savedItem)
     }
 
     // 카테고리별 모든 일정 조회
 
     @Transactional(readOnly = true)
     // tripId를 파라미터로 추가
-    fun getItinerariesByCategory(tripId: Long, categoryId: Long): List<ItineraryResponse> {
-
+    fun getItinerariesByCategory(tripId: Long, categoryId: Long): List<ItineraryResponse.ItineraryDetail> {
         val memberId = SecurityUtil.getCurrentMemberId()
         validateTripMember(tripId, memberId)
 
@@ -83,12 +89,12 @@ class ItineraryService(
 
         // 검증이 끝난 뒤 카테고리 ID로 일정 목록을 조회
         return itineraryItemRepository.findByCategoryIdOrderByOrderAsc(categoryId)
-            .map { ItineraryResponse.from(it) }
+            .map { ItineraryResponse.ItineraryDetail.from(it) }
     }
 
     // 특정 일정 정보 수정
 
-    fun updateItinerary(itemId: Long, request: ItineraryRequest.Update): ItineraryResponse {
+    fun updateItinerary(itemId: Long, request: ItineraryRequest.Update): ItineraryResponse.ItineraryDetail {
         val memberId = SecurityUtil.getCurrentMemberId()
         val item = findItemById(itemId)
 
@@ -98,7 +104,8 @@ class ItineraryService(
             this.time = request.time
             this.memo = request.memo
         }
-        return ItineraryResponse.from(item)
+        logger.info("Itinerary item updated. Item ID: {}", item.id)
+        return ItineraryResponse.ItineraryDetail.from(item)
     }
 
     // 특정 일정 삭제
@@ -110,10 +117,11 @@ class ItineraryService(
         validateTripMember(item.category.trip.id!!, memberId)
 
         itineraryItemRepository.delete(item)
+        logger.info("Itinerary item deleted. Item ID: {}", itemId)
     }
 
     // 전체 일정 순서 일괄 변경
-    fun updateItineraryOrder(tripId: Long, request: ItineraryRequest.OrderUpdate): List<ItineraryResponse> {
+    fun updateItineraryOrder(tripId: Long, request: ItineraryRequest.OrderUpdate): List<ItineraryResponse.ItineraryDetail> {
         val memberId = SecurityUtil.getCurrentMemberId()
         validateTripMember(tripId, memberId)
 
@@ -156,7 +164,8 @@ class ItineraryService(
             item.category = newCategory
         }
 
-        return itemsToUpdate.sortedBy { it.order }.map { ItineraryResponse.from(it) }
+        logger.info("Itinerary order updated for tripId: {}. Number of items updated: {}", tripId, itemsToUpdate.size)
+        return itemsToUpdate.sortedBy { it.order }.map { ItineraryResponse.ItineraryDetail.from(it) }
     }
 
     private fun findItemById(itemId: Long): ItineraryItem {
@@ -168,6 +177,111 @@ class ItineraryService(
         if (!tripMemberRepository.existsByTripIdAndMemberId(tripId, memberId)) {
             throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
         }
+    }
+
+    /**
+     * Trip에 속한 일정들간의 모든 거리 계산 후 배열로 반환
+     * @param tripId 계산을 원하는 여행의 id
+     * @param mode 이동 방법
+     */
+    fun getAllDirectionsForTrip(
+        tripId: Long,
+        mode: String
+    ): List<ItineraryResponse.RouteDetails> {
+        val travelMode = TravelMode.entries
+            .firstOrNull { it.name.equals(mode, ignoreCase = true) }
+            ?: throw BusinessException(ErrorCode.TRAVEL_MODE_NOT_FOUND)
+
+        val itineraryItems = itineraryItemRepository.findByTripIdOrderByCategoryAndOrder(tripId)
+
+        // 일정이 2개보다 적다면 빈 배열 반환
+        if (itineraryItems.size < 2) {
+            return emptyList()
+        }
+
+        // 일정들를 순서대로 Pair<originItem, destinationItem> 쌍으로 만들어 순환하며 치환
+        return itineraryItems.zipWithNext().mapNotNull { (originItem, destinationItem) ->
+            if (originItem.place == null || destinationItem.place == null) {
+                return@mapNotNull null
+            }
+
+            getDirectionBetweenPlaces(
+                originItem.place!!,
+                destinationItem.place!!,
+                travelMode)
+        }
+    }
+
+    /**
+     * mode에 따른 두 장소간 거리 계산 후 DTO로 반환
+     * @param originPlace 출발지
+     * @param destinationPlace 도착지
+     * @param mode 이동 방법
+     */
+    private fun getDirectionBetweenPlaces(
+        originPlace: Place,
+        destinationPlace: Place,
+        mode: TravelMode
+    ): ItineraryResponse.RouteDetails? {
+        val routeDetails = googleMapService.getDirections(
+            originPlace.externalPlaceId,
+            destinationPlace.externalPlaceId,
+            mode)
+            ?: throw BusinessException(ErrorCode.EXTERNAL_API_ERROR)
+
+        // 1. API 응답 상태 확인 OK일때만 실행
+        if (routeDetails.status != "OK") {
+            // ZERO_RESULTS 일 떄 null을 반환하여 호출할 때 처리                                                        │
+            logger.warn("Google API returned status: {} for origin: {}, destination: {}, mode: {}",
+                routeDetails.status,
+                originPlace.name,
+                destinationPlace.name,
+                mode)
+
+            return null
+        }
+
+        // 2. 실제 데이터가 있는 routes[0], legs[0] 추출
+        val route = routeDetails.routes.firstOrNull()
+            ?: return null
+        val leg = route.legs.firstOrNull()
+            ?: return null
+
+        // 3. List<RawStep> -> List<CleanStep>로 변환
+        val cleanSteps = leg.steps.map { rawStep ->
+
+            // 4. RawTransitDetails -> TransitDetails 변환
+            val cleanTransitDetails = rawStep.transitDetails?.let { rawTransit ->
+                ItineraryResponse.RouteDetails.TransitDetails(
+                    lineName = rawTransit.line.shortName ?: "이름 없음",
+                    vehicleType = rawTransit.line.vehicle.type,
+                    vehicleIconUrl = rawTransit.line.vehicle.icon,
+                    numStops = rawTransit.numStops,
+                    departureStop = rawTransit.departureStop.name,
+                    arrivalStop = rawTransit.arrivalStop.name
+                )
+            }
+
+            // 5. RawStep -> Clean RouteStep 변환
+            ItineraryResponse.RouteDetails.RouteStep(
+                travelMode = rawStep.travelMode,
+                instructions = rawStep.htmlInstructions.replace(Regex("<[^>]*>"), ""),
+                duration = rawStep.duration.text,
+                distance = rawStep.distance.text,
+                transitDetails = cleanTransitDetails // WALKING 스텝이면 여기가 자동으로 null
+            )
+        }
+
+        // 6. 최종 DTO 반환
+        return ItineraryResponse.RouteDetails(
+            travelMode = mode.toString(),
+            originPlace = PlaceDto.Simple.from(originPlace),
+            destinationPlace = PlaceDto.Simple.from(destinationPlace),
+            totalDuration = leg.duration.text,
+            totalDistance = leg.distance.text,
+//            overviewPolyline = route.overviewPolyline.points,
+            steps = cleanSteps
+        )
     }
 }
 

@@ -16,6 +16,9 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     EXPENSE_TOTAL_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "지출 총액과 품목 금액의 합이 일치하지 않습니다."),
     IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다."),
     NO_BELONG_TRIP(HttpStatus.BAD_REQUEST, "해당 카테고리는 현재 여행에 속해있지 않습니다."),
+    DUPLICATE_CATEGORY_ID_REQUEST(HttpStatus.BAD_REQUEST, "카테고리 ID는 중복될 수 없습니다."),
+    DUPLICATE_ORDER_REQUEST(HttpStatus.BAD_REQUEST, "카테고리의 순서가 중복입니다."),
+    CATEGORY_DAY_MISMATCH(HttpStatus.BAD_REQUEST, "카테고리의 day가 맞지 않습니다"),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),
@@ -39,13 +42,19 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 여정을 찾을 수 없습니다."),
     EXPENSE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 지출 내역을 찾을 수 없습니다."),
     EXPENSE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 지출 항목을 찾을 수 없습니다."),
+    EXCHANGE_RATE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 날짜에 적용 가능한 환율 정보를 찾을 수 없습니다."),
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 게시글을 찾을 수 없습니다."),
+    TRAVEL_MODE_NOT_FOUND(HttpStatus.NOT_FOUND, "지원하지 않는 이동 수단입니다."),
 
     // 409 CONFLICT
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     ALREADY_SIGNED_EMAIL(HttpStatus.CONFLICT, "이미 회원가입한 이메일입니다"),
+    WISHLIST_ITEM_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 위시리스트에 추가된 장소입니다."),
+
 
     // 500 INTERNAL_SERVER_ERROR
+    EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "외부 API 호출에 실패했습니다."),
     AI_RESPONSE_PARSING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,  "AI 응답 파싱에 실패했습니다."),
     SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부에 문제가 발생했습니다."),
     CODE_GENERATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "코드 생성 중 오류가 발생했습니다."),

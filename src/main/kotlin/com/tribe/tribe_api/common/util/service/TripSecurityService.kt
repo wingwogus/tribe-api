@@ -3,6 +3,7 @@ package com.tribe.tribe_api.common.util.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
+import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
@@ -13,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service("tripSecurityService")
 class TripSecurityService(
     private val tripMemberRepository: TripMemberRepository,
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val communityPostRepository: CommunityPostRepository
 ) {
     @Transactional(readOnly = true)
     fun isTripMember(tripId: Long): Boolean {
@@ -47,5 +49,16 @@ class TripSecurityService(
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
 
         return isTripMember(tripId)
+    }
+
+    @Transactional(readOnly = true)
+    fun isTripOwnerByPostId(postId: Long): Boolean {
+        val post = communityPostRepository.findByIdOrNull(postId)
+            ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
+
+        val tripId = post.trip.id
+            ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
+        return isTripOwner(tripId)
     }
 }

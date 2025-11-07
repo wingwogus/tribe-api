@@ -41,3 +41,6 @@ out/
 
 .env
 *.yml
+
+### LOG FILE ###
+logs

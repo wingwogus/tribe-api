@@ -27,6 +27,10 @@ object ExpenseDto {
         @field:NotBlank(message = "입력 방식은 필수입니다.")
         val inputMethod: String,
 
+        // 통화 필드 추가 (USD, JPY 등)
+        @field:NotBlank(message = "통화 정보는 필수입니다.")
+        val currency: String = "KRW",
+
         @field:Valid
         val items: List<ItemCreate> = emptyList()
     )
@@ -41,7 +45,6 @@ object ExpenseDto {
     )
 
     data class UpdateRequest(
-        val tripId: Long,
 
         @field:NotBlank(message = "지출 제목은 필수입니다.")
         val expenseTitle: String,
@@ -58,19 +61,19 @@ object ExpenseDto {
     )
 
     data class ItemUpdate(
-        val itemId: Long?,
+        val itemId: Long?, //Null이라면 새 항목
 
         @field:NotBlank(message = "항목 이름은 비워둘 수 없습니다.")
         val itemName: String,
 
         @field:NotNull(message = "항목 가격은 필수입니다.")
-        @field:PositiveOrZero(message = "항목 가격은 0 또는 양수여야 합니다.")
         val price: BigDecimal
     )
 
     data class ParticipantAssignRequest(
-        val tripId: Long,
 
+        @field:Valid
+        @field:NotEmpty(message = "items는 필수입니다.")
         val items: List<ItemAssignment> = emptyList()
     )
 
@@ -175,7 +178,11 @@ object ExpenseDto {
     // Gemini의 JSON 응답을 파싱하기 위한 DTO
     data class OcrResponse(
         val totalAmount: BigDecimal,
-        val items: List<OcrItem>
+        val items: List<OcrItem>,
+        val subtotal: BigDecimal?, // 항목 합계 (소계)
+        val tax: BigDecimal?,      // 세금
+        val tip: BigDecimal?,      // 팁
+        val discount: BigDecimal?  // 할인
     )
 
     data class OcrItem(
@@ -185,7 +192,8 @@ object ExpenseDto {
 
     // 어떤 항목의 배분 내역을 삭제할지 서버에 알려주는 역할
     data class AssignmentClearRequest(
-        val tripId: Long,
+
+        @field:NotEmpty(message = "삭제할 배분 항목 ID 리스트는 비어있을 수 없습니다.")
         val itemIds: List<Long>
     )
 
