@@ -67,7 +67,6 @@ dependencies {
 	// Test
 	testImplementation("io.mockk:mockk:1.13.5")
 	testImplementation("com.ninja-squad:springmockk:4.0.2")
-	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 }
 
 dependencyManagement {

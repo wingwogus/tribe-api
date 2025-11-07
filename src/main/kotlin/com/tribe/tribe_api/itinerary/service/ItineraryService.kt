@@ -186,8 +186,12 @@ class ItineraryService(
      */
     fun getAllDirectionsForTrip(
         tripId: Long,
-        mode: TravelMode
+        mode: String
     ): List<ItineraryResponse.RouteDetails> {
+        val travelMode = TravelMode.entries
+            .firstOrNull { it.name.equals(mode, ignoreCase = true) }
+            ?: throw BusinessException(ErrorCode.TRAVEL_MODE_NOT_FOUND)
+
         val itineraryItems = itineraryItemRepository.findByTripIdOrderByCategoryAndOrder(tripId)
 
         // 일정이 2개보다 적다면 빈 배열 반환
@@ -204,7 +208,7 @@ class ItineraryService(
             getDirectionBetweenPlaces(
                 originItem.place!!,
                 destinationItem.place!!,
-                mode)
+                travelMode)
         }
     }
 

@@ -3,13 +3,11 @@ package com.tribe.tribe_api.itinerary.controller
 import com.tribe.tribe_api.common.util.ApiResponse
 import com.tribe.tribe_api.itinerary.dto.ItineraryRequest
 import com.tribe.tribe_api.itinerary.dto.ItineraryResponse
-import com.tribe.tribe_api.itinerary.entity.TravelMode
 import com.tribe.tribe_api.itinerary.service.ItineraryService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.util.*
 
 @RestController
 @RequestMapping("/api/v1/trips/{tripId}")
@@ -72,9 +70,7 @@ class ItineraryController(
         @PathVariable tripId: Long,
         @RequestParam mode: String
     ): ResponseEntity<ApiResponse<List<ItineraryResponse.RouteDetails>>> {
-        val response = itineraryService.getAllDirectionsForTrip(
-            tripId,
-            TravelMode.valueOf(mode.uppercase(Locale.ROOT)))
+        val response = itineraryService.getAllDirectionsForTrip(tripId, mode)
         return ResponseEntity.ok(ApiResponse.success("전체 경로 조회 성공", response))
     }
 }
