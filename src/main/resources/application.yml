@@ -27,8 +27,6 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
-        format_sql: true
-    show-sql: true
 
   security:
     oauth2:
