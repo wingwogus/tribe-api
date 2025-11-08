@@ -28,5 +28,8 @@ interface CommunityPostRepository : JpaRepository<CommunityPost, Long> {
 
     @Query("SELECT cp FROM CommunityPost cp JOIN FETCH cp.author JOIN FETCH cp.trip WHERE cp.id = :postId")
     fun findByIdWithDetails(@Param("postId") postId: Long): CommunityPost?
+
+    @Query("SELECT p FROM CommunityPost p JOIN FETCH p.author a JOIN FETCH p.trip t WHERE a.id = :memberId ORDER BY p.createdAt DESC")
+    fun findByAuthorMemberIdWithDetails(@Param("memberId") memberId: Long): List<CommunityPost>
 }
 
