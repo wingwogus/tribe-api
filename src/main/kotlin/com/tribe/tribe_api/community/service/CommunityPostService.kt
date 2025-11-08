@@ -72,7 +72,6 @@ class CommunityPostService(
     }
 
     // 게시글 상세 조회
-
     @Transactional(readOnly = true)
     fun getPostDetail(postId: Long): CommunityPostDto.DetailResponse {
         // N+1 방지를 위해 Fetch Join 쿼리 사용
@@ -133,6 +132,16 @@ class CommunityPostService(
         if (imageUrlToDelete != null) {
             cloudinaryUploadService.delete(imageUrlToDelete)
         }
+    }
+
+    // 6. 특정 MemberId가 작성한 모든 게시글 목록 조회
+    @Transactional(readOnly = true)
+    fun getPostsByMemberId(memberId: Long): List<CommunityPostDto.SimpleResponse> {
+        // memberId로 해당 회원이 작성한 모든 게시글을 조회, DTO 변환
+        val posts = communityPostRepository.findByAuthorMemberIdWithDetails(memberId)
+
+        // SimpleResponse DTO로 변환하여 반환
+        return posts.map { CommunityPostDto.SimpleResponse.from(it) }
     }
 }
 
