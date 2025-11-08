@@ -26,7 +26,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.mock.web.MockMultipartFile
@@ -36,6 +35,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.util.*
+import org.junit.jupiter.api.Nested
 
 @SpringBootTest
 @Transactional
@@ -104,6 +104,52 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
         val userDetails = CustomUserDetails(member)
         val authentication = UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
         SecurityContextHolder.getContext().authentication = authentication
+    }
+
+    @Nested
+    @DisplayName("회원 작성 게시글 목록 조회 (getPostsByAuthorId)")
+    inner class GetPostsByAuthorIdTest {
+
+        @Test
+        @DisplayName("성공 - 특정 작성자의 게시글 목록 조회")
+        fun getPostsByAuthorId_Success() {
+            // given: 작성자 owner의 ID
+            val authorId = owner.id!!
+
+            // when
+            val posts = communityPostService.getPostsByMemberId(authorId)
+
+            // then: owner가 작성한 2개의 게시글이 모두 조회되어야 함
+            assertThat(posts).hasSize(2)
+            assertThat(posts.map { it.authorNickname }).allMatch { it == owner.nickname }
+            assertThat(posts.map { it.title }).containsExactlyInAnyOrder("기존 게시글", "미국 여행 공유")
+        }
+
+        @Test
+        @DisplayName("성공 - 게시글이 없는 사용자의 목록 조회")
+        fun getPostsByAuthorId_Success_NoPosts() {
+            // given: 게시글을 작성하지 않은 member의 ID
+            val nonAuthorId = member.id!!
+
+            // when
+            val posts = communityPostService.getPostsByMemberId(nonAuthorId)
+
+            // then: 결과는 비어 있어야 함
+            assertThat(posts).isEmpty()
+        }
+
+        @Test
+        @DisplayName("성공 - 존재하지 않는 멤버 ID로 조회")
+        fun getPostsByAuthorId_Success_NonExistingMember() {
+            // given: 존재하지 않는 멤버 ID
+            val invalidMemberId = 999L
+
+            // when
+            val posts = communityPostService.getPostsByMemberId(invalidMemberId)
+
+            // then: 게시글이 없으므로 빈 목록이 반환되어야 함 (DB 예외 없이)
+            assertThat(posts).isEmpty()
+        }
     }
 
     @Test
