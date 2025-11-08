@@ -4,6 +4,9 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.RedisService
+import com.tribe.tribe_api.community.repository.CommunityPostRepository
+import com.tribe.tribe_api.itinerary.entity.Category
+import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.dto.TripRequest
@@ -31,6 +34,7 @@ class TripService(
     private val tripRepository: TripRepository,
     private val redisService: RedisService,
     private val tripMemberRepository: TripMemberRepository,
+    private val communityPostRepository: CommunityPostRepository,
     @Value("\${app.url}") private val appUrl: String
 ) {
     companion object {
@@ -125,6 +129,63 @@ class TripService(
         logger.info("Trip joined successfully, Trip Id: {}, Member Id: {}", trip.id, currentMemberId)
 
         return TripResponse.TripDetail.from(trip)
+    }
+
+    fun importTripFromPost(request: TripRequest.Import):TripResponse.TripDetail {
+        val member = memberRepository.findByIdOrNull(SecurityUtil.getCurrentMemberId())
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+
+        val post = (communityPostRepository.findByIdOrNull(request.postId)
+            ?: throw BusinessException(ErrorCode.POST_NOT_FOUND))
+
+        val originalTripId = post.trip.id!!
+
+        val originalTrip = tripRepository.findTripWithFullItineraryById(originalTripId)
+            ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+
+        val importTrip = Trip(
+            title = request.title,
+            startDate = request.startDate,
+            endDate = request.endDate,
+            country = originalTrip.country,
+        )
+
+        importTrip.addMember(member, TripRole.OWNER)
+
+        // 각 원본 카테고리를 반복해서
+        originalTrip.categories.forEach { originalCategory ->
+
+            // 새로운 카테고리를 생성하고 새로운 여행에 연결
+            val importCategory = Category(
+                importTrip,         // 새 부모
+                originalCategory.day,
+                originalCategory.name,
+                originalCategory.order
+            )
+
+            // 원본 아이템들을 새 아이템으로 매핑하여
+            // 새 카테고리의 itineraryItems 리스트에 바로 추가(mapTo 활용)
+            originalCategory.itineraryItems.mapTo(importCategory.itineraryItems) { originalItem ->
+                ItineraryItem(
+                    importCategory,
+                    originalItem.place,
+                    originalItem.title,
+                    originalItem.time,
+                    originalItem.order,
+                    originalItem.memo
+                )
+            }
+
+            // 새로운 카테고리를 새로운 여행에 추가
+            importTrip.categories.add(importCategory)
+        }
+
+        // CascadeAll 설정으로 trip만 저장해도 전부 저장됨
+        tripRepository.save(importTrip)
+
+        logger.info("Trip imported successfully, Trip Id: {}", importTrip.id)
+
+        return TripResponse.TripDetail.from(importTrip)
     }
 
     private fun findTripWithMembers(tripId: Long): Trip {

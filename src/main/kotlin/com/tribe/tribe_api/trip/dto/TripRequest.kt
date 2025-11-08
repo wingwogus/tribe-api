@@ -60,4 +60,23 @@ sealed class TripRequest {
         @field:NotBlank(message = "초대 토큰은 필수입니다.")
         val token: String
     )
+
+    data class Import(
+        @field:NotNull(message = "포스트 아이디는 필수입니다.")
+        val postId: Long,
+
+        @field:NotBlank(message = "여행 제목은 필수입니다.")
+        val title: String,
+
+        @field:NotNull(message = "여행 시작일은 필수입니다.")
+        val startDate: LocalDate,
+
+        @field:NotNull(message = "여행 종료일은 필수입니다.")
+        val endDate: LocalDate,
+    ) {
+        @AssertTrue(message = "여행 시작일은 종료일보다 이전이거나 같아야 합니다.")
+        private fun isDatesValid(): Boolean {
+            return !startDate.isAfter(endDate)
+        }
+    }
 }
