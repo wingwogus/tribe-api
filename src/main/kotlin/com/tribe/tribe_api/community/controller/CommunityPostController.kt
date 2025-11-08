@@ -82,5 +82,16 @@ class CommunityPostController(
         communityPostService.deletePost(postId)
         return ResponseEntity.ok(ApiResponse.success("게시글 삭제 성공", null))
     }
+
+    /**
+     * 6. 특정 MemberId가 작성한 모든 게시글 목록 조회
+     */
+    @GetMapping("/authors/{memberId}")
+    fun getPostsByAuthorId(
+        @PathVariable memberId: Long
+    ): ResponseEntity<ApiResponse<List<CommunityPostDto.SimpleResponse>>> {
+        val posts = communityPostService.getPostsByMemberId(memberId)
+        return ResponseEntity.ok(ApiResponse.success("회원 작성 게시글 목록 조회 성공", posts))
+    }
 }
 
