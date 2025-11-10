@@ -60,10 +60,13 @@ dependencies {
 
     implementation("com.cloudinary:cloudinary-http44:1.38.0")
 
+	//Flyway
+	implementation("org.flywaydb:flyway-core")
+	implementation("org.flywaydb:flyway-mysql")
+
 	// Test
 	testImplementation("io.mockk:mockk:1.13.5")
 	testImplementation("com.ninja-squad:springmockk:4.0.2")
-	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 }
 
 dependencyManagement {

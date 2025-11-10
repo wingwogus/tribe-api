@@ -15,7 +15,6 @@ import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import org.slf4j.LoggerFactory
-import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -185,11 +184,14 @@ class ItineraryService(
      * @param tripId 계산을 원하는 여행의 id
      * @param mode 이동 방법
      */
-    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun getAllDirectionsForTrip(
         tripId: Long,
-        mode: TravelMode
+        mode: String
     ): List<ItineraryResponse.RouteDetails> {
+        val travelMode = TravelMode.entries
+            .firstOrNull { it.name.equals(mode, ignoreCase = true) }
+            ?: throw BusinessException(ErrorCode.TRAVEL_MODE_NOT_FOUND)
+
         val itineraryItems = itineraryItemRepository.findByTripIdOrderByCategoryAndOrder(tripId)
 
         // 일정이 2개보다 적다면 빈 배열 반환
@@ -199,10 +201,14 @@ class ItineraryService(
 
         // 일정들를 순서대로 Pair<originItem, destinationItem> 쌍으로 만들어 순환하며 치환
         return itineraryItems.zipWithNext().mapNotNull { (originItem, destinationItem) ->
+            if (originItem.place == null || destinationItem.place == null) {
+                return@mapNotNull null
+            }
+
             getDirectionBetweenPlaces(
                 originItem.place!!,
                 destinationItem.place!!,
-                mode)
+                travelMode)
         }
     }
 

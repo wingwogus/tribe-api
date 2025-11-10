@@ -102,4 +102,15 @@ class TripController(
         val response = tripService.joinTrip(request)
         return ResponseEntity.ok(ApiResponse.success("여행 참여 성공", response))
     }
+
+    /**
+     * 게시글에서 여행 복사
+     */
+    @PostMapping("/import")
+    fun importTrip(
+        @Valid @RequestBody request: TripRequest.Import
+    ): ResponseEntity<ApiResponse<TripResponse.TripDetail>> {
+        val response = tripService.importTripFromPost(request)
+        return ResponseEntity.ok(ApiResponse.success("여행 복사 완료", response))
+    }
 }

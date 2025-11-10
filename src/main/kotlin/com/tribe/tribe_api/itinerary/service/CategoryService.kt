@@ -63,11 +63,12 @@ class CategoryService (
         categoryId: Long,
         request: CategoryDto.UpdateRequest
     ): CategoryDto.CategoryResponse {
-
-
         val category = categoryRepository.findByIdOrNull(categoryId)
             ?: throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
 
+        if (category.trip.id != tripId) {
+            throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
+        }
 
         request.name?.let { category.name = it }
         request.day?.let { category.day = it }

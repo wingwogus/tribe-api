@@ -21,15 +21,12 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     open-in-view: false
-    show-sql: true
 
     properties:
       hibernate:
         default_batch_fetch_size: 100
-        format_sql: true
-
 
   security:
     oauth2:

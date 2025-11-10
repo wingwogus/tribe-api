@@ -7,6 +7,7 @@ import com.tribe.tribe_api.trip.entity.Country
 import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
 import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -41,7 +42,7 @@ class CommunityPostController(
     @GetMapping
     fun getPosts(
         @RequestParam(required = false) country: Country?,
-        @PageableDefault(size = 10, sort = ["createdAt,desc"]) pageable: Pageable
+        @PageableDefault(size = 10, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
     ): ResponseEntity<ApiResponse<Page<CommunityPostDto.SimpleResponse>>> {
         val response = communityPostService.getPosts(country, pageable)
         return ResponseEntity.ok(ApiResponse.success("게시글 목록 조회 성공", response))
