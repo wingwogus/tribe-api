@@ -86,7 +86,7 @@ class CommunityPostController(
     /**
      * 6. 특정 MemberId가 작성한 모든 게시글 목록 조회
      */
-    @GetMapping("/by-authors/{memberId}")
+    @GetMapping("/by-author/{memberId}")
     fun getPostsByAuthorId(
         @PathVariable memberId: Long,
         @PageableDefault(size = 10, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
