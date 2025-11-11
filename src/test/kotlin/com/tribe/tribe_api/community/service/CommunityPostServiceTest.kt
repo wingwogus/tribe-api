@@ -111,44 +111,50 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
     inner class GetPostsByAuthorIdTest {
 
         @Test
-        @DisplayName("성공 - 특정 작성자의 게시글 목록 조회")
+        @DisplayName("성공 - 특정 작성자의 게시글 목록 조회 및 페이지 검증")
         fun getPostsByAuthorId_Success() {
-            // given: 작성자 owner의 ID
+            // given: 작성자 owner의 ID와 Pageable 객체
             val authorId = owner.id!!
+            val pageable: Pageable = PageRequest.of(0, 10)
 
             // when
-            val posts = communityPostService.getPostsByMemberId(authorId)
+            val postsPage = communityPostService.getPostsByMemberId(authorId, pageable)
 
-            // then: owner가 작성한 2개의 게시글이 모두 조회되어야 함
-            assertThat(posts).hasSize(2)
-            assertThat(posts.map { it.authorNickname }).allMatch { it == owner.nickname }
-            assertThat(posts.map { it.title }).containsExactlyInAnyOrder("기존 게시글", "미국 여행 공유")
+            // then: owner가 작성한 2개의 게시글이 모두 조회되어야 하며, Page 객체 검증
+            assertThat(postsPage.totalElements).isEqualTo(2) // 전체 요소 개수
+            assertThat(postsPage.content).hasSize(2) // 현재 페이지 컨텐츠 크기
+            assertThat(postsPage.content.map { it.authorNickname }).allMatch { it == owner.nickname }
+            assertThat(postsPage.content.map { it.title }).containsExactlyInAnyOrder("기존 게시글", "미국 여행 공유")
         }
 
         @Test
-        @DisplayName("성공 - 게시글이 없는 사용자의 목록 조회")
+        @DisplayName("성공 - 게시글이 없는 사용자의 목록 조회 및 페이지 검증")
         fun getPostsByAuthorId_Success_NoPosts() {
-            // given: 게시글을 작성하지 않은 member의 ID
+            // given: 게시글을 작성하지 않은 member의 ID와 Pageable 객체
             val nonAuthorId = member.id!!
+            val pageable: Pageable = PageRequest.of(0, 10)
 
             // when
-            val posts = communityPostService.getPostsByMemberId(nonAuthorId)
+            val postsPage = communityPostService.getPostsByMemberId(nonAuthorId, pageable)
 
-            // then: 결과는 비어 있어야 함
-            assertThat(posts).isEmpty()
+            // then: 결과는 비어 있어야 하며, Page 객체 검증
+            assertThat(postsPage.totalElements).isEqualTo(0)
+            assertThat(postsPage.content).isEmpty()
         }
 
         @Test
-        @DisplayName("성공 - 존재하지 않는 멤버 ID로 조회")
+        @DisplayName("성공 - 존재하지 않는 멤버 ID로 조회 및 페이지 검증")
         fun getPostsByAuthorId_Success_NonExistingMember() {
-            // given: 존재하지 않는 멤버 ID
+            // given: 존재하지 않는 멤버 ID와 Pageable 객체
             val invalidMemberId = 999L
+            val pageable: Pageable = PageRequest.of(0, 10)
 
             // when
-            val posts = communityPostService.getPostsByMemberId(invalidMemberId)
+            val postsPage = communityPostService.getPostsByMemberId(invalidMemberId, pageable)
 
-            // then: 게시글이 없으므로 빈 목록이 반환되어야 함 (DB 예외 없이)
-            assertThat(posts).isEmpty()
+            // then: 게시글이 없으므로 빈 목록이 반환되어야 하며, Page 객체 검증
+            assertThat(postsPage.totalElements).isEqualTo(0)
+            assertThat(postsPage.content).isEmpty()
         }
     }
 
