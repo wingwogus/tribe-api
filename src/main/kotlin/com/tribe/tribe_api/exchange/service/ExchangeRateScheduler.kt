@@ -25,8 +25,8 @@ class ExchangeRateScheduler(
      * 월 ~ 금 14시 00분 부터 5분 주기로 55분까지 (12회) 진행합니다.
      * 한국수출입은행의 업데이트 시점에 맞춰 호출합니다.
      */
-    @Scheduled(cron = "0 0/5 14 * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작으로 수정
-//    @Scheduled(cron = "0 * * * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작했을때 못받았을때 이거 쓰면됨. 이걸로 하면은 아무때나해도 db에 들어가짐
+//    @Scheduled(cron = "0 0/5 14 * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작으로 수정
+    @Scheduled(cron = "0 * * * * MON-FRI", zone = "Asia/Seoul") // 크론식 14시 시작했을때 못받았을때 이거 쓰면됨. 이걸로 하면은 아무때나해도 db에 들어가짐
     @Transactional
     fun updateCurrency() {
         try {
@@ -39,7 +39,7 @@ class ExchangeRateScheduler(
 
             // 2. 필터링 로직 없이 모든 통화를 처리하도록 수정
             val currenciesToSave = exchanges.mapNotNull { dto ->
-                ExchangeRateProcessor.process(dto, apiDate) // ✅ 변경: 유틸리티 호출
+                ExchangeRateProcessor.process(dto, apiDate)
             }
 
             // 3. DB에 저장/업데이트 (PK가 같으면 UPDATE)

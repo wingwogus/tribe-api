@@ -21,13 +21,14 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     open-in-view: false
 
     properties:
       hibernate:
         default_batch_fetch_size: 100
-
+  flyway:
+    enabled: false
   security:
     oauth2:
       client:
