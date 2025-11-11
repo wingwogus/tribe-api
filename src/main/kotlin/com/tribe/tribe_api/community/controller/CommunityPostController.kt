@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
 @RestController
-@RequestMapping("/api/v1/community") // Base URL
+@RequestMapping("/api/v1/community/posts") // Base URL
 class CommunityPostController(
     private val communityPostService: CommunityPostService
 ) {
@@ -25,7 +25,7 @@ class CommunityPostController(
      * 1. 게시글 생성 (여행 공유)
      * JSON(request)과 Image(imageFile)를 함께 받기 위해 multipart/form-data 사용
      */
-    @PostMapping("/posts",consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun createPost(
         @Valid @RequestPart("request") request: CommunityPostDto.CreateRequest,
         @RequestPart(value = "image", required = false) imageFile: MultipartFile?
@@ -39,7 +39,7 @@ class CommunityPostController(
     /**
      * 2. 게시글 목록 조회 (국가별 필터링)
      */
-    @GetMapping("/posts")
+    @GetMapping
     fun getPosts(
         @RequestParam(required = false) country: Country?,
         @PageableDefault(size = 10, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
@@ -51,7 +51,7 @@ class CommunityPostController(
     /**
      * 3. 게시글 상세 조회
      */
-    @GetMapping("/posts/{postId}")
+    @GetMapping("/{postId}")
     fun getPostDetail(
         @PathVariable postId: Long
     ): ResponseEntity<ApiResponse<CommunityPostDto.DetailResponse>> {
@@ -62,7 +62,7 @@ class CommunityPostController(
     /**
      * 4. 게시글 수정
      */
-    @PatchMapping("/posts/{postId}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    @PatchMapping("/{postId}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun updatePost(
         @PathVariable postId: Long,
         @Valid @RequestPart("request") request: CommunityPostDto.UpdateRequest,
@@ -75,7 +75,7 @@ class CommunityPostController(
     /**
      * 5. 게시글 삭제
      */
-    @DeleteMapping("/posts/{postId}")
+    @DeleteMapping("/{postId}")
     fun deletePost(
         @PathVariable postId: Long
     ): ResponseEntity<ApiResponse<Unit>> {
@@ -86,7 +86,7 @@ class CommunityPostController(
     /**
      * 6. 특정 MemberId가 작성한 모든 게시글 목록 조회
      */
-    @GetMapping("/authors/{memberId}")
+    @GetMapping("/by-authors/{memberId}")
     fun getPostsByAuthorId(
         @PathVariable memberId: Long,
         @PageableDefault(size = 10, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
