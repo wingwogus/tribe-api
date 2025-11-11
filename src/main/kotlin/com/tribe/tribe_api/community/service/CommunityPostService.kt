@@ -9,10 +9,8 @@ import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
-import com.tribe.tribe_api.trip.entity.TripRole // [추가!] TripRole을 import합니다.
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.Id
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.security.access.prepost.PreAuthorize
@@ -136,12 +134,10 @@ class CommunityPostService(
 
     // 6. 특정 MemberId가 작성한 모든 게시글 목록 조회
     @Transactional(readOnly = true)
-    fun getPostsByMemberId(memberId: Long): List<CommunityPostDto.SimpleResponse> {
-        // memberId로 해당 회원이 작성한 모든 게시글을 조회, DTO 변환
-        val posts = communityPostRepository.findByAuthorMemberIdWithDetails(memberId)
+    fun getPostsByMemberId(memberId: Long, pageable: Pageable): Page<CommunityPostDto.SimpleResponse> {
+        val postPage: Page<CommunityPost> = communityPostRepository.findByAuthorMemberIdWithDetails(memberId, pageable)
 
-        // SimpleResponse DTO로 변환하여 반환
-        return posts.map { CommunityPostDto.SimpleResponse.from(it) }
+        return postPage.map { CommunityPostDto.SimpleResponse.from(it) }
     }
 }
 
