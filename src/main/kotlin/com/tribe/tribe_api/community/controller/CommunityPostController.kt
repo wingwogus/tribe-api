@@ -88,10 +88,11 @@ class CommunityPostController(
      */
     @GetMapping("/authors/{memberId}")
     fun getPostsByAuthorId(
-        @PathVariable memberId: Long
-    ): ResponseEntity<ApiResponse<List<CommunityPostDto.SimpleResponse>>> {
-        val posts = communityPostService.getPostsByMemberId(memberId)
-        return ResponseEntity.ok(ApiResponse.success("회원 작성 게시글 목록 조회 성공", posts))
+        @PathVariable memberId: Long,
+        @PageableDefault(size = 10, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
+    ): ResponseEntity<ApiResponse<Page<CommunityPostDto.SimpleResponse>>> {
+        val postsPage = communityPostService.getPostsByMemberId(memberId, pageable)
+        return ResponseEntity.ok(ApiResponse.success("회원 작성 게시글 목록 조회 성공", postsPage))
     }
 }
 
