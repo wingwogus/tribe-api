@@ -35,4 +35,3 @@ interface CommunityPostRepository : JpaRepository<CommunityPost, Long> {
     )
     fun findByAuthorMemberIdWithDetails(@Param("memberId") memberId: Long, pageable: Pageable): Page<CommunityPost>
 }
-
