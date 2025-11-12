@@ -35,6 +35,7 @@ class SettlementService(
 
     private val KRW = "KRW" // 기준 통화 정의
     private val SCALE = 0 // 정산은 원화 단위(0)로 처리
+    private val FOREIGN_CURRENCY_SCALE = 2
     private val EPSILON = BigDecimal("1.00")
     private val MIN_DATE = LocalDate.of(2000, 1, 1)
     private val MAX_DATE = LocalDate.of(2100, 1, 1) // 충분히 먼 미래 날짜
@@ -180,43 +181,69 @@ class SettlementService(
             Pair(data.member, balance)
         }
 
-        // 4. 일별 최소 송금 관계 계산 (통화별 분리 로직)
+        // lines ~210 (기존 코드 시작 부분)
+
+        // 4. 일별 최소 송금 관계 계산 (통화별 분리 로직 또는 최소 송금 알고리즘)
         val debtRelations = mutableListOf<SettlementDto.DebtRelation>()
 
-        // 1. 순 잔액 목록에서 Debtor와 Creditor 식별 (B -> A 1:1 확정 가정을 위해 사용)
-        val debtorMember = memberBalances.minByOrNull { it.second }?.first
-        val creditorMember = memberBalances.maxByOrNull { it.second }?.first
-        val debtorNetBalance = memberBalances.minByOrNull { it.second }?.second?.abs() ?: BigDecimal.ZERO
+        // 1. 잔액 목록에서 0.01 KRW 미만의 잔액을 제거하여 실제 채권/채무 관계만 남깁니다.
+        val cleanBalances = memberBalances
+            .filter { it.second.abs().compareTo(EPSILON) >= 0 }
+            .map { it.first to it.second } // Pair<TripMember, BigDecimal>
 
-        // 부채가 존재하고 1:1 관계인 경우에만 통화별로 분리합니다. (B가 A에게 빚짐)
-        if (debtorMember != null && creditorMember != null && debtorMember.id != creditorMember.id && debtorNetBalance.compareTo(BigDecimal.ZERO) > 0) {
+        if (cleanBalances.size == 2) {
+            // Case 1: Simple 1:1 Debt (정확히 2명만 잔액이 남은 경우) -> 통화별 분리 로직 적용
 
-            // 2. 외화별 부채 구성 요소 계산 (Debtor B의 모든 외화 분담 내역)
-            val debtComponentsKrw = dailyExpenses
+            val debtorPair = cleanBalances.minByOrNull { it.second }!!
+            val creditorPair = cleanBalances.maxByOrNull { it.second }!!
+            val debtorMember = debtorPair.first
+            val creditorMember = creditorPair.first
+            val debtorNetBalance = debtorPair.second.abs() // 최종 송금해야 할 KRW 금액
+
+            // 2. 외화별 순 부채 구성 요소 계산 (Debtor가 외화로 '분담받은 총액' - '결제한 총액')
+            val foreignDebtComponentsKrw = dailyExpenses
                 .filter { it.currency != KRW && it.currency != null }
-                .flatMap { expense -> expense.expenseItems }
-                .flatMap { item -> item.assignments }
-                .filter { it.tripMember.id == debtorMember.id }
-                .groupBy { it.expenseItem.expense.currency!!.uppercase() }
-                .mapValues { (_, assignments) ->
-                    // 해당 통화로 B가 분담한 총액 (KRW)
-                    assignments.sumOf { assignment ->
-                        val expense = assignment.expenseItem.expense
-                        convertToKrw(assignment.amount, expense)
-                    }
+                .groupBy { it.currency!!.uppercase() }
+                .mapValues { (currencyCode, expensesInCurrency) ->
+                    // 해당 통화로 Debtor가 분담받은 총액 (Assigned_F)
+                    val assignedKrw = expensesInCurrency
+                        .flatMap { expense -> expense.expenseItems }
+                        .flatMap { item -> item.assignments }
+                        .filter { it.tripMember.id == debtorMember.id }
+                        .sumOf { assignment ->
+                            val expense = assignment.expenseItem.expense
+                            convertToKrw(assignment.amount, expense)
+                        }
+
+                    // 해당 통화로 Debtor가 결제한 총액 (Paid_F)
+                    val paidKrw = expensesInCurrency
+                        .filter { it.payer.id == debtorMember.id }
+                        .sumOf { expense -> convertToKrw(expense.totalAmount, expense) }
+
+                    // 순 외화 부채 = max(0, Assigned_F - Paid_F). 음수(초과 결제)는 부채가 아님.
+                    assignedKrw.subtract(paidKrw).max(BigDecimal.ZERO)
                 }
+                .filterValues { it.compareTo(BigDecimal.ZERO) > 0 } // 양수 순 부채만 포함
 
             // 3. 각 통화별로 송금 관계 DTO 생성
-            for ((currencyCode, amountKrw) in debtComponentsKrw) {
-                if (amountKrw.compareTo(BigDecimal.ZERO) <= 0) continue // 0원 이하는 건너뛰기
+            var totalForeignDebtKrw = BigDecimal.ZERO
 
-                val dateForRate = date
+            for ((currencyCode, netForeignDebtKrw) in foreignDebtComponentsKrw) {
+
+                // 최종 송금액이 debtorNetBalance를 초과하지 않도록 보장
+                val remainingTransferLimit = debtorNetBalance.subtract(totalForeignDebtKrw)
+                val actualTransferAmountKrw = netForeignDebtKrw.min(remainingTransferLimit)
+
+                if (actualTransferAmountKrw.compareTo(BigDecimal.ZERO) <= 0) continue
+
+                totalForeignDebtKrw = totalForeignDebtKrw.add(actualTransferAmountKrw)
+
                 // 가장 가까운 환율을 찾아 KRW -> 외화 역산에 사용합니다.
-                val rate = findClosestRate(currencyCode, dateForRate)?.exchangeRate
+                val rate = findClosestRate(currencyCode, date)?.exchangeRate
                     ?: continue
 
-                // KRW 송금액을 해당 통화로 역산
-                val equivalentOriginalAmount = amountKrw.divide(rate, 0, RoundingMode.HALF_UP)
+                // KRW 송금액을 해당 통화로 역산 (FOREIGN_CURRENCY_SCALE 적용!)
+                val equivalentOriginalAmount = actualTransferAmountKrw.divide(rate, FOREIGN_CURRENCY_SCALE, RoundingMode.HALF_UP) // 👈 수정됨
 
                 debtRelations.add(
                     SettlementDto.DebtRelation(
@@ -224,15 +251,14 @@ class SettlementService(
                         fromTripMemberId = debtorMember.id!!,
                         toNickname = creditorMember.name,
                         toTripMemberId = creditorMember.id!!,
-                        amount = amountKrw, // KRW 송금 금액 (부채 구성 요소)
+                        amount = actualTransferAmountKrw, // KRW 송금 금액
                         equivalentOriginalAmount = equivalentOriginalAmount,
                         originalCurrencyCode = currencyCode
                     )
                 )
             }
 
-            // 4. KRW 부채 (KRW로 지출했으나 B가 분담해야 할 금액) 처리
-            val totalForeignDebtKrw = debtComponentsKrw.values.sumOf { it }
+            // 4. KRW 부채 처리
             val remainingKrwDebt = debtorNetBalance.subtract(totalForeignDebtKrw)
 
             if (remainingKrwDebt.compareTo(BigDecimal.ZERO) > 0) {
@@ -244,14 +270,24 @@ class SettlementService(
                         toNickname = creditorMember.name,
                         toTripMemberId = creditorMember.id!!,
                         amount = remainingKrwDebt,
-                        equivalentOriginalAmount = null, // KRW이므로 원본 금액/코드는 null
+                        equivalentOriginalAmount = null,
                         originalCurrencyCode = null
                     )
                 )
             }
-        }
+        } else if (cleanBalances.size > 2) {
+            // Case 2: Multi-party Debt (Minimal Transfer Algorithm 사용)
+            // Daily Settlement는 KRW 기준으로 Minimal Transfer를 실행하여 최소 송금 관계를 제공합니다.
+            log.warn("Multi-party debt detected for daily settlement on {}. Using Minimal Transfer algorithm (KRW only).", date)
 
-        // **[주의] 다자간 정산일 경우 이 로직은 최소 송금 원칙을 따르지 않고 부채가 누락될 수 있습니다.**
+            debtRelations.addAll(
+                calculateDebtRelations(
+                    cleanBalances,
+                    KRW, // KRW 기준으로 정산 통일
+                    BigDecimal.ONE // KRW 환율
+                )
+            )
+        }
 
 
         // 5. 유효성 검사 (Total Assigned는 여전히 B에게 할당된 전체 KRW 금액을 사용해야 함)
@@ -273,6 +309,15 @@ class SettlementService(
             debtRelations = debtRelations // 통화별로 분리된 목록 반환
         )
     }
+
+    /**
+     * 전체 정산 로직: 모든 지출 내역에 대해 환율을 적용하여 KRW 기준으로 잔액을 계산합니다.
+     */
+
+    /**
+     * 전체 정산 로직: 모든 지출 내역에 대해 환율을 적용하여 KRW 기준으로 잔액을 계산합니다.
+     */
+    // src/main/kotlin/com/tribe/tribe_api/expense/service/SettlementService.kt
 
     /**
      * 전체 정산 로직: 모든 지출 내역에 대해 환율을 적용하여 KRW 기준으로 잔액을 계산합니다.
@@ -310,69 +355,87 @@ class SettlementService(
             // Case 1: Simple 1:1 Debt (통화별 분리 로직 적용)
 
             // 1.1. Debtor와 Creditor 식별
-            val debtorMember = cleanBalances.minByOrNull { it.second }?.first
-            val creditorMember = cleanBalances.maxByOrNull { it.second }?.first
-            val debtorNetBalance = cleanBalances.minByOrNull { it.second }?.second?.abs() ?: BigDecimal.ZERO
+            val debtorPair = cleanBalances.minByOrNull { it.second }!!
+            val creditorPair = cleanBalances.maxByOrNull { it.second }!!
+            val debtorMember = debtorPair.first
+            val creditorMember = creditorPair.first
+            val debtorNetBalance = debtorPair.second.abs() // 최종 송금해야 할 KRW 금액
 
-            if (debtorMember != null && creditorMember != null) {
-
-                // 1.2. 외화별 부채 구성 요소 계산 (Debtor의 모든 외화 분담 내역 - 전체 여행 기준)
-                val debtComponentsKrw = allExpenses
-                    .filter { it.currency != KRW && it.currency != null }
-                    .flatMap { expense -> expense.expenseItems }
-                    .flatMap { item -> item.assignments }
-                    .filter { it.tripMember.id == debtorMember.id }
-                    .groupBy { it.expenseItem.expense.currency!!.uppercase() }
-                    .mapValues { (_, assignments) ->
-                        // 해당 통화로 Debtor가 분담한 총액 (KRW)
-                        assignments.sumOf { assignment ->
+            // 1.2. 외화별 순 부채 구성 요소 계산 (Debtor가 외화로 '분담받은 총액' - '결제한 총액')
+            val foreignDebtComponentsKrw = allExpenses // 전체 여행 지출 사용
+                .filter { it.currency != KRW && it.currency != null }
+                .groupBy { it.currency!!.uppercase() }
+                .mapValues { (_, expensesInCurrency) ->
+                    // 해당 통화로 Debtor가 분담받은 총액 (Assigned_F)
+                    val assignedKrw = expensesInCurrency
+                        .flatMap { expense -> expense.expenseItems }
+                        .flatMap { item -> item.assignments }
+                        .filter { it.tripMember.id == debtorMember.id }
+                        .sumOf { assignment ->
                             val expense = assignment.expenseItem.expense
                             convertToKrw(assignment.amount, expense)
                         }
-                    }
 
-                // 1.3. 각 통화별로 송금 관계 DTO 생성
-                for ((currencyCode, amountKrw) in debtComponentsKrw) {
-                    if (amountKrw.compareTo(BigDecimal.ZERO) <= 0) continue
+                    // 해당 통화로 Debtor가 결제한 총액 (Paid_F)
+                    val paidKrw = expensesInCurrency
+                        .filter { it.payer.id == debtorMember.id }
+                        // [수정 완료]: 'it' 대신 람다 파라미터 'expense' 사용
+                        .sumOf { expense -> convertToKrw(expense.totalAmount, expense) }
 
-                    // 전체 정산은 최신 환율을 사용
-                    val rate = currencyRepository.findTopByCurUnitOrderByDateDesc(currencyCode)?.exchangeRate
-                        ?: continue
-
-                    // KRW 송금액을 해당 통화로 역산
-                    val equivalentOriginalAmount = amountKrw.divide(rate, 0, RoundingMode.HALF_UP)
-
-                    debtRelations.add(
-                        SettlementDto.DebtRelation(
-                            fromNickname = debtorMember.name,
-                            fromTripMemberId = debtorMember.id!!,
-                            toNickname = creditorMember.name,
-                            toTripMemberId = creditorMember.id!!,
-                            amount = amountKrw, // KRW 송금 금액 (부채 구성 요소)
-                            equivalentOriginalAmount = equivalentOriginalAmount,
-                            originalCurrencyCode = currencyCode
-                        )
-                    )
+                    // 순 외화 부채 = max(0, Assigned_F - Paid_F)
+                    assignedKrw.subtract(paidKrw).max(BigDecimal.ZERO)
                 }
+                .filterValues { it.compareTo(BigDecimal.ZERO) > 0 } // 양수 순 부채만 포함
 
-                // 1.4. KRW 부채 처리
-                val totalForeignDebtKrw = debtComponentsKrw.values.sumOf { it }
-                val remainingKrwDebt = debtorNetBalance.subtract(totalForeignDebtKrw)
+            // 1.3. 각 통화별로 송금 관계 DTO 생성
+            var totalForeignDebtKrw = BigDecimal.ZERO
 
-                if (remainingKrwDebt.compareTo(BigDecimal.ZERO) > 0) {
-                    // KRW 순 부채가 남은 경우, KRW로 송금 관계를 추가합니다.
-                    debtRelations.add(
-                        SettlementDto.DebtRelation(
-                            fromNickname = debtorMember.name,
-                            fromTripMemberId = debtorMember.id!!,
-                            toNickname = creditorMember.name,
-                            toTripMemberId = creditorMember.id!!,
-                            amount = remainingKrwDebt,
-                            equivalentOriginalAmount = null,
-                            originalCurrencyCode = null
-                        )
+            for ((currencyCode, netForeignDebtKrw) in foreignDebtComponentsKrw) {
+
+                // 최종 송금액이 debtorNetBalance를 초과하지 않도록 보장
+                val remainingTransferLimit = debtorNetBalance.subtract(totalForeignDebtKrw)
+                val actualTransferAmountKrw = netForeignDebtKrw.min(remainingTransferLimit)
+
+                if (actualTransferAmountKrw.compareTo(BigDecimal.ZERO) <= 0) continue
+
+                totalForeignDebtKrw = totalForeignDebtKrw.add(actualTransferAmountKrw)
+
+                // 전체 정산은 최신 환율을 사용 (Latest Rate)
+                val rate = currencyRepository.findTopByCurUnitOrderByDateDesc(currencyCode)?.exchangeRate
+                    ?: continue
+
+                // KRW 송금액을 해당 통화로 역산 (FOREIGN_CURRENCY_SCALE 적용)
+                val equivalentOriginalAmount = actualTransferAmountKrw.divide(rate, FOREIGN_CURRENCY_SCALE, RoundingMode.HALF_UP)
+
+                debtRelations.add(
+                    SettlementDto.DebtRelation(
+                        fromNickname = debtorMember.name,
+                        fromTripMemberId = debtorMember.id!!,
+                        toNickname = creditorMember.name,
+                        toTripMemberId = creditorMember.id!!,
+                        amount = actualTransferAmountKrw, // KRW 송금 금액
+                        equivalentOriginalAmount = equivalentOriginalAmount,
+                        originalCurrencyCode = currencyCode
                     )
-                }
+                )
+            }
+
+            // 1.4. KRW 부채 처리
+            val remainingKrwDebt = debtorNetBalance.subtract(totalForeignDebtKrw)
+
+            if (remainingKrwDebt.compareTo(BigDecimal.ZERO) > 0) {
+                // KRW 순 부채가 남은 경우, KRW로 송금 관계를 추가합니다.
+                debtRelations.add(
+                    SettlementDto.DebtRelation(
+                        fromNickname = debtorMember.name,
+                        fromTripMemberId = debtorMember.id!!,
+                        toNickname = creditorMember.name,
+                        toTripMemberId = creditorMember.id!!,
+                        amount = remainingKrwDebt,
+                        equivalentOriginalAmount = null,
+                        originalCurrencyCode = null
+                    )
+                )
             }
 
         } else if (cleanBalances.size > 2) {
@@ -434,6 +497,7 @@ class SettlementService(
 
         return SettlementDto.TotalResponse(memberBalanceDtos, debtRelations)
     }
+
 
     /**
      * 특정 지출 목록을 기반으로 멤버별 정산 데이터를 계산합니다. (PaidAmount/AssignedAmount/ForeignCurrencies)
@@ -514,7 +578,7 @@ class SettlementService(
             // 소수점 0자리로 반올림
             val equivalentOriginalAmount = if (isForeignCurrency) {
                 // 외화인 경우: KRW 송금액을 환율로 나누어 원본 통화 금액을 역추산
-                transferAmount.divide(assumedExchangeRate, SCALE, RoundingMode.HALF_UP)
+                transferAmount.divide(assumedExchangeRate, FOREIGN_CURRENCY_SCALE, RoundingMode.HALF_UP)
             } else {
                 null
             }
