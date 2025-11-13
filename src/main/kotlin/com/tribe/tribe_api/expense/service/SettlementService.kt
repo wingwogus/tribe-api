@@ -116,6 +116,7 @@ class SettlementService(
             return amount.setScale(SCALE, RoundingMode.HALF_UP)
         }
 
+        // [수정] 가장 가까운 환율을 찾는 헬퍼 함수 호출로 대체
         val currencyRate = findClosestRate(currencyCode, currentDate)
 
         // 환율을 찾지 못했으면 예외 발생
@@ -196,6 +197,7 @@ class SettlementService(
         if (cleanBalances.size == 2) {
             // Case 1: Simple 1:1 Debt (정확히 2명만 잔액이 남은 경우) -> 통화별 분리 로직 적용
 
+            // Rate Lookup for Daily Settlement (date-based lookup)
             val dailyRateLookup: (String) -> BigDecimal? = { currencyCode ->
                 findClosestRate(currencyCode, date)?.exchangeRate
             }
@@ -521,7 +523,7 @@ class SettlementService(
             // 송금액: 채무액(음수 잔액의 절댓값)과 채권액) 중 작은 값. BigDecimal.min() 사용
             val transferAmount = debtorBalance.abs().min(creditorBalance)
 
-            //  원본 통화 금액 계산 (KRW 금액 / 동적으로 결정된 환율)
+            // 💡 수정된 로직: 원본 통화 금액 계산 (KRW 금액 / 동적으로 결정된 환율)
             // 소수점 0자리로 반올림
             val equivalentOriginalAmount = if (isForeignCurrency) {
                 // 외화인 경우: KRW 송금액을 환율로 나누어 원본 통화 금액을 역추산
