@@ -24,6 +24,7 @@ configurations {
 
 repositories {
 	mavenCentral()
+	maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -67,6 +68,9 @@ dependencies {
 	// Test
 	testImplementation("io.mockk:mockk:1.13.5")
 	testImplementation("com.ninja-squad:springmockk:4.0.2")
+
+	// Discord WebHook
+	implementation 'com.github.napstr:logback-discord-appender:1.0.0'
 }
 
 dependencyManagement {
