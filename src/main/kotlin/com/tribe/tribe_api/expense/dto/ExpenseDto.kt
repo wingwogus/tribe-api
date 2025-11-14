@@ -6,7 +6,6 @@ import com.tribe.tribe_api.trip.entity.TripMember
 import jakarta.validation.Valid
 import jakarta.validation.constraints.*
 import java.math.BigDecimal
-import java.time.LocalDate
 
 object ExpenseDto {
     data class CreateRequest(
@@ -90,7 +89,6 @@ object ExpenseDto {
         val expenseTitle: String,
         val totalAmount: BigDecimal,
         val payer: ParticipantInfo,
-        val paymentDate: LocalDate,
         val items: List<ItemSimpleResponse>
     ) {
         companion object {
@@ -100,7 +98,6 @@ object ExpenseDto {
                     expenseTitle = expense.title,
                     totalAmount = expense.totalAmount,
                     payer = ParticipantInfo.from(expense.payer),
-                    paymentDate = expense.paymentDate,
                     items = expense.expenseItems.map { ItemSimpleResponse.from(it) }
                 )
             }
@@ -111,7 +108,6 @@ object ExpenseDto {
         val expenseId: Long,
         val expenseTitle: String,
         val totalAmount: BigDecimal,
-        val paymentDate: LocalDate,
         val payer: ParticipantInfo,
         val items: List<ItemDetailResponse>
     ) {
@@ -121,7 +117,6 @@ object ExpenseDto {
                     expenseId = expense.id!!,
                     expenseTitle = expense.title,
                     totalAmount = expense.totalAmount,
-                    paymentDate = expense.paymentDate,
                     payer = ParticipantInfo.from(expense.payer),
                     items = expense.expenseItems.map { ItemDetailResponse.from(it) }
                 )

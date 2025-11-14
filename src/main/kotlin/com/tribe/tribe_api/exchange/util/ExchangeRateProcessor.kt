@@ -44,7 +44,7 @@ object ExchangeRateProcessor {
         // 3. 100단위로 받은 경우 1단위로 변환 (JPY(100) 등)
         if (is100Unit) {
             // Currency 엔티티의 scale=4에 맞춰 정밀하게 나누기
-            exchangeRate = exchangeRate.divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+            exchangeRate = exchangeRate.divide(BigDecimal("100"), 4, RoundingMode.HALF_UP)
         }
 
         // 데이터베이스 scale(4)에 맞춰 최종 스케일 조정 (변환이 없더라도 4자리 보장)
