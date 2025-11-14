@@ -42,54 +42,33 @@ class SettlementService(
 
     /**
      * 특정 날짜를 기준으로 과거와 미래를 통틀어 가장 가까운 환율을 찾습니다.
-     * 불필요한 null 검사 및 비효율적인 날짜 증가 로직을 수정했습니다.
+     * 비효율적인 일일 단위 검색을 JPQL 쿼리로 대체하여 성능을 개선합니다.
      */
     private fun findClosestRate(currencyCode: String, targetDate: LocalDate): Currency? {
-        // 1. 정확히 일치하는 날짜가 있는지 확인 (최적화)
+        // 1. 정확히 일치하는 날짜가 있는지 확인
         val exactMatch = currencyRepository.findByCurUnitAndDate(currencyCode, targetDate)
         if (exactMatch != null) return exactMatch
 
-        // 2. 가장 가까운 과거 환율 검색
-        var pastDate = targetDate.minusDays(1)
-        var pastRate: Currency? = null
-        while (pastRate == null && pastDate.isAfter(MIN_DATE)) {
-            pastRate = currencyRepository.findByCurUnitAndDate(currencyCode, pastDate)
+        // 2. 가장 가까운 과거 환율 조회
+        val pastRate = currencyRepository.findTopByCurUnitAndDateLessThanEqualOrderByDateDesc(
+            currencyCode,
+            targetDate
+        )
 
-            // 찾지 못했을 경우에만 날짜를 조정합니다.
-            if (pastRate == null) {
-                val dayOfWeek = pastDate.dayOfWeek
-                if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
-                    pastDate = pastDate.minusDays(1)
-                    continue
-                }
-                pastDate = pastDate.minusDays(1)
-            }
-        }
+        // 3. 가장 가까운 미래 환율 조회
+        val futureRate = currencyRepository.findTopByCurUnitAndDateGreaterThanEqualOrderByDateAsc(
+            currencyCode,
+            targetDate
+        )
 
-        // 3. 가장 가까운 미래 환율 검색
-        var futureDate = targetDate.plusDays(1)
-        var futureRate: Currency? = null
-        while (futureRate == null && futureDate.isBefore(MAX_DATE)) {
-            futureRate = currencyRepository.findByCurUnitAndDate(currencyCode, futureDate)
-
-            // 찾지 못했을 경우에만 날짜를 조정합니다.
-            if (futureRate == null) {
-                val dayOfWeek = futureDate.dayOfWeek
-                if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
-                    futureDate = futureDate.plusDays(1)
-                    continue
-                }
-                futureDate = futureDate.plusDays(1)
-            }
-        }
-
-        // 4. 거리 비교 및 선택 (거리 계산은 절대값으로 수행)
+        // 4. 거리 비교 및 선택
         return when {
             pastRate != null && futureRate == null -> pastRate
             pastRate == null && futureRate != null -> futureRate
             pastRate != null && futureRate != null -> {
-                val pastDistance = ChronoUnit.DAYS.between(pastRate.date, targetDate)
-                val futureDistance = ChronoUnit.DAYS.between(targetDate, futureRate.date)
+                // 과거/미래 날짜 간의 거리만 비교합니다.
+                val pastDistance = ChronoUnit.DAYS.between(pastRate.date, targetDate).coerceAtLeast(0)
+                val futureDistance = ChronoUnit.DAYS.between(targetDate, futureRate.date).coerceAtLeast(0)
 
                 // 거리가 짧거나 같으면 과거 환율을 선택 (과거 데이터 선호)
                 if (pastDistance <= futureDistance) {
@@ -98,7 +77,7 @@ class SettlementService(
                     futureRate
                 }
             }
-            else -> null // 아무것도 찾지 못한 경우
+            else -> null
         }
     }
 
@@ -310,6 +289,7 @@ class SettlementService(
             }
 
             val singleDebtExchangeRate = if (singleDebtCurrencyCode != KRW) {
+                // findClosestRate는 이 경우에 부적합하므로, findTopByCurUnitOrderByDateDesc를 사용
                 currencyRepository.findTopByCurUnitOrderByDateDesc(singleDebtCurrencyCode)?.exchangeRate
                     ?: throw BusinessException(ErrorCode.EXCHANGE_RATE_NOT_FOUND)
             } else {
@@ -416,6 +396,7 @@ class SettlementService(
                 val assignedKrw = expensesInCurrency
                     .flatMap { expense -> expense.expenseItems }
                     .flatMap { item -> item.assignments }
+                    .distinct()
                     .filter { it.tripMember.id == debtorMember.id }
                     .sumOf { assignment ->
                         val expense = assignment.expenseItem.expense

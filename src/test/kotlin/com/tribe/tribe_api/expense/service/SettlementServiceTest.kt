@@ -77,6 +77,7 @@ class SettlementServiceIntegrationTest @Autowired constructor(
     fun setUp() {
         // 🚨 FIX 2: DB 클린업 추가 (테스트 간의 격리 보장)
         currencyRepository.deleteAll()
+        memberRepository.deleteAll()
 
         // 0. 환율 데이터 저장 (JPY 1 = 9.3100 KRW로 설정)
         currencyRepository.save(Currency("JPY", paymentDate, "일본 엔", jpyRate))
