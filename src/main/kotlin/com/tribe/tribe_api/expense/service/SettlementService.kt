@@ -413,25 +413,42 @@ class SettlementService(
             }
             .filterValues { it.compareTo(BigDecimal.ZERO) > 0 } // 양수 순 부채만 포함
 
+        // [FIX: 비례 배분 로직]
+
+        // 1. 모든 순 외화 부채의 합산 (KRW 기준)
+        val sumNetForeignDebtKrw = foreignDebtComponentsKrw.values.sumOf { it }
+
+        // 2. 전체 부채 대비 외화 부채의 비율을 계산하고, 비율 적용이 필요한지 판단
+        val debtorNetBalanceAbs = debtorNetBalance.abs()
+        val isScalingNeeded = sumNetForeignDebtKrw.compareTo(debtorNetBalanceAbs) > 0
+
+        val scaleFactor = if (isScalingNeeded && sumNetForeignDebtKrw.compareTo(BigDecimal.ZERO) > 0) {
+            // 외화 부채의 합이 전체 부채를 초과하면 비율로 축소
+            debtorNetBalanceAbs.divide(sumNetForeignDebtKrw, 4, RoundingMode.HALF_UP) // SCALE=4로 정밀하게 계산
+        } else {
+            BigDecimal.ONE
+        }
+
         // 3. 각 통화별로 송금 관계 DTO 생성
         val debtRelations = mutableListOf<SettlementDto.DebtRelation>()
         var totalForeignDebtKrw = BigDecimal.ZERO
 
         for ((currencyCode, netForeignDebtKrw) in foreignDebtComponentsKrw) {
 
-            // 최종 송금액이 debtorNetBalance를 초과하지 않도록 보장
-            val remainingTransferLimit = debtorNetBalance.subtract(totalForeignDebtKrw)
-            val actualTransferAmountKrw = netForeignDebtKrw.min(remainingTransferLimit)
+            // 3.1. 비율에 따라 실제 송금액 결정 (KRW 기준)
+            val actualTransferAmountKrw = netForeignDebtKrw.multiply(scaleFactor)
+                .setScale(SCALE, RoundingMode.HALF_UP) // 정산은 원화 단위(0)로 처리
 
-            if (actualTransferAmountKrw.compareTo(BigDecimal.ZERO) <= 0) continue
+            // EPSILON 미만(1원 미만)은 무시하고, 마지막 항목에서 KRW 잔액으로 처리하도록 함
+            if (actualTransferAmountKrw.compareTo(EPSILON) < 0) continue
 
             totalForeignDebtKrw = totalForeignDebtKrw.add(actualTransferAmountKrw)
 
-            // 환율 조회 (rateLookup 함수 사용)
+            // 3.2. 환율 조회 (rateLookup 함수 사용)
             val rate = rateLookup(currencyCode)
                 ?: continue
 
-            // KRW 송금액을 해당 통화로 역산 (FOREIGN_CURRENCY_SCALE 적용)
+            // 3.3. KRW 송금액을 해당 통화로 역산 (FOREIGN_CURRENCY_SCALE 적용)
             val equivalentOriginalAmount = actualTransferAmountKrw.divide(rate, FOREIGN_CURRENCY_SCALE, RoundingMode.HALF_UP)
 
             debtRelations.add(
@@ -466,7 +483,6 @@ class SettlementService(
         }
         return debtRelations
     }
-
 
     /**
      * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
