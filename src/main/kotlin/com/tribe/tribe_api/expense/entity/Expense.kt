@@ -7,7 +7,6 @@ import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripMember
 import jakarta.persistence.*
 import java.math.BigDecimal
-import java.time.LocalDate
 
 @Entity
 class Expense(
@@ -30,9 +29,6 @@ class Expense(
     @Enumerated(EnumType.STRING)
     @Column(name = "entry_method", nullable = false)
     var entryMethod: InputMethod,
-
-    @Column(name = "payment_date", nullable = true)
-    var paymentDate: LocalDate,
 
     @Column(name = "receipt_image_url", nullable = true)
     var receiptImageUrl: String? = null,

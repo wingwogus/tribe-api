@@ -4,8 +4,8 @@ import com.ninjasquad.springmockk.MockkBean
 import com.tribe.tribe_api.common.util.DateUtils
 import com.tribe.tribe_api.exchange.client.ExchangeRateClient
 import com.tribe.tribe_api.exchange.dto.ExchangeRateDto
-import com.tribe.tribe_api.exchange.entity.Currency
-import com.tribe.tribe_api.exchange.entity.CurrencyId // 👈 CurrencyId import 유지
+import com.tribe.tribe_api.exchange.entity.CurrencyId
+import org.springframework.test.context.TestPropertySource
 import com.tribe.tribe_api.exchange.repository.CurrencyRepository
 import io.mockk.every
 import io.mockk.verify
@@ -24,6 +24,7 @@ import java.time.LocalDate
 @SpringBootTest
 @Transactional
 @ActiveProfiles("test")
+@TestPropertySource(properties = ["spring.flyway.enabled=false"])
 class ExchangeRateSchedulerTest @Autowired constructor(
     private val exchangeRateScheduler: ExchangeRateScheduler,
     private val currencyRepository: CurrencyRepository
