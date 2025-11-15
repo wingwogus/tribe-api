@@ -4,7 +4,10 @@ import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseItem
 import com.tribe.tribe_api.trip.entity.TripMember
 import jakarta.validation.Valid
-import jakarta.validation.constraints.*
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.PositiveOrZero
 import java.math.BigDecimal
 
 object ExpenseDto {
@@ -89,7 +92,8 @@ object ExpenseDto {
         val expenseTitle: String,
         val totalAmount: BigDecimal,
         val payer: ParticipantInfo,
-        val items: List<ItemSimpleResponse>
+        val items: List<ItemSimpleResponse>,
+        val currency: String
     ) {
         companion object {
             fun from(expense: Expense): CreateResponse {
@@ -98,7 +102,8 @@ object ExpenseDto {
                     expenseTitle = expense.title,
                     totalAmount = expense.totalAmount,
                     payer = ParticipantInfo.from(expense.payer),
-                    items = expense.expenseItems.map { ItemSimpleResponse.from(it) }
+                    items = expense.expenseItems.map { ItemSimpleResponse.from(it) },
+                    currency = expense.currency ?: "KRW"
                 )
             }
         }
@@ -109,7 +114,8 @@ object ExpenseDto {
         val expenseTitle: String,
         val totalAmount: BigDecimal,
         val payer: ParticipantInfo,
-        val items: List<ItemDetailResponse>
+        val items: List<ItemDetailResponse>,
+        val currency: String
     ) {
         companion object {
             fun from(expense: Expense): DetailResponse {
@@ -118,7 +124,8 @@ object ExpenseDto {
                     expenseTitle = expense.title,
                     totalAmount = expense.totalAmount,
                     payer = ParticipantInfo.from(expense.payer),
-                    items = expense.expenseItems.map { ItemDetailResponse.from(it) }
+                    items = expense.expenseItems.map { ItemDetailResponse.from(it) },
+                    currency = expense.currency ?: "KRW"
                 )
             }
         }
