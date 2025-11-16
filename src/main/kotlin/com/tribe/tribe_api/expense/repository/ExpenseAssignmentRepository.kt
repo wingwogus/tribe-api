@@ -15,6 +15,6 @@ interface ExpenseAssignmentRepository : JpaRepository<ExpenseAssignment, Long> {
     // 나가는 멤버가 갚아야 할 사람인 모든 배분 정보를 삭제
     @Transactional
     @Modifying
-    @Query("delete from ExpenseAssignment ea where ea.debtor.id = :memberId")
+    @Query("delete from ExpenseAssignment ea where ea.tripMember.id = :memberId")
     fun deleteByDebtorId(memberId: Long)
 }
