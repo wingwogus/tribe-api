@@ -3,6 +3,8 @@ package com.tribe.tribe_api.expense.repository
 import com.tribe.tribe_api.expense.entity.Expense
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.transaction.annotation.Transactional
 
 interface ExpenseRepository : JpaRepository<Expense, Long> {
 
@@ -18,4 +20,14 @@ interface ExpenseRepository : JpaRepository<Expense, Long> {
         WHERE e.trip.id = :tripId
     """)
     fun findAllWithDetailsByTripId(tripId: Long): List<Expense>
+
+    // 나가는 멤버가 Payer인 모든 Expense 찾기
+    @Query("SELECT e FROM Expense e WHERE e.payer.id = :payerId")
+    fun findByPayerId(payerId: Long): List<Expense>
+
+    // Expense의 Payer를 새로운 멤버로 변경
+    @Transactional
+    @Modifying
+    @Query("UPDATE Expense e SET e.payer.id = :newPayerId WHERE e.id = :expenseId")
+    fun updatePayerId(expenseId: Long, newPayerId: Long)
 }
