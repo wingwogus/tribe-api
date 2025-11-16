@@ -10,6 +10,7 @@ object MemberDto {
     )
 
     data class Response(
+        val memberId: Long,
         val nickname: String,
         val email: String,
         val avatar: String?,
@@ -19,6 +20,7 @@ object MemberDto {
             // from 팩토리 메소드를 companion object로 이동
             fun from(member: Member): Response {
                 return Response(
+                    memberId = member.id!!,
                     nickname = member.nickname,
                     email = member.email,
                     avatar = member.avatar,
