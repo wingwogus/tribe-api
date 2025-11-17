@@ -1,6 +1,5 @@
 package com.tribe.tribe_api.trip.entity
 
-import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
@@ -28,13 +27,13 @@ class TripMember(
     @Column(name = "trip_member_id")
     val id: Long? = null
 
-    @OneToMany(mappedBy = "adder", cascade = [CascadeType.ALL], orphanRemoval = true)
+    @OneToMany(mappedBy = "adder", orphanRemoval = true)
     var wishlistItems: MutableList<WishlistItem> = mutableListOf()
 
-    @OneToMany(mappedBy = "payer", cascade = [CascadeType.ALL])
+    @OneToMany(mappedBy = "payer")
     var paidExpenses: MutableList<Expense> = mutableListOf()
 
-    @OneToMany(mappedBy = "tripMember", cascade = [CascadeType.ALL])
+    @OneToMany(mappedBy = "tripMember")
     var assignments: MutableList<ExpenseAssignment> = mutableListOf()
 
     val name: String
