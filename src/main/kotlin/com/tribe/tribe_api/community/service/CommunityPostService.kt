@@ -5,8 +5,10 @@ import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
 import com.tribe.tribe_api.community.dto.CommunityPostDto
+import com.tribe.tribe_api.community.dto.PostSearchCondition
 import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
+import com.tribe.tribe_api.community.repository.CommunityPostRepositoryCustom
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
@@ -25,6 +27,7 @@ class CommunityPostService(
     private val memberRepository: MemberRepository,
     private val tripRepository: TripRepository,
     private val tripMemberRepository: TripMemberRepository,
+    private val communityPostRepositoryImpl: CommunityPostRepositoryCustom,
     private val cloudinaryUploadService: CloudinaryUploadService // 이미지 업로드 서비스
 ) {
 
@@ -138,6 +141,16 @@ class CommunityPostService(
         val postPage: Page<CommunityPost> = communityPostRepository.findByAuthorMemberIdWithDetails(memberId, pageable)
 
         return postPage.map { CommunityPostDto.SimpleResponse.from(it) }
+    }
+
+    @Transactional(readOnly = true)
+    fun searchPosts(
+        condition: PostSearchCondition,
+        pageable: Pageable
+    ): Page<CommunityPostDto.SimpleResponse> {
+        val searchPost = communityPostRepositoryImpl.searchPost(condition, pageable)
+
+        return searchPost.map { CommunityPostDto.SimpleResponse.from(it) }
     }
 }
 
