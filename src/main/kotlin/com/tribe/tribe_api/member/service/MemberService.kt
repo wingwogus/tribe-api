@@ -16,10 +16,14 @@ class MemberService(
 ) {
     val logger = LoggerFactory.getLogger(javaClass)
 
-    fun getMemberInfo(): MemberDto.Response {
+    fun getMyInfo(): MemberDto.Response {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
 
-        val member = memberRepository.findById(currentMemberId)
+        return getMemberInfo(currentMemberId)
+    }
+
+    fun getMemberInfo(memberId: Long): MemberDto.Response {
+        val member = memberRepository.findById(memberId)
             .orElseThrow({ BusinessException(ErrorCode.MEMBER_NOT_FOUND) })
 
         val responseDto = MemberDto.Response.from(member)
