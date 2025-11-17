@@ -1,12 +1,12 @@
 package com.tribe.tribe_api.trip.entity
 
 import com.tribe.tribe_api.common.util.BaseTimeEntity
+import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
 import com.tribe.tribe_api.member.entity.Member
-import jakarta.persistence.*;
-import org.hibernate.annotations.BatchSize
+import jakarta.persistence.*
 import java.time.LocalDate
 
 @Entity
@@ -37,6 +37,9 @@ class Trip(
 
     @OneToMany(mappedBy = "trip", cascade = [CascadeType.ALL], orphanRemoval = true)
     var wishlistItems: MutableList<WishlistItem> = mutableListOf()
+
+    @OneToMany(mappedBy = "trip", cascade = [CascadeType.ALL], orphanRemoval = true)
+    val communityPosts: MutableList<CommunityPost> = mutableListOf()
 
     //== 비즈니스 로직 ==//
     fun update(title: String, startDate: LocalDate, endDate: LocalDate, country: Country) {

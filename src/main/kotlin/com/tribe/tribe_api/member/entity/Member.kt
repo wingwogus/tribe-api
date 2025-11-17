@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.member.entity
 
 import com.tribe.tribe_api.community.entity.CommunityOffer
+import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.community.entity.Notification
 import com.tribe.tribe_api.trip.entity.TripMember
 import jakarta.persistence.*
@@ -39,6 +40,9 @@ class Member(
 
     @OneToMany(mappedBy = "member", cascade = [CascadeType.ALL], orphanRemoval = true)
     var tripMembers: MutableList<TripMember> = mutableListOf()
+
+    @OneToMany(mappedBy = "author", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var communityPosts: MutableList<CommunityPost> = mutableListOf()
 
     @OneToMany(mappedBy = "provider", cascade = [CascadeType.ALL], orphanRemoval = true)
     var communityOffers: MutableList<CommunityOffer> = mutableListOf()
