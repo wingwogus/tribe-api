@@ -14,7 +14,7 @@ import org.springframework.data.support.PageableExecutionUtils
 class CommunityPostRepositoryImpl(
     private val queryFactory: JPAQueryFactory
 ): CommunityPostRepositoryCustom {
-
+    
     fun <T> JPAQuery<T>.limit(pageSize:Int): JPAQuery<T> {
         return this.limit(pageSize.toLong())
     }
@@ -26,10 +26,13 @@ class CommunityPostRepositoryImpl(
 
         val content = queryFactory
             .selectFrom(communityPost)
+            .join(communityPost.author).fetchJoin()
+            .join(communityPost.trip).fetchJoin()
             .where(
                 countryEq(condition.country),
                 authorIdEq(condition.authorId)
             )
+            .orderBy(communityPost.createdAt.desc())
             .offset(pageable.offset)
             .limit(pageable.pageSize)
             .fetch()

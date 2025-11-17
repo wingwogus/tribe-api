@@ -27,7 +27,7 @@ class CommunityPostService(
     private val memberRepository: MemberRepository,
     private val tripRepository: TripRepository,
     private val tripMemberRepository: TripMemberRepository,
-    private val communityPostRepositoryImpl: CommunityPostRepositoryCustom,
+    private val communityPostRepositoryCustom: CommunityPostRepositoryCustom,
     private val cloudinaryUploadService: CloudinaryUploadService // 이미지 업로드 서비스
 ) {
 
@@ -148,7 +148,7 @@ class CommunityPostService(
         condition: PostSearchCondition,
         pageable: Pageable
     ): Page<CommunityPostDto.SimpleResponse> {
-        val searchPost = communityPostRepositoryImpl.searchPost(condition, pageable)
+        val searchPost = communityPostRepositoryCustom.searchPost(condition, pageable)
 
         return searchPost.map { CommunityPostDto.SimpleResponse.from(it) }
     }
