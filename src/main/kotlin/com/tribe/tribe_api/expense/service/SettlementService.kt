@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit // 날짜 차이 계산을 위해 추가
 
