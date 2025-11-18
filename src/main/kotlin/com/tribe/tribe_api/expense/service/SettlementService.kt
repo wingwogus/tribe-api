@@ -363,11 +363,6 @@ class SettlementService(
         }
     }
 
-
-    // wingwogus/tribe-api/tribe-api-modify/src/main/kotlin/com/tribe/tribe_api/expense/service/SettlementService.kt
-
-// ... (생략)
-
     /**
      * 채권/채무 관계를 계산하여 최소 송금 관계로 변환합니다. (Greedy Algorithm)
      * 이 함수는 이제 다자간 정산이 필요한 경우에 사용됩니다. (KRW 기준으로만 정산 관계 표시)
@@ -464,7 +459,9 @@ class SettlementService(
         for (currencyCode in allCurrencies) {
             val isForeign = currencyCode != KRW
             val rate = if (isForeign) rateLookup(currencyCode) else BigDecimal.ONE
-            if (rate == null) continue // 환율이 없으면 해당 외화는 무시
+            if (rate == null) {
+                log.warn("환율을 찾을 수 없어 {} 통화를 정산에서 제외합니다.", currencyCode)
+                continue }
 
             // 2-1. 해당 통화에 대한 멤버별 Paid, Assigned (모두 Original Currency Amount)
             val netBalances = members.associateWith { member ->
