@@ -27,13 +27,13 @@ class TripMember(
     @Column(name = "trip_member_id")
     val id: Long? = null
 
-    @OneToMany(mappedBy = "adder", orphanRemoval = true)
+    @OneToMany(mappedBy = "adder", cascade = [CascadeType.ALL])
     var wishlistItems: MutableList<WishlistItem> = mutableListOf()
 
-    @OneToMany(mappedBy = "payer")
+    @OneToMany(mappedBy = "payer", cascade = [CascadeType.ALL])
     var paidExpenses: MutableList<Expense> = mutableListOf()
 
-    @OneToMany(mappedBy = "tripMember")
+    @OneToMany(mappedBy = "tripMember", cascade = [CascadeType.ALL])
     var assignments: MutableList<ExpenseAssignment> = mutableListOf()
 
     val name: String
