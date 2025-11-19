@@ -20,7 +20,7 @@ class TripMember(
     var guestNickname: String? = null,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 10)
     var role: TripRole,
 ) {
     @Id
