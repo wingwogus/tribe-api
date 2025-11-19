@@ -19,6 +19,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     DUPLICATE_CATEGORY_ID_REQUEST(HttpStatus.BAD_REQUEST, "카테고리 ID는 중복될 수 없습니다."),
     DUPLICATE_ORDER_REQUEST(HttpStatus.BAD_REQUEST, "카테고리의 순서가 중복입니다."),
     CATEGORY_DAY_MISMATCH(HttpStatus.BAD_REQUEST, "카테고리의 day가 맞지 않습니다"),
+    CANNOT_CHANGE_OWN_ROLE(HttpStatus.BAD_REQUEST, "자신의 역할을 변경할 수 없습니다."),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),
