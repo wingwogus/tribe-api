@@ -59,7 +59,7 @@ class TripMemberServiceTest @Autowired constructor(
         owner = memberRepository.save(Member("owner@test.com", passwordEncoder.encode("pw"), "여행소유자", null, Role.USER, Provider.LOCAL, null, false))
         member1 = memberRepository.save(Member("member@test.com", passwordEncoder.encode("pw"), "일반멤버", null, Role.USER, Provider.LOCAL, null, false))
         member2 = memberRepository.save(Member("member2@test.com", passwordEncoder.encode("pw"), "일반멤버2", null, Role.USER, Provider.LOCAL, null, false))
-        adminMember = memberRepository.save(Member("admin@test.com", passwordEncoder.encode("pw"), "어드민", null, Role.ADMIN, Provider.LOCAL, null, false))
+        adminMember = memberRepository.save(Member("admin@test.com", passwordEncoder.encode("pw"), "어드민", null, Role.USER, Provider.LOCAL, null, false))
         nonMember = memberRepository.save(Member("nonmember@test.com", passwordEncoder.encode("pw"), "비멤버", null, Role.USER, Provider.LOCAL, null, false))
 
 

@@ -54,6 +54,15 @@ class TripMemberService(
             throw BusinessException(ErrorCode.CANNOT_CHANGE_OWN_ROLE)
         }
 
+        if (request.requestRole == TripRole.OWNER) {
+            throw BusinessException(ErrorCode.CANNOT_CHANGE_MEMBER_TO_OWNER)
+        }
+        if (participantTripMember.role == request.requestRole) {
+            throw BusinessException(ErrorCode.EQUAL_ROLE)
+        }
+        if (request.requestRole == TripRole.GUEST) {
+            throw BusinessException(ErrorCode.CANNOT_CHANGE_MEMBER_TO_GUEST)
+        }
         val oldRole = participantTripMember.role
 
         participantTripMember.role = request.requestRole
