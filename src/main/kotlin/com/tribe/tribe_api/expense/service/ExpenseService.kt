@@ -72,9 +72,6 @@ class ExpenseService(
             throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
         }
 
-        val dayNumber = itineraryItem.category.day
-        val paymentDate = trip.startDate.plusDays(dayNumber.toLong() - 1) //날짜 확인
-
         val processedData = when (request.inputMethod.uppercase()){
             "SCAN" -> {
                 val file = imageFile ?: throw BusinessException(ErrorCode.INVALID_INPUT_VALUE)
@@ -107,7 +104,6 @@ class ExpenseService(
             title = request.expenseTitle,
             totalAmount = processedData.totalAmount,
             entryMethod = InputMethod.valueOf(request.inputMethod.uppercase()),
-            paymentDate = paymentDate,
             receiptImageUrl = imageUrl,
             currency = request.currency.uppercase() // 통화 코드 저장 (예: KRW, USD, JPY)
         )

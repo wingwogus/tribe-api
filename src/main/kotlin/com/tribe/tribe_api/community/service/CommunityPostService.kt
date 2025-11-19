@@ -9,10 +9,8 @@ import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
-import com.tribe.tribe_api.trip.entity.TripRole // [추가!] TripRole을 import합니다.
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.Id
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.security.access.prepost.PreAuthorize
@@ -72,7 +70,6 @@ class CommunityPostService(
     }
 
     // 게시글 상세 조회
-
     @Transactional(readOnly = true)
     fun getPostDetail(postId: Long): CommunityPostDto.DetailResponse {
         // N+1 방지를 위해 Fetch Join 쿼리 사용
@@ -133,6 +130,14 @@ class CommunityPostService(
         if (imageUrlToDelete != null) {
             cloudinaryUploadService.delete(imageUrlToDelete)
         }
+    }
+
+    // 6. 특정 MemberId가 작성한 모든 게시글 목록 조회
+    @Transactional(readOnly = true)
+    fun getPostsByMemberId(memberId: Long, pageable: Pageable): Page<CommunityPostDto.SimpleResponse> {
+        val postPage: Page<CommunityPost> = communityPostRepository.findByAuthorMemberIdWithDetails(memberId, pageable)
+
+        return postPage.map { CommunityPostDto.SimpleResponse.from(it) }
     }
 }
 
