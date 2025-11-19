@@ -11,7 +11,7 @@ class ExpenseAssignment(
     val expenseItem: ExpenseItem,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trip_member_id", nullable = false)
+    @JoinColumn(name = "trip_member_id", nullable = true)
     val tripMember: TripMember,
 
     // 분담금액 저장할 필드
