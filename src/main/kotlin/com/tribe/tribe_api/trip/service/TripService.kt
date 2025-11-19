@@ -99,7 +99,7 @@ class TripService(
         return trips.map { TripResponse.SimpleTrip.from(it) }
     }
 
-    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
+    @PreAuthorize("@tripSecurityService.isTripAdmin(#tripId)")
     fun createInvitation(tripId: Long): TripResponse.Invitation {
         tripRepository.existsById(tripId).takeIf { it }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
