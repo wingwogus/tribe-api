@@ -34,7 +34,20 @@ class TripSecurityService(
         val tripMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
             ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
 
-        if (tripMember.role != TripRole.OWNER) {
+        if (tripMember.role != TripRole.OWNER ) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+        }
+        return true
+    }
+
+    @Transactional(readOnly = true)
+    fun isTripAdmin(tripId: Long) : Boolean {
+        val memberId = SecurityUtil.getCurrentMemberId()
+
+        val tripMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
+            ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
+
+        if (tripMember.role != TripRole.OWNER && tripMember.role != TripRole.ADMIN) {
             throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
         }
         return true
@@ -59,6 +72,6 @@ class TripSecurityService(
         val tripId = post.trip.id
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
 
-        return isTripOwner(tripId)
+        return isTripAdmin(tripId)
     }
 }
