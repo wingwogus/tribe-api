@@ -68,10 +68,8 @@ class TripMemberService(
         participantTripMember.role = request.requestRole
 
         val newRole = request.requestRole
-
-        val updatedMember = tripMemberRepository.save(participantTripMember)
         logger.info("TripMember Role Changed.: [TripMemberID: {}, TripID: {}] -> [ Role : {} -> {}]", request.tripMemberId, tripId, oldRole, newRole)
 
-        return TripMemberDto.Simple.from(updatedMember)
+        return TripMemberDto.Simple.from(participantTripMember)
     }
 }
