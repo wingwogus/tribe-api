@@ -10,7 +10,6 @@ import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
-import jakarta.persistence.EntityManager
 import org.slf4j.LoggerFactory
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
@@ -22,8 +21,7 @@ class TripMemberService(
     private val tripMemberRepository: TripMemberRepository,
     private val expenseRepository: ExpenseRepository,
     private val wishlistItemRepository: WishlistItemRepository,
-    private val expenseAssignmentRepository: ExpenseAssignmentRepository,
-    private val entityManager: EntityManager
+    private val expenseAssignmentRepository: ExpenseAssignmentRepository
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -31,35 +29,26 @@ class TripMemberService(
     @Transactional
     fun handleMemberExit(exitingMemberId: Long, tripId: Long) {
 
-        // 배분 정보 삭제
-        expenseAssignmentRepository.deleteByDebtorId(exitingMemberId)
-
-        // 위시리스트 삭제
         wishlistItemRepository.deleteByAdderId(exitingMemberId)
 
-        // 컬렉션 초기화를 위한 TripMember 재로딩
         val targetTripMember = tripMemberRepository.findById(exitingMemberId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
 
-        // 컬렉션 명시적 초기화
-        targetTripMember.wishlistItems.clear()
-        targetTripMember.paidExpenses.clear()
-        targetTripMember.assignments.clear()
-
-        // 위임받을 OWNER 찾기
         val ownerMember = tripMemberRepository.findByTripIdAndRole(tripId, TripRole.OWNER)
             .firstOrNull()
             ?: throw BusinessException(ErrorCode.OWNER_NOT_FOUND)
 
         val newPayerId = ownerMember.id!!
 
-        // Payer 위임
         val expensesToReassign = expenseRepository.findByPayerId(exitingMemberId)
 
-        // 각 Expense의 Payer를 새로운 멤버에게 위임
         expensesToReassign.forEach { expense ->
             expenseRepository.updatePayerId(expense.id!!, newPayerId)
         }
+
+        expenseAssignmentRepository.setTripMemberToNullForExitingMember(exitingMemberId)
+
+        tripMemberRepository.delete(targetTripMember)
     }
 
     //특정 여행에 임시 참여자(게스트)를 추가
@@ -98,10 +87,6 @@ class TripMemberService(
             exitingMemberId = targetTripMember.id!!,
             tripId = tripId
         )
-
-        targetTripMember.trip.members.remove(targetTripMember)
-        entityManager.flush()
-        tripMemberRepository.delete(targetTripMember)
     }
 
     //OWNER가 특정 MEMBER 강퇴
@@ -120,10 +105,6 @@ class TripMemberService(
             exitingMemberId = targetTripMember.id!!,
             tripId = tripId
         )
-
-        targetTripMember.trip.members.remove(targetTripMember)
-        entityManager.flush()
-        tripMemberRepository.delete(targetTripMember)
     }
 
     //여행 탈퇴
@@ -142,9 +123,5 @@ class TripMemberService(
             exitingMemberId = tripMember.id!!,
             tripId = tripId
         )
-
-        tripMember.trip.members.remove(tripMember)
-        entityManager.flush()
-        tripMemberRepository.delete(tripMember)
     }
 }
