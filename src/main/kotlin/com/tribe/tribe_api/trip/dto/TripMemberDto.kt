@@ -14,6 +14,17 @@ object TripMemberDto {
         val name: String
     )
 
+    data class AssignRoleRequest(
+        @field:NotNull(message = "tripId는 필수입니다.")
+        val tripId: Long,
+
+        @field:NotNull(message = "memberId는 필수입니다.")
+        val tripMemberId: Long,
+
+        @field:NotNull(message = "role은 필수입니다.")
+        val requestRole: TripRole
+    )
+
     data class Simple(
         val id: Long,
         val name: String,
