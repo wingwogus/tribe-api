@@ -46,9 +46,7 @@ class TripService(
     val logger = LoggerFactory.getLogger(javaClass)
 
     fun createTrip(request: TripRequest.Create): TripResponse.TripDetail {
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
-
-        val member = findMember(currentMemberId)
+        val member = findMember(SecurityUtil.getCurrentMemberId())
 
         return request.toEntity()
             .apply { addMember(member, TripRole.OWNER) }
@@ -99,7 +97,7 @@ class TripService(
         return trips.map { TripResponse.SimpleTrip.from(it) }
     }
 
-    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
+    @PreAuthorize("@tripSecurityService.isTripAdmin(#tripId)")
     fun createInvitation(tripId: Long): TripResponse.Invitation {
         tripRepository.existsById(tripId).takeIf { it }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
@@ -132,8 +130,7 @@ class TripService(
     }
 
     fun importTripFromPost(request: TripRequest.Import):TripResponse.TripDetail {
-        val member = memberRepository.findByIdOrNull(SecurityUtil.getCurrentMemberId())
-            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+        val member = findMember(SecurityUtil.getCurrentMemberId())
 
         val post = (communityPostRepository.findByIdOrNull(request.postId)
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND))

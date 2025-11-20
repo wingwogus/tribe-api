@@ -32,7 +32,7 @@ class CommunityPostService(
 ) {
 
     // 1. 게시글 생성
-    @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
+    @PreAuthorize("@tripSecurityService.isTripAdmin(#tripId)")
     fun createPost(tripId: Long, request: CommunityPostDto.CreateRequest, imageFile: MultipartFile?,): CommunityPostDto.DetailResponse {
         val memberId = SecurityUtil.getCurrentMemberId()
         val author = memberRepository.findById(memberId)
