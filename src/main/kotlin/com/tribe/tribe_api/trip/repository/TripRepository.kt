@@ -20,7 +20,7 @@ interface TripRepository : JpaRepository<Trip, Long> {
     @Query("""
             SELECT DISTINCT t FROM Trip t 
             JOIN FETCH t.members m 
-            JOIN FETCH m.member 
+            LEFT JOIN FETCH m.member 
             WHERE t.id = :tripId
             """)
     fun findTripWithMembersById(@Param("tripId") tripId: Long): Trip?
