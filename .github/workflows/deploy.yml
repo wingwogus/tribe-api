@@ -19,7 +19,7 @@ jobs:
 
       - name: Rsync backend to server
         run: |
-          rsync --delete --exclude='.env' -avz -e "ssh -o StrictHostKeyChecking=no" ./ \
+          rsync --delete --exclude='.env' --exclude='logs' -avz -e "ssh -o StrictHostKeyChecking=no" ./ \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/home/${{ secrets.SERVER_USER }}/apps/tribe/backend/
 
       - name: Build and restart containers

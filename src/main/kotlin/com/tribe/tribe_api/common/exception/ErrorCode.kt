@@ -21,6 +21,10 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     CATEGORY_DAY_MISMATCH(HttpStatus.BAD_REQUEST, "카테고리의 day가 맞지 않습니다"),
     CANNOT_KICK_OWNER(HttpStatus.BAD_REQUEST, "여행의 소유자는 강퇴할 수 없습니다"),
     CANNOT_LEAVE_AS_OWNER(HttpStatus.BAD_REQUEST, "여행의 소유자는 여행을 나갈 수 없습니다."),
+    CANNOT_CHANGE_OWN_ROLE(HttpStatus.BAD_REQUEST, "자신의 역할을 변경할 수 없습니다."),
+    CANNOT_CHANGE_MEMBER_TO_OWNER(HttpStatus.BAD_REQUEST, "멤버를 오너로 변경할 수 없습니다."),
+    EQUAL_ROLE(HttpStatus.BAD_REQUEST, "이미 동일한 권한을 가지고 있습니다."),
+    CANNOT_CHANGE_MEMBER_TO_GUEST(HttpStatus.BAD_REQUEST, "멤버를 게스트로 변경할 수 없습니다."),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),

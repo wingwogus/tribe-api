@@ -1,198 +1,311 @@
 package com.tribe.tribe_api.trip.service
 
+import com.ninjasquad.springmockk.MockkBean
+import com.tribe.tribe_api.common.exception.BusinessException
+import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
-import com.tribe.tribe_api.expense.entity.Expense
-import com.tribe.tribe_api.expense.entity.ExpenseAssignment
-import com.tribe.tribe_api.expense.entity.ExpenseItem
-import com.tribe.tribe_api.expense.enumeration.InputMethod
-import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
-import com.tribe.tribe_api.expense.repository.ExpenseItemRepository
-import com.tribe.tribe_api.expense.repository.ExpenseRepository
-import com.tribe.tribe_api.itinerary.entity.Category
-import com.tribe.tribe_api.itinerary.entity.ItineraryItem
-import com.tribe.tribe_api.itinerary.repository.CategoryRepository
-import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
+import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
+import com.tribe.tribe_api.common.util.service.RedisService
+import com.tribe.tribe_api.community.dto.CommunityPostDto
+import com.tribe.tribe_api.community.entity.CommunityPost
+import com.tribe.tribe_api.community.repository.CommunityPostRepository
+import com.tribe.tribe_api.community.service.CommunityPostService
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
 import com.tribe.tribe_api.member.entity.Role
 import com.tribe.tribe_api.member.repository.MemberRepository
+import com.tribe.tribe_api.trip.dto.TripMemberDto
 import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.entity.Trip
-import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Test
-import org.mockito.Mockito
+import org.junit.jupiter.api.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
+import java.time.Duration
 import java.time.LocalDate
+
+
 
 @SpringBootTest
 @Transactional
 class TripMemberServiceTest @Autowired constructor(
     private val tripMemberService: TripMemberService,
-    private val tripRepository: TripRepository,
+    private val tripService: TripService,
+    private val communityPostService: CommunityPostService,
+    private val communityPostRepository: CommunityPostRepository,
+    private val cloudinaryUploadService: CloudinaryUploadService,
     private val memberRepository: MemberRepository,
+    private val tripRepository: TripRepository,
     private val tripMemberRepository: TripMemberRepository,
-    private val expenseRepository: ExpenseRepository,
-    private val expenseItemRepository: ExpenseItemRepository,
-    private val expenseAssignmentRepository: ExpenseAssignmentRepository,
-    private val categoryRepository: CategoryRepository,
-    private val itineraryItemRepository: ItineraryItemRepository
-) {
+    private val passwordEncoder: PasswordEncoder
+){
+    private lateinit var owner: Member
+    private lateinit var member1: Member
+    private lateinit var member2 : Member
+    private lateinit var adminMember : Member
+    private lateinit var nonMember: Member
+    private lateinit var trip: Trip
 
-    private fun setAuthentication(memberId: Long) {
-        // 1. Member 객체 Mocking (우리가 필요한 건 id 뿐입니다)
-        val mockMember = Mockito.mock(Member::class.java)
-        Mockito.`when`(mockMember.id).thenReturn(memberId)
+    @BeforeEach
+    fun setUp() {
+        // 1. 사용자 생성 (소유자, 일반 멤버, 비멤버)
+        owner = memberRepository.save(Member("owner@test.com", passwordEncoder.encode("pw"), "여행소유자", null, Role.USER, Provider.LOCAL, null, false))
+        member1 = memberRepository.save(Member("member@test.com", passwordEncoder.encode("pw"), "일반멤버", null, Role.USER, Provider.LOCAL, null, false))
+        member2 = memberRepository.save(Member("member2@test.com", passwordEncoder.encode("pw"), "일반멤버2", null, Role.USER, Provider.LOCAL, null, false))
+        adminMember = memberRepository.save(Member("admin@test.com", passwordEncoder.encode("pw"), "어드민", null, Role.USER, Provider.LOCAL, null, false))
+        nonMember = memberRepository.save(Member("nonmember@test.com", passwordEncoder.encode("pw"), "비멤버", null, Role.USER, Provider.LOCAL, null, false))
 
-        // 2. CustomUserDetails 객체 Mocking
-        // SecurityUtil이 형변환(as CustomUserDetails)을 하므로 이 클래스를 Mocking 해야 합니다.
-        val mockUserDetails = Mockito.mock(CustomUserDetails::class.java)
-        Mockito.`when`(mockUserDetails.member).thenReturn(mockMember)
 
-        // (선택사항) UserDetails 인터페이스 필수 메서드 처리 (필요시)
-        Mockito.`when`(mockUserDetails.authorities).thenReturn(null)
+        // 2. 여행 데이터 생성 (일본)
+        trip = Trip("일본 여행", LocalDate.now(), LocalDate.now().plusDays(5), Country.JAPAN)
+        trip.addMember(owner, TripRole.OWNER)
+        trip.addMember(member1, TripRole.MEMBER)
+        trip.addMember(member2, TripRole.MEMBER)
+        trip.addMember(adminMember, TripRole.ADMIN)
+        trip.addMember(nonMember, TripRole.GUEST)
+        tripRepository.save(trip)
+    }
 
-        // 3. Mock 객체를 담은 토큰 생성
-        val authentication = UsernamePasswordAuthenticationToken(mockUserDetails, null, null)
+    private fun setAuthentication(member: Member) {
+        val userDetails = CustomUserDetails(member)
+        val authentication = UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
         SecurityContextHolder.getContext().authentication = authentication
     }
 
-    @Test
-    @DisplayName("게스트 삭제 시 분배금이 남은 인원에게 재계산되어야 한다 (3명 -> 2명)")
-    fun deleteGuest_recalculation() {
-        // Given
-        val (trip, owner, member, guest) = createTripWithMembers()
+    @Nested
+    @DisplayName("멤버 권한 변경")
+    inner class UpdateMemberRoleTest {
+        @Test
+        @DisplayName("Owner가 멤버의 권한 변경 - 성공 ( 일반 멤버를 어드민으로 )")
+        fun 멤버권한_변경_오너_성공() {
+            //given
+            setAuthentication(owner)
+            val tripId = trip.id
+            val memberId = member1.id
+            val requestRole = TripRole.ADMIN
+            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            //when
+            tripMemberService.assignRole(tripId, requestDto)
+            //then
+            val updatedMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
+            assertThat(updatedMember!!.role).isEqualTo(requestRole)
+        }
 
-        // 권한 있는 사용자(Owner)로 로그인
-        setAuthentication(owner.member!!.id!!)
+        @Test
+        @DisplayName("Owner가 멤버의 권한 변경 - 성공 ( 어드민을 일반 멤버로 )")
+        fun 멤버권한_변경_오너_성공2() {
+            //given
+            setAuthentication(owner)
+            val tripId = trip.id
+            val memberId = adminMember.id
+            val requestRole = TripRole.MEMBER
+            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            //when
+            tripMemberService.assignRole(tripId, requestDto)
+            //then
+            val updatedMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
+            assertThat(updatedMember!!.role).isEqualTo(requestRole)
+        }
 
-        // 지출 생성 (총액 30,000원)
-        val expense = createExpense(trip, owner, "저녁 식사", BigDecimal("30000"))
-        val item = createExpenseItem(expense, "고기", BigDecimal("30000"))
+        @Test
+        @DisplayName("Owner가 멤버의 권한 변경 - 실패 ( owner가 owner의 권한 변경 )")
+        fun 멤버권한_변경_오너_실패() {
+            //given
+            setAuthentication(owner)
+            val tripId = trip.id
+            val memberId = owner.id
+            val requestRole = TripRole.ADMIN
+            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            //when & then
+            val exception = assertThrows<BusinessException> {
+                tripMemberService.assignRole(tripId, requestDto)
+            }
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.CANNOT_CHANGE_OWN_ROLE)
+        }
 
-        // 3명이 10,000원씩 분배
-        createAssignment(item, owner, BigDecimal("10000"))
-        createAssignment(item, member, BigDecimal("10000"))
-        createAssignment(item, guest, BigDecimal("10000"))
+        @Test
+        @DisplayName("Member가 멤버의 권한 변경")
+        fun 멤버권한_변경_멤버() {
+            //given
+            setAuthentication(member2)
+            val tripId = trip.id
+            val memberId = member1.id
+            val requestRole = TripRole.ADMIN
+            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            //when & then
 
-        // When
-        tripMemberService.deleteGuest(trip.id!!, guest.id!!)
+            val exception = assertThrows<BusinessException> {
+                tripMemberService.assignRole(tripId, requestDto)
+            }
 
-        // Then
-        // 1. 게스트 삭제 확인
-        val deletedGuest = tripMemberRepository.findById(guest.id!!)
-        assertThat(deletedGuest).isEmpty
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
 
-        // [수정] findAll() 대신, 현재 테스트 아이템(item.id)에 연관된 Assignment만 필터링하여 조회
-        val assignments = expenseAssignmentRepository.findAll().filter { it.expenseItem.id == item.id }
+            val updatedMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
+            assertThat(updatedMember!!.role).isNotEqualTo(requestRole)
+            assertThat(updatedMember.role).isEqualTo(TripRole.MEMBER)
+        }
 
-        // InitDataService 데이터 간섭 없이 정확히 2개인지 확인
-        assertThat(assignments).hasSize(2)
+        @Test
+        @DisplayName("Guest가 멤버의 권한 변경")
+        fun 멤버권한_변경_게스트() {
+            //given
+            setAuthentication(nonMember)
+            val tripId = trip.id
+            val memberId = member1.id
+            val requestRole = TripRole.ADMIN
+            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            //when & then
+            val exception = assertThrows<BusinessException> {
+                tripMemberService.assignRole(tripId, requestDto)
+            }
 
-        // 3. 금액 재계산 확인 (30,000 / 2명 = 15,000원)
-        assignments.forEach { assignment ->
-            assertThat(assignment.amount).isEqualByComparingTo(BigDecimal("15000"))
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
+        }
+
+        @Test
+        @DisplayName("Admin이 멤버의 권한 변경")
+        fun 멤버권한_변경_어드민() {
+            //given
+            setAuthentication(adminMember)
+            val tripId = trip.id
+            val memberId = member1.id
+            val requestRole = TripRole.ADMIN
+            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            //when & then
+            val exception = assertThrows<BusinessException> {
+                tripMemberService.assignRole(tripId, requestDto)
+            }
+
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
         }
     }
 
-    @Test
-    @DisplayName("게스트가 결제한(Payer) 내역은 삭제 시 Owner에게 이관되어야 한다")
-    fun deleteGuest_payer_transfer() {
-        // Given
-        val (trip, owner, _, guest) = createTripWithMembers()
-
-        // [중요] 로그인 (권한 있는 사용자)
-        setAuthentication(owner.member!!.id!!)
-
-        val expense = createExpense(trip, guest, "게스트가 쏜 커피", BigDecimal("5000"))
-
-        // When
-        tripMemberService.deleteGuest(trip.id!!, guest.id!!)
-
-        // Then
-        val updatedExpense = expenseRepository.findById(expense.id!!).get()
-        assertThat(updatedExpense.payer.id).isEqualTo(owner.id)
+    @Nested
+    @DisplayName("멤버 초대")
+    inner class InviteMember{
+        @Test
+        @DisplayName("Owner가 다른 멤버를 초대")
+        fun 멤버_초대_오너() {
+            //given
+            setAuthentication(owner)
+            val tripId = trip.id!!
+            //when
+            val invitation = tripService.createInvitation(tripId)
+            //then
+            assertThat(invitation).isNotNull()
+        }
+        @Test
+        @DisplayName("Admin이 다른 멤버를 초대")
+        fun 멤버_초대_어드민() {
+            //given
+            setAuthentication(adminMember)
+            val tripId = trip.id!!
+            //when
+            val invitation = tripService.createInvitation(tripId)
+            //then
+            assertThat(invitation).isNotNull()
+        }
+        @Test
+        @DisplayName("Member가 다른 멤버를 초대")
+        fun 멤버_초대_멤버() {
+            //given
+            setAuthentication(member1)
+            val tripId = trip.id!!
+            // when & then
+            val exception = assertThrows<BusinessException> {
+                tripService.createInvitation(tripId)
+            }
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
+        }
+        @Test
+        @DisplayName("Guest가 다른 멤버를 초대")
+        fun 멤버_초대_게스트() {
+            //given
+            setAuthentication(nonMember)
+            val tripId = trip.id!!
+            // when & then
+            val exception = assertThrows<BusinessException> {
+                tripService.createInvitation(tripId)
+            }
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
+        }
     }
 
-    @Test
-    @DisplayName("멤버 강퇴 시 Role이 KICKED로 변경되고 데이터는 유지되어야 한다")
-    fun kickMember() {
-        // Given
-        val (trip, owner, member, _) = createTripWithMembers()
-
-        // [중요] 강퇴는 Owner만 가능하므로 Owner로 로그인 필수
-        setAuthentication(owner.member!!.id!!)
-
-        // When
-        tripMemberService.kickMember(trip.id!!, member.id!!)
-
-        // Then
-        val kickedMember = tripMemberRepository.findById(member.id!!).get()
-        assertThat(kickedMember.role).isEqualTo(TripRole.KICKED)
-        assertThat(kickedMember.member).isNotNull
+    @Nested
+    @DisplayName("여행 공유 생성")
+    inner class CreatePost{
+        @Test
+        @DisplayName("OWNER가 여행 공유 생성")
+        fun 여행공유_생성_오너() {
+            //given
+            setAuthentication(owner)
+            val tripId = trip.id!!
+            val title = "레전드 일본 여행"
+            val content = "시부야 사변 한번 훑어주고 신주쿠가서 장어먹고 산책 좀 하다가 레전드 마트가서 와규 산다음에 숙소가서 양주까고 먹었습니다."
+            val imageFile = null
+            val createPost = CommunityPostDto.CreateRequest(tripId, title, content)
+            //when
+            val response = communityPostService.createPost(tripId, createPost,imageFile)
+            //then
+            assertThat(response.trip.tripId).isEqualTo(tripId)
+            assertThat(response.title).isEqualTo(title)
+            assertThat(response.content).isEqualTo(content)
+            assertThat(response.authorNickname).isEqualTo(owner.nickname)
+            assertThat(response.representativeImageUrl).isNull()
+            assertThat(response.postId).isNotNull()
+            assertThat(response.country).isEqualTo("일본")
+        }
+        @Test
+        @DisplayName("ADMIN이 여행 공유 생성")
+        fun 여행공유_생성_어드민() {
+            //given
+            setAuthentication(adminMember)
+            val tripId = trip.id!!
+            val title = "레전드 일본 여행"
+            val content = "시부야 사변 한번 훑어주고 신주쿠가서 장어먹고 산책 좀 하다가 레전드 마트가서 와규 산다음에 숙소가서 양주까고 먹었습니다."
+            val imageFile = null
+            val createPost = CommunityPostDto.CreateRequest(tripId, title, content)
+            //when
+            val response = communityPostService.createPost(tripId, createPost,imageFile)
+            //then
+            assertThat(response.trip.tripId).isEqualTo(tripId)
+            assertThat(response.title).isEqualTo(title)
+            assertThat(response.content).isEqualTo(content)
+            assertThat(response.authorNickname).isEqualTo(adminMember.nickname)
+            assertThat(response.representativeImageUrl).isNull()
+            assertThat(response.postId).isNotNull()
+            assertThat(response.country).isEqualTo("일본")
+        }
+        @Test
+        @DisplayName("MEMBER가 여행 공유 생성")
+        fun 여행공유_생성_멤버() {
+            //given
+            setAuthentication(member1)
+            val tripId = trip.id!!
+            // when & then
+            val exception = assertThrows<BusinessException> {
+                communityPostService.createPost(tripId, CommunityPostDto.CreateRequest(tripId, "title", "content"), null)
+            }
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
+        }
+        @Test
+        @DisplayName("GUEST가 여행 공유 생성")
+        fun 여행공유_생성_게스트() {
+            //given
+            setAuthentication(nonMember)
+            val tripId = trip.id!!
+            // when & then
+            val exception = assertThrows<BusinessException> {
+                communityPostService.createPost(tripId, CommunityPostDto.CreateRequest(tripId, "title", "content"), null)
+            }
+            assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
+        }
     }
-
-    @Test
-    @DisplayName("여행 탈퇴 시 Role이 EXITED로 변경되어야 한다")
-    fun leaveTrip() {
-        // Given
-        val (trip, _, member, _) = createTripWithMembers()
-
-        // [중요] 탈퇴는 본인(Member)이 요청해야 하므로 Member로 로그인
-        setAuthentication(member.member!!.id!!)
-
-        // When
-        tripMemberService.leaveTrip(trip.id!!, member.id!!)
-
-        // Then
-        val exitedMember = tripMemberRepository.findById(member.id!!).get()
-        assertThat(exitedMember.role).isEqualTo(TripRole.EXITED)
-    }
-
-    // --- Helper Methods ---
-
-    private fun createTripWithMembers(): Quadruple<Trip, TripMember, TripMember, TripMember> {
-        val trip = tripRepository.save(Trip("Test Trip", LocalDate.now(), LocalDate.now().plusDays(3), Country.JAPAN))
-
-        val memberUser = memberRepository.save(Member("m@test.com", "pw", "member", null, Role.USER, Provider.LOCAL, null, false))
-        val ownerUser = memberRepository.save(Member("o@test.com", "pw", "owner", null, Role.USER, Provider.LOCAL, null, false))
-
-        val owner = tripMemberRepository.save(TripMember(ownerUser, trip, null, TripRole.OWNER))
-        val member = tripMemberRepository.save(TripMember(memberUser, trip, null, TripRole.MEMBER))
-        val guest = tripMemberRepository.save(TripMember(null, trip, "Guest1", TripRole.GUEST))
-
-        return Quadruple(trip, owner, member, guest)
-    }
-
-    private fun createExpense(trip: Trip, payer: TripMember, title: String, amount: BigDecimal): Expense {
-        val category = categoryRepository.save(Category(trip, 1, "Cat", 1))
-        val itinerary = itineraryItemRepository.save(ItineraryItem(category, null, "Item", null, 1, null))
-
-        return expenseRepository.save(
-            Expense(trip, itinerary, payer, title, amount, InputMethod.HANDWRITE, null, "KRW")
-        )
-    }
-
-    private fun createExpenseItem(expense: Expense, name: String, price: BigDecimal): ExpenseItem {
-        val item = ExpenseItem(expense, name, price)
-        expense.addExpenseItem(item)
-        return expenseItemRepository.save(item)
-    }
-
-    private fun createAssignment(item: ExpenseItem, member: TripMember, amount: BigDecimal) {
-        val assignment = ExpenseAssignment(item, member, amount)
-        item.assignments.add(assignment)
-        expenseAssignmentRepository.save(assignment)
-    }
-
-    data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 }
