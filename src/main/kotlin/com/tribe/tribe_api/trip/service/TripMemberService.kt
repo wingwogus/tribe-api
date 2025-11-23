@@ -29,7 +29,7 @@ class TripMemberService(
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private fun handleMemberExit(exitingMemberId: Long, tripId: Long, targetRole: TripRole) {
+    private fun handleMemberExit(exitingMemberId: Long, targetRole: TripRole) {
 
         val targetTripMember = tripMemberRepository.findById(exitingMemberId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
@@ -132,7 +132,7 @@ class TripMemberService(
             throw BusinessException(ErrorCode.CANNOT_KICK_OWNER)
         }
 
-        handleMemberExit(targetTripMember.id!!, tripId, TripRole.KICKED)
+        handleMemberExit(targetTripMember.id!!, TripRole.KICKED)
     }
 
     //여행 탈퇴
@@ -148,16 +148,16 @@ class TripMemberService(
             throw BusinessException(ErrorCode.CANNOT_LEAVE_AS_OWNER)
         }
 
-        handleMemberExit(tripMember.id!!, tripId, TripRole.EXITED)
+        handleMemberExit(tripMember.id!!, TripRole.EXITED)
     }
 
     @Transactional
     @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
-    fun assignRole(tripId: Long, request: TripMemberDto.AssignRoleRequest): TripMemberDto.Simple {
+    fun assignRole(tripId: Long, tripMemberId: Long, request: TripMemberDto.AssignRoleRequest): TripMemberDto.Simple {
         tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
-        val participantTripMember = tripMemberRepository.findByTripIdAndMemberId(tripId,request.tripMemberId)
+        val participantTripMember = tripMemberRepository.findByTripIdAndMemberId(tripId, tripMemberId)
             ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
 
         if (participantTripMember.member?.id == SecurityUtil.getCurrentMemberId()) {
@@ -178,7 +178,7 @@ class TripMemberService(
         participantTripMember.role = request.requestRole
 
         val newRole = request.requestRole
-        logger.info("TripMember Role Changed.: [TripMemberID: {}, TripID: {}] -> [ Role : {} -> {}]", request.tripMemberId, tripId, oldRole, newRole)
+        logger.info("TripMember Role Changed.: [TripMemberID: {}, TripID: {}] -> [ Role : {} -> {}]", tripMemberId, tripId, oldRole, newRole)
 
         return TripMemberDto.Simple.from(participantTripMember)
     }

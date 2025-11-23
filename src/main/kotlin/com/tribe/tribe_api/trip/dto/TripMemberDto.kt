@@ -7,41 +7,11 @@ import jakarta.validation.constraints.NotNull
 
 object TripMemberDto {
     data class AddGuestRequest(
-        @field:NotNull(message = "tripId는 필수입니다.")
-        val tripId: Long,
-
         @field:NotBlank(message = "게스트 이름은 비워둘 수 없습니다.")
         val name: String
     )
 
-    data class DeleteGuestRequest(
-        @field:NotNull(message = "tripId는 필수입니다.")
-        val tripId: Long,
-
-        @field:NotNull(message = "삭제할 게스트의 tripMemberId는 필수입니다.")
-        val guestTripMemberId: Long
-    )
-
-    data class KickMemberRequest(
-        @field:NotNull(message = "tripId는 필수입니다.")
-        val tripId: Long,
-
-        @field:NotNull(message = "강퇴할 멤버의 tripMemberId는 필수입니다.")
-        val targetTripMemberId: Long
-    )
-
-    data class LeaveTripRequest(
-        @field:NotNull(message = "tripId는 필수입니다.")
-        val tripId: Long
-    )
-
     data class AssignRoleRequest(
-        @field:NotNull(message = "tripId는 필수입니다.")
-        val tripId: Long,
-
-        @field:NotNull(message = "memberId는 필수입니다.")
-        val tripMemberId: Long,
-
         @field:NotNull(message = "role은 필수입니다.")
         val requestRole: TripRole
     )
