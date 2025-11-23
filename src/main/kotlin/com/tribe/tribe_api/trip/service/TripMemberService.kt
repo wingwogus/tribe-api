@@ -30,11 +30,12 @@ class TripMemberService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     private fun handleMemberExit(exitingMemberId: Long, tripId: Long, targetRole: TripRole) {
-        // 위시리스트 삭제
-        wishlistItemRepository.deleteByAdderId(exitingMemberId)
 
         val targetTripMember = tripMemberRepository.findById(exitingMemberId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+
+        // 위시리스트 삭제
+        wishlistItemRepository.deleteByAdderId(exitingMemberId)
 
         // 연관관계는 유지하되 Role만 변경
         targetTripMember.role = targetRole
@@ -111,13 +112,13 @@ class TripMemberService(
                 item.assignments.add(payerAssignment)
                 expenseAssignmentRepository.save(payerAssignment)
             }
-            // 위시리스트 삭제
-            wishlistItemRepository.deleteByAdderId(targetGuest.id!!)
-
-            // 게스트 엔티티 삭제
-            tripMemberRepository.delete(targetGuest)
-            logger.info("Guest deleted logic completed. TripId: {}, GuestId: {}", tripId, guestTripMemberId)
         }
+        // 위시리스트 삭제
+        wishlistItemRepository.deleteByAdderId(targetGuest.id!!)
+
+        // 게스트 엔티티 삭제
+        tripMemberRepository.delete(targetGuest)
+        logger.info("Guest deleted logic completed. TripId: {}, GuestId: {}", tripId, guestTripMemberId)
     }
 
     //OWNER가 특정 MEMBER 강퇴
