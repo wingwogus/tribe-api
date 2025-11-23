@@ -14,6 +14,7 @@ interface TripRepository : JpaRepository<Trip, Long> {
             FROM Trip t
             JOIN t.members tm
             WHERE tm.member.id = :memberId
+            AND tm.role not in ('KICKED', 'EXITED')
             """)
     fun findTripsByMemberId(@Param("memberId") memberId: Long, pageable: Pageable): Page<Trip>
 
