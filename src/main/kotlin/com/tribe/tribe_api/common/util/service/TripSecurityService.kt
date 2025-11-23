@@ -21,8 +21,13 @@ class TripSecurityService(
     fun isTripMember(tripId: Long): Boolean {
         val memberId = SecurityUtil.getCurrentMemberId()
 
-        if (!tripMemberRepository.existsByTripIdAndMemberId(tripId, memberId)) {
-            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
+        val tripMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
+
+        // 멤버 기록이 없거나, 탈퇴(EXITED)했거나, 강퇴(KICKED)당했으면 접근 불가
+        if (tripMember == null ||
+            tripMember.role == TripRole.EXITED ||
+            tripMember.role == TripRole.KICKED) {
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
         }
         return true
     }

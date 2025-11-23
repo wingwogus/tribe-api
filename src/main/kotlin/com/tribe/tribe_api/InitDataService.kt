@@ -1,5 +1,11 @@
 package com.tribe.tribe_api
 
+import com.tribe.tribe_api.expense.entity.Expense
+import com.tribe.tribe_api.expense.entity.ExpenseAssignment
+import com.tribe.tribe_api.expense.entity.ExpenseItem
+import com.tribe.tribe_api.expense.enumeration.InputMethod
+import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
+import com.tribe.tribe_api.expense.repository.ExpenseItemRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
@@ -33,6 +39,8 @@ class InitDataService(
     private val itineraryItemRepository: ItineraryItemRepository,
     private val tripMemberRepository: TripMemberRepository,
     private val expenseRepository: ExpenseRepository,
+    private val expenseItemRepository: ExpenseItemRepository,
+    private val expenseAssignmentRepository: ExpenseAssignmentRepository,
 ) {
     @PostConstruct
     fun dbInit() {
@@ -70,6 +78,9 @@ class InitDataService(
         trip.addMember(memberB, TripRole.MEMBER)
 
         tripRepository.save(trip)
+
+        val tripMemberA = tripMemberRepository.findByTripIdAndRole(trip.id!!, TripRole.OWNER).first()
+        val tripMemberB = tripMemberRepository.findByTripIdAndRole(trip.id!!, TripRole.MEMBER).first()
 
         val dotonbori = placeRepository.save(Place("dotonbori_id", "도톤보리", "일본 오사카시", BigDecimal("34.6688"), BigDecimal("135.5013")))
         val osakaCastle = placeRepository.save(Place("osaka_castle_id", "오사카성", "일본 오사카시", BigDecimal("34.6873"), BigDecimal("135.5262")))
@@ -129,6 +140,43 @@ class InitDataService(
                 time = trip.startDate.plusDays(1).atTime(17, 0),
                 order = 2,
                 memo = "저녁 식사 장소 찾아보기"
+            )
+        )
+
+        val dinnerExpense = Expense(
+            trip = trip,
+            itineraryItem = dinnerItinerary,
+            payer = tripMemberA,
+            title = "도톤보리 저녁 식사 (타코야끼, 오꼬노미야끼)",
+            totalAmount = BigDecimal("10000"),
+            entryMethod = InputMethod.HANDWRITE,
+            currency = "JPY"
+        ).apply { expenseRepository.save(this) }
+
+        val foodItem = ExpenseItem(
+            expense = dinnerExpense,
+            name = "식사 및 주류",
+            price = BigDecimal("10000")
+        ).apply { expenseItemRepository.save(this) }
+
+        dinnerExpense.addExpenseItem(foodItem)
+        expenseRepository.save(dinnerExpense)
+
+        val assignmentAmount = BigDecimal("5000")
+
+        expenseAssignmentRepository.save(
+            ExpenseAssignment(
+                expenseItem = foodItem,
+                tripMember = tripMemberA,
+                amount = assignmentAmount
+            )
+        )
+
+        expenseAssignmentRepository.save(
+            ExpenseAssignment(
+                expenseItem = foodItem,
+                tripMember = tripMemberB,
+                amount = assignmentAmount
             )
         )
     }

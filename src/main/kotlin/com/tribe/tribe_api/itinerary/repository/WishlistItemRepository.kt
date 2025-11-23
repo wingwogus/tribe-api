@@ -4,6 +4,7 @@ import com.tribe.tribe_api.itinerary.entity.WishlistItem
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -48,4 +49,8 @@ interface WishlistItemRepository : JpaRepository<WishlistItem, Long>{
 
     @Query("SELECT w.id FROM WishlistItem w WHERE w.trip.id = :tripId AND w.id IN :ids")
     fun findIdsByTripIdAndIdIn(@Param("tripId") tripId: Long, @Param("ids") ids: List<Long>): List<Long>
+
+    @Modifying
+    @Query("DELETE FROM WishlistItem w WHERE w.adder.id = :adderId")
+    fun deleteByAdderId(adderId: Long)
 }

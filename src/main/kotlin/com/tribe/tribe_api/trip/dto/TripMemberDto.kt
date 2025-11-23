@@ -14,6 +14,30 @@ object TripMemberDto {
         val name: String
     )
 
+    data class DeleteGuestRequest(
+        @field:NotNull(message = "tripId는 필수입니다.")
+        val tripId: Long,
+
+        @field:NotNull(message = "삭제할 게스트의 tripMemberId는 필수입니다.")
+        val guestTripMemberId: Long
+    )
+
+    data class KickMemberRequest(
+        @field:NotNull(message = "tripId는 필수입니다.")
+        val tripId: Long,
+
+        @field:NotNull(message = "강퇴할 멤버의 tripMemberId는 필수입니다.")
+        val targetMemberId: Long
+    )
+
+    data class LeaveTripRequest(
+        @field:NotNull(message = "tripId는 필수입니다.")
+        val tripId: Long,
+
+        @field:NotNull(message = "탈퇴할 멤버의 tripMemberId는 필수입니다.")
+        val memberId: Long
+    )
+
     data class AssignRoleRequest(
         @field:NotNull(message = "tripId는 필수입니다.")
         val tripId: Long,
