@@ -67,7 +67,7 @@ class TripMemberService(
     fun deleteGuest(tripId: Long, guestTripMemberId: Long) {
 
         val targetGuest = tripMemberRepository.findByIdAndTripId(guestTripMemberId, tripId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
 
         if (targetGuest.role != TripRole.GUEST) {
             throw BusinessException(ErrorCode.NOT_GUEST)
@@ -126,7 +126,7 @@ class TripMemberService(
     @PreAuthorize("@tripSecurityService.isTripOwner(#tripId)")
     fun kickMember(tripId: Long, targetMemberId: Long) {
         val targetTripMember = tripMemberRepository.findByIdAndTripId(targetMemberId, tripId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
 
         if (targetTripMember.role == TripRole.OWNER) {
             throw BusinessException(ErrorCode.CANNOT_KICK_OWNER)
@@ -141,8 +141,8 @@ class TripMemberService(
     fun leaveTrip(tripId: Long) {
         val currentMemberId = SecurityUtil.getCurrentMemberId()
 
-        val tripMember = tripMemberRepository.findByIdAndTripId(currentMemberId, tripId)
-            .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
+        val tripMember = tripMemberRepository.findByTripIdAndMemberId(tripId, currentMemberId)
+            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
 
         if (tripMember.role == TripRole.OWNER) {
             throw BusinessException(ErrorCode.CANNOT_LEAVE_AS_OWNER)

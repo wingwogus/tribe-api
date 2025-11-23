@@ -38,23 +38,23 @@ class TripMemberController(
     }
 
     // 멤버 권한 수정
-    @PatchMapping("{memberId}/role")
+    @PatchMapping("{tripMemberId}/role")
     fun assignRole(
         @PathVariable("tripId") tripId: Long,
-        @PathVariable("memberId") memberId: Long,
+        @PathVariable("tripMemberId") tripMemberId: Long,
         @Valid @RequestBody request: TripMemberDto.AssignRoleRequest
     ) : ResponseEntity<ApiResponse<TripMemberDto.Simple>>{
-        val response = tripMemberService.assignRole(tripId, memberId, request)
+        val response = tripMemberService.assignRole(tripId, tripMemberId, request)
         return ResponseEntity.ok(ApiResponse.success("멤버 권한 수정 성공", response))
     }
 
     // OWNER가 특정 MEMBER 강퇴
-    @DeleteMapping("/{memberId}")
+    @DeleteMapping("/{tripMemberId}")
     fun kickMember(
         @PathVariable("tripId") tripId: Long,
-        @PathVariable("memberId") memberId: Long,
+        @PathVariable("tripMemberId") tripMemberId: Long,
     ): ResponseEntity<ApiResponse<Any>> {
-        tripMemberService.kickMember(tripId, memberId)
+        tripMemberService.kickMember(tripId, tripMemberId)
         return ResponseEntity
             .ok(ApiResponse.success("멤버 강퇴 성공"))
     }
