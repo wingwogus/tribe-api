@@ -19,7 +19,7 @@ class TripMemberController(
     private val tripMemberService: TripMemberService
 ){
     // 게스트 추가
-    @PostMapping("/expenses/guest")
+    @PostMapping("/guest")
     fun addGuest(
         @Valid @RequestBody request: TripMemberDto.AddGuestRequest
     ): ResponseEntity<ApiResponse<TripMemberDto.Simple>> {
@@ -40,7 +40,7 @@ class TripMemberController(
     }
 
     // 게스트 삭제
-    @DeleteMapping("/members/guest")
+    @DeleteMapping("/guest")
     fun deleteGuest(
         @Valid @RequestBody request: TripMemberDto.DeleteGuestRequest
     ): ResponseEntity<ApiResponse<Any>> {
@@ -50,7 +50,7 @@ class TripMemberController(
     }
 
     // OWNER가 특정 MEMBER 강퇴
-    @DeleteMapping("/members/kick")
+    @DeleteMapping("/kick")
     fun kickMember(
         @Valid @RequestBody request: TripMemberDto.KickMemberRequest
     ): ResponseEntity<ApiResponse<Any>> {
@@ -60,7 +60,7 @@ class TripMemberController(
     }
 
     // 여행 탈퇴
-    @DeleteMapping("/members/leave")
+    @DeleteMapping("/leave")
     fun leaveTrip(
         @Valid @RequestBody request: TripMemberDto.LeaveTripRequest
     ): ResponseEntity<ApiResponse<Any>> {
