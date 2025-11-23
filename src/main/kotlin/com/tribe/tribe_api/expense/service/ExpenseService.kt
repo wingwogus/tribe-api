@@ -11,6 +11,7 @@ import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.entity.ExpenseItem
 import com.tribe.tribe_api.expense.enumeration.InputMethod
 import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
+import com.tribe.tribe_api.expense.repository.ExpenseItemRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.entity.TripMember
@@ -33,7 +34,8 @@ class ExpenseService(
     private val itineraryItemRepository: ItineraryItemRepository,
     private val geminiApiClient: GeminiApiClient,
     private val cloudinaryUploadService: CloudinaryUploadService,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val expenseItemRepository: ExpenseItemRepository
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -249,11 +251,14 @@ class ExpenseService(
         //item Id가 null이라면 새 항목으로 간주하고 추가, 수정
         itemUpdateRequests.forEach { request ->
             if (request.itemId == null){
-                val newItem = ExpenseItem(
-                    expense = expense,
-                    name = request.itemName,
-                    price = request.price
+                val newItem = expenseItemRepository.save(
+                    ExpenseItem(
+                        expense = expense,
+                        name = request.itemName,
+                        price = request.price
+                    )
                 )
+
                 expense.addExpenseItem(newItem)
             } else {
                 val existingItem = existingItemsMap[request.itemId]
