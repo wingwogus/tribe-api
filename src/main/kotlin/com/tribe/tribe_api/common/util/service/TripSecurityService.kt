@@ -27,7 +27,7 @@ class TripSecurityService(
         if (tripMember == null ||
             tripMember.role == TripRole.EXITED ||
             tripMember.role == TripRole.KICKED) {
-            return false // 403 Forbidden 발생 유도
+            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
         }
         return true
     }
