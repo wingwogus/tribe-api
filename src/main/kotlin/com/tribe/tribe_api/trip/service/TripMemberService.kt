@@ -2,12 +2,12 @@ package com.tribe.tribe_api.trip.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.ExpenseCalculator
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
-import com.tribe.tribe_api.itinerary.repository.WishlistItemRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
-import com.tribe.tribe_api.common.util.security.SecurityUtil
+import com.tribe.tribe_api.itinerary.repository.WishlistItemRepository
 import com.tribe.tribe_api.trip.dto.TripMemberDto
 import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
@@ -138,8 +138,10 @@ class TripMemberService(
     //여행 탈퇴
     @Transactional
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
-    fun leaveTrip(tripId: Long, memberId: Long) {
-        val tripMember = tripMemberRepository.findByIdAndTripId(memberId, tripId)
+    fun leaveTrip(tripId: Long) {
+        val currentMemberId = SecurityUtil.getCurrentMemberId()
+
+        val tripMember = tripMemberRepository.findByIdAndTripId(currentMemberId, tripId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
 
         if (tripMember.role == TripRole.OWNER) {

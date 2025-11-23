@@ -6,12 +6,7 @@ import com.tribe.tribe_api.trip.service.TripMemberService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.PatchMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/trip-members")
@@ -54,7 +49,7 @@ class TripMemberController(
     fun kickMember(
         @Valid @RequestBody request: TripMemberDto.KickMemberRequest
     ): ResponseEntity<ApiResponse<Any>> {
-        tripMemberService.kickMember(request.tripId, request.targetMemberId)
+        tripMemberService.kickMember(request.tripId, request.targetTripMemberId)
         return ResponseEntity
             .ok(ApiResponse.success("멤버 강퇴 성공"))
     }
@@ -64,7 +59,7 @@ class TripMemberController(
     fun leaveTrip(
         @Valid @RequestBody request: TripMemberDto.LeaveTripRequest
     ): ResponseEntity<ApiResponse<Any>> {
-        tripMemberService.leaveTrip(request.tripId, request.memberId)
+        tripMemberService.leaveTrip(request.tripId)
         return ResponseEntity
             .ok(ApiResponse.success("여행 탈퇴 성공"))
     }

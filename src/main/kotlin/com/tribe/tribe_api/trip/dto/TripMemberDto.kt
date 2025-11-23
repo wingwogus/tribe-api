@@ -27,15 +27,12 @@ object TripMemberDto {
         val tripId: Long,
 
         @field:NotNull(message = "강퇴할 멤버의 tripMemberId는 필수입니다.")
-        val targetMemberId: Long
+        val targetTripMemberId: Long
     )
 
     data class LeaveTripRequest(
         @field:NotNull(message = "tripId는 필수입니다.")
-        val tripId: Long,
-
-        @field:NotNull(message = "탈퇴할 멤버의 tripMemberId는 필수입니다.")
-        val memberId: Long
+        val tripId: Long
     )
 
     data class AssignRoleRequest(
