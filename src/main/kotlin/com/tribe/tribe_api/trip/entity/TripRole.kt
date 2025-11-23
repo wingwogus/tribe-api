@@ -4,5 +4,7 @@ enum class TripRole {
     OWNER,
     ADMIN,
     MEMBER,
-    GUEST
+    GUEST,
+    EXITED,
+    KICKED
 }
