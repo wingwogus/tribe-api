@@ -257,16 +257,15 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id!!
             val title = "레전드 일본 여행"
             val content = "시부야 사변 한번 훑어주고 신주쿠가서 장어먹고 산책 좀 하다가 레전드 마트가서 와규 산다음에 숙소가서 양주까고 먹었습니다."
-            val imageFile = null
-            val createPost = CommunityPostDto.CreateRequest(tripId, title, content)
+            val createPost = CommunityPostDto.CreateRequest(tripId, title, content,"http://mock.cdn/img.jpg", emptyList())
             //when
-            val response = communityPostService.createPost(tripId, createPost,imageFile)
+            val response = communityPostService.createPost(createPost)
             //then
-            assertThat(response.trip.tripId).isEqualTo(tripId)
+            assertThat(response.tripMapData.tripId).isEqualTo(tripId)
             assertThat(response.title).isEqualTo(title)
             assertThat(response.content).isEqualTo(content)
             assertThat(response.authorNickname).isEqualTo(owner.nickname)
-            assertThat(response.representativeImageUrl).isNull()
+            assertThat(response.representativeImageUrl).isEqualTo("http://mock.cdn/img.jpg")
             assertThat(response.postId).isNotNull()
             assertThat(response.country).isEqualTo("일본")
         }
@@ -279,15 +278,15 @@ class TripMemberServiceTest @Autowired constructor(
             val title = "레전드 일본 여행"
             val content = "시부야 사변 한번 훑어주고 신주쿠가서 장어먹고 산책 좀 하다가 레전드 마트가서 와규 산다음에 숙소가서 양주까고 먹었습니다."
             val imageFile = null
-            val createPost = CommunityPostDto.CreateRequest(tripId, title, content)
+            val createPost = CommunityPostDto.CreateRequest(tripId, title, content,"http://mock.cdn/img.jpg",emptyList())
             //when
-            val response = communityPostService.createPost(tripId, createPost,imageFile)
+            val response = communityPostService.createPost(createPost)
             //then
-            assertThat(response.trip.tripId).isEqualTo(tripId)
+            assertThat(response.tripMapData.tripId).isEqualTo(tripId)
             assertThat(response.title).isEqualTo(title)
             assertThat(response.content).isEqualTo(content)
             assertThat(response.authorNickname).isEqualTo(adminMember.nickname)
-            assertThat(response.representativeImageUrl).isNull()
+            assertThat(response.representativeImageUrl).isEqualTo("http://mock.cdn/img.jpg")
             assertThat(response.postId).isNotNull()
             assertThat(response.country).isEqualTo("일본")
         }
@@ -297,9 +296,10 @@ class TripMemberServiceTest @Autowired constructor(
             //given
             setAuthentication(member1)
             val tripId = trip.id!!
+            val createPost = CommunityPostDto.CreateRequest(tripId, "title", "content", null,emptyList())
             // when & then
             val exception = assertThrows<BusinessException> {
-                communityPostService.createPost(tripId, CommunityPostDto.CreateRequest(tripId, "title", "content"), null)
+                communityPostService.createPost(createPost)
             }
             assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
         }
@@ -309,9 +309,10 @@ class TripMemberServiceTest @Autowired constructor(
             //given
             setAuthentication(nonMember)
             val tripId = trip.id!!
+            val createPost = CommunityPostDto.CreateRequest(tripId, "title", "content", null,emptyList())
             // when & then
             val exception = assertThrows<BusinessException> {
-                communityPostService.createPost(tripId, CommunityPostDto.CreateRequest(tripId, "title", "content"), null)
+                communityPostService.createPost(createPost)
             }
             assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
         }

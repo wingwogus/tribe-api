@@ -20,22 +20,16 @@ import com.tribe.tribe_api.trip.repository.TripRepository
 import io.mockk.every
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
-import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-import java.util.*
-import org.junit.jupiter.api.Nested
 
 @SpringBootTest
 @Transactional
@@ -159,25 +153,46 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("게시글 생성 성공 - 소유자(OWNER)가 이미지와 함께 생성")
-    fun createPost_Success_WithImage() {
+    @DisplayName("게시글 생성 성공 - 소유자(OWNER)가 Day 컨텐츠와 함께 생성")
+    fun createPost_Success_WithDaysAndPhotos() {
         // given: 소유자로 로그인
         setAuthentication(owner)
-        val request = CommunityPostDto.CreateRequest(tripId = trip.id!!, title = "새 게시글", content = "새 내용")
-        val imageFile = MockMultipartFile("image", "hello.jpg", "image/jpeg", "test image bytes".toByteArray())
-
-        // Mocking: Cloudinary 업로드 시 "new_image_url" 반환하도록 설정
-        every { cloudinaryUploadService.upload(imageFile, "community") } returns "http://example.com/new_image.jpg"
+        val request = CommunityPostDto.CreateRequest(
+            tripId = trip.id!!,
+            title = "일지형 게시글",
+            content = "이것은 Day 1과 Day 2가 있는 블로그입니다.",
+            representativeImageUrl = "http://mock.cdn/rep_img.jpg",
+            days = listOf(
+                CommunityPostDto.DayCreateRequest(
+                    day = 1,
+                    content = "아침에 커피 마시고 출발",
+                    photoUrls = listOf("http://mock.cdn/d1_p1.jpg", "http://mock.cdn/d1_p2.jpg")
+                ),
+                CommunityPostDto.DayCreateRequest(
+                    day = 2,
+                    content = "오사카성에서 점심",
+                    photoUrls = emptyList() // 사진 없는 Day도 가능
+                )
+            )
+        )
 
         // when
-        val response = communityPostService.createPost(request.tripId,request, imageFile)
+        val response = communityPostService.createPost(request)
 
         // then
         assertThat(response.postId).isNotNull()
-        assertThat(response.title).isEqualTo("새 게시글")
-        assertThat(response.authorNickname).isEqualTo(owner.nickname)
-        assertThat(response.representativeImageUrl).isEqualTo("http://example.com/new_image.jpg")
-        assertThat(response.trip.tripId).isEqualTo(trip.id)
+        assertThat(response.title).isEqualTo("일지형 게시글")
+        assertThat(response.representativeImageUrl).isEqualTo("http://mock.cdn/rep_img.jpg")
+
+        // Day별 컨텐츠 검증
+        assertThat(response.days).hasSize(2)
+        assertThat(response.days[0].day).isEqualTo(1)
+        assertThat(response.days[0].content).contains("아침에 커피")
+        assertThat(response.days[0].photos).hasSize(2)
+        assertThat(response.days[0].photos[0].imageUrl).isEqualTo("http://mock.cdn/d1_p1.jpg")
+
+        assertThat(response.days[1].day).isEqualTo(2)
+        assertThat(response.days[1].photos).isEmpty()
     }
 
     @Test
@@ -185,11 +200,11 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
     fun createPost_Fail_When_UserIsMember() {
         // given: 일반 멤버로 로그인
         setAuthentication(member)
-        val request = CommunityPostDto.CreateRequest(tripId = trip.id!!, title = "글쓰기 시도", content = "내용")
+        val request = CommunityPostDto.CreateRequest(tripId = trip.id!!, title = "글쓰기 시도", content = "내용",  representativeImageUrl = null, days = emptyList())
 
         // when & then: NO_AUTHORITY_POST 에러가 발생하는지 검증
         val exception = assertThrows<BusinessException> {
-            communityPostService.createPost(request.tripId, request, null)
+            communityPostService.createPost(request)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
@@ -199,11 +214,11 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
     fun createPost_Fail_When_UserIsNotMember() {
         // given: 여행에 참여하지 않은 사용자로 로그인
         setAuthentication(nonMember)
-        val request = CommunityPostDto.CreateRequest(tripId = trip.id!!, title = "글쓰기 시도", content = "내용")
+        val request = CommunityPostDto.CreateRequest(tripId = trip.id!!, title = "글쓰기 시도", content = "내용",  representativeImageUrl = null, days = emptyList())
 
         // when & then: NOT_A_TRIP_MEMBER 에러가 발생하는지 검증
         val exception = assertThrows<BusinessException> {
-            communityPostService.createPost(request.tripId,request, null)
+            communityPostService.createPost(request)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NOT_A_TRIP_MEMBER)
     }
@@ -251,9 +266,8 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
         assertThat(response.postId).isEqualTo(postId)
         assertThat(response.title).isEqualTo("기존 게시글")
         assertThat(response.authorNickname).isEqualTo(owner.nickname)
-        // 공유용 DTO에 민감 정보가 없는지 간접 확인 (categories는 있지만 members, expenses 등은 없음)
-        assertThat(response.trip).isNotNull()
-        assertThat(response.trip.categories).isNotNull()
+        // 공유용 DTO에 민감 정보가 없는지 간접 확인
+        assertThat(response.tripMapData).isNotNull()
     }
 
     @Test
@@ -270,29 +284,47 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("게시글 수정 성공 - 작성자가 이미지 교체")
-    fun updatePost_Success_WithImageChange() {
+    @DisplayName("게시글 수정 성공 - 작성자가 컨텐츠 및 이미지 URL 변경")
+    fun updatePost_Success_WithContentAndUrlChange() {
         // given: 작성자(owner)로 로그인
         setAuthentication(owner)
         val postId = savedPost.id!!
-        val request = CommunityPostDto.UpdateRequest(title = "제목 수정됨", content = "내용 수정됨")
-        val newImageFile = MockMultipartFile("image", "new.jpg", "image/jpeg", "new image bytes".toByteArray())
         val oldImageUrl = savedPost.representativeImageUrl!! // "http://example.com/old_image.jpg"
 
-        // Mocking
-        every { cloudinaryUploadService.upload(newImageFile, "community") } returns "http://example.com/new_image.jpg"
-        every { cloudinaryUploadService.delete(oldImageUrl) } returns Unit // delete가 호출되는지 검증하기 위함
+        val request = CommunityPostDto.UpdateRequest(
+            title = "제목 수정됨",
+            content = "내용 수정됨",
+            representativeImageUrl = "http://mock.cdn/new_rep.jpg", // 새 이미지 URL
+            days = listOf(
+                CommunityPostDto.DayCreateRequest(day = 1, content = "수정된 1일차", photoUrls = listOf("http://mock.cdn/d1_new.jpg"))
+            )
+        )
+
+        // Mocking: 기존 이미지 삭제를 검증
+        every { cloudinaryUploadService.delete(oldImageUrl) } returns Unit
+        every { cloudinaryUploadService.delete("http://mock.cdn/old_day_photo.jpg") } returns Unit // (가상으로 존재했다고 가정)
 
         // when
-        val response = communityPostService.updatePost(postId, request, newImageFile)
+        val response = communityPostService.updatePost(postId, request)
 
         // then
+        // 1. 기본 정보 검증
         assertThat(response.title).isEqualTo("제목 수정됨")
-        assertThat(response.content).isEqualTo("내용 수정됨")
-        assertThat(response.representativeImageUrl).isEqualTo("http://example.com/new_image.jpg")
+        assertThat(response.representativeImageUrl).isEqualTo("http://mock.cdn/new_rep.jpg")
 
-        // Cloudinary의 delete가 1번 호출되었는지 검증
+        // 2. Day 컨텐츠 검증 (기존 컨텐츠가 삭제되고 새 컨텐츠로 대체되었는지)
+        assertThat(response.days).hasSize(1)
+        assertThat(response.days[0].day).isEqualTo(1)
+        assertThat(response.days[0].content).isEqualTo("수정된 1일차")
+        assertThat(response.days[0].photos).hasSize(1)
+
+        // 3. 비용 검증: 기존 대표 이미지가 삭제되었는지 검증
         verify(exactly = 1) { cloudinaryUploadService.delete(oldImageUrl) }
+
+        // 4. (보조 검증) DB에 1개의 Day와 1개의 Photo만 남았는지 확인
+        val updatedPost = communityPostRepository.findByIdWithDetails(postId)!!
+        assertThat(updatedPost.days).hasSize(1)
+        assertThat(updatedPost.days.first().photos).hasSize(1)
     }
 
     @Test
@@ -301,11 +333,11 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
         // given: 작성자가 아닌, 같은 여행의 '일반 멤버'로 로그인
         setAuthentication(member)
         val postId = savedPost.id!!
-        val request = CommunityPostDto.UpdateRequest(title = "해킹 시도", content = "해킹 내용")
+        val request = CommunityPostDto.UpdateRequest(title = "해킹 시도", content = "해킹 내용", representativeImageUrl = null, days = emptyList())
 
         // when & then
         val exception = assertThrows<BusinessException> {
-            communityPostService.updatePost(postId, request, null)
+            communityPostService.updatePost(postId, request)
         }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
     }
@@ -319,7 +351,7 @@ class CommunityPostServiceIntegrationTest @Autowired constructor(
         val oldImageUrl = savedPost.representativeImageUrl!!
 
         // Mocking: delete 호출을 가로챕니다.
-        every { cloudinaryUploadService.delete(oldImageUrl) } returns Unit
+        every { cloudinaryUploadService.delete(any()) } returns Unit
 
         // when
         communityPostService.deletePost(postId)
