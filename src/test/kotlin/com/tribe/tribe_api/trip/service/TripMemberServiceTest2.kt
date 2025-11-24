@@ -151,7 +151,7 @@ class TripMemberServiceTest2 @Autowired constructor(
         setAuthentication(member.member!!.id!!)
 
         // When
-        tripMemberService.leaveTrip(trip.id!!, member.id!!)
+        tripMemberService.leaveTrip(trip.id!!)
 
         // Then
         val exitedMember = tripMemberRepository.findById(member.id!!).get()

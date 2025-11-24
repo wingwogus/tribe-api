@@ -1,13 +1,10 @@
 package com.tribe.tribe_api.trip.service
 
-import com.ninjasquad.springmockk.MockkBean
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
-import com.tribe.tribe_api.common.util.service.RedisService
 import com.tribe.tribe_api.community.dto.CommunityPostDto
-import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.community.service.CommunityPostService
 import com.tribe.tribe_api.member.entity.Member
@@ -28,9 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
-import java.time.Duration
 import java.time.LocalDate
-
 
 
 @SpringBootTest
@@ -90,9 +85,11 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id
             val memberId = member1.id
             val requestRole = TripRole.ADMIN
-            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            val requestDto = TripMemberDto.AssignRoleRequest(requestRole)
+            val tripMemberId = tripMemberRepository.findByTripIdAndMemberId(tripId!!, memberId!!)?.id!!
+
             //when
-            tripMemberService.assignRole(tripId, requestDto)
+            tripMemberService.assignRole(tripId, tripMemberId, requestDto)
             //then
             val updatedMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
             assertThat(updatedMember!!.role).isEqualTo(requestRole)
@@ -106,9 +103,11 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id
             val memberId = adminMember.id
             val requestRole = TripRole.MEMBER
-            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            val requestDto = TripMemberDto.AssignRoleRequest(requestRole)
+            val tripMemberId = tripMemberRepository.findByTripIdAndMemberId(tripId!!, memberId!!)?.id!!
+
             //when
-            tripMemberService.assignRole(tripId, requestDto)
+            tripMemberService.assignRole(tripId, tripMemberId, requestDto)
             //then
             val updatedMember = tripMemberRepository.findByTripIdAndMemberId(tripId, memberId)
             assertThat(updatedMember!!.role).isEqualTo(requestRole)
@@ -122,10 +121,13 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id
             val memberId = owner.id
             val requestRole = TripRole.ADMIN
-            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            val requestDto = TripMemberDto.AssignRoleRequest(requestRole)
+            val tripMemberId = tripMemberRepository.findByTripIdAndMemberId(tripId!!, memberId!!)?.id!!
+
+
             //when & then
             val exception = assertThrows<BusinessException> {
-                tripMemberService.assignRole(tripId, requestDto)
+                tripMemberService.assignRole(tripId, tripMemberId, requestDto)
             }
             assertThat(exception.errorCode).isEqualTo(ErrorCode.CANNOT_CHANGE_OWN_ROLE)
         }
@@ -138,11 +140,13 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id
             val memberId = member1.id
             val requestRole = TripRole.ADMIN
-            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            val requestDto = TripMemberDto.AssignRoleRequest(requestRole)
+            val tripMemberId = tripMemberRepository.findByTripIdAndMemberId(tripId!!, memberId!!)?.id!!
+
             //when & then
 
             val exception = assertThrows<BusinessException> {
-                tripMemberService.assignRole(tripId, requestDto)
+                tripMemberService.assignRole(tripId, tripMemberId, requestDto)
             }
 
             assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
@@ -160,10 +164,12 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id
             val memberId = member1.id
             val requestRole = TripRole.ADMIN
-            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            val requestDto = TripMemberDto.AssignRoleRequest(requestRole)
+            val tripMemberId = tripMemberRepository.findByTripIdAndMemberId(tripId!!, memberId!!)?.id!!
+
             //when & then
             val exception = assertThrows<BusinessException> {
-                tripMemberService.assignRole(tripId, requestDto)
+                tripMemberService.assignRole(tripId, tripMemberId,requestDto)
             }
 
             assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
@@ -177,10 +183,12 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id
             val memberId = member1.id
             val requestRole = TripRole.ADMIN
-            val requestDto = TripMemberDto.AssignRoleRequest(tripId!!, memberId!!, requestRole)
+            val requestDto = TripMemberDto.AssignRoleRequest(requestRole)
+            val tripMemberId = tripMemberRepository.findByTripIdAndMemberId(tripId!!, memberId!!)?.id!!
+
             //when & then
             val exception = assertThrows<BusinessException> {
-                tripMemberService.assignRole(tripId, requestDto)
+                tripMemberService.assignRole(tripId, tripMemberId, requestDto)
             }
 
             assertThat(exception.errorCode).isEqualTo(ErrorCode.NO_AUTHORITY_TRIP)
