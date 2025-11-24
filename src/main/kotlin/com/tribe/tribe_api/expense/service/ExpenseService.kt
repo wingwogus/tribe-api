@@ -5,12 +5,14 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
+import com.tribe.tribe_api.common.util.service.ExpenseCalculator
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.entity.ExpenseItem
 import com.tribe.tribe_api.expense.enumeration.InputMethod
 import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
+import com.tribe.tribe_api.expense.repository.ExpenseItemRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.trip.entity.TripMember
@@ -33,7 +35,8 @@ class ExpenseService(
     private val itineraryItemRepository: ItineraryItemRepository,
     private val geminiApiClient: GeminiApiClient,
     private val cloudinaryUploadService: CloudinaryUploadService,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val expenseItemRepository: ExpenseItemRepository
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -249,11 +252,14 @@ class ExpenseService(
         //item Id가 null이라면 새 항목으로 간주하고 추가, 수정
         itemUpdateRequests.forEach { request ->
             if (request.itemId == null){
-                val newItem = ExpenseItem(
-                    expense = expense,
-                    name = request.itemName,
-                    price = request.price
+                val newItem = expenseItemRepository.save(
+                    ExpenseItem(
+                        expense = expense,
+                        name = request.itemName,
+                        price = request.price
+                    )
                 )
+
                 expense.addExpenseItem(newItem)
             } else {
                 val existingItem = existingItemsMap[request.itemId]
@@ -265,7 +271,7 @@ class ExpenseService(
                     // 기존 참여자 목록을 가져옴
                     val participants = existingItem.assignments.map { it.tripMember }
                     // 새로운 가격으로 N빵 재계산
-                    val newAmounts = calculateFairShare(request.price, participants)
+                    val newAmounts = ExpenseCalculator.calculateFairShare(request.price, participants.size)
                     // 기존 배정 내역에 새 금액을 덮어씀
                     existingItem.assignments.zip(newAmounts).forEach { (assignment, newAmount) ->
                         assignment.amount = newAmount
@@ -310,7 +316,7 @@ class ExpenseService(
 
             // N빵 계산
             if (participants.isNotEmpty()) {
-                val amounts = calculateFairShare(expenseItem.price, participants)
+                val amounts = ExpenseCalculator.calculateFairShare(expenseItem.price, participants.size)
 
                 // 계산된 금액으로 ExpenseAssignment 생성
                 participants.zip(amounts).forEach { (participant, amount) ->
@@ -326,23 +332,6 @@ class ExpenseService(
             
         logger.info("Participants assigned for expense ID: {}. Number of items assigned: {}", expenseId, request.items.size)
         return ExpenseDto.DetailResponse.from(expense)
-    }
-
-    // 1/n 계산 로직
-    private fun calculateFairShare(totalAmount: BigDecimal, participants: List<TripMember>): List<BigDecimal> {
-        val participantCount = participants.size.toBigDecimal()
-        if (participantCount == BigDecimal.ZERO) {
-            return emptyList()
-        }
-
-        val baseAmount = totalAmount.divide(participantCount, 0, RoundingMode.DOWN)
-        val remainder = totalAmount.subtract(baseAmount.multiply(participantCount))
-
-        val amounts = MutableList(participants.size) { baseAmount }
-        if (amounts.isNotEmpty()) {
-            amounts[0] = amounts[0] + remainder
-        }
-        return amounts
     }
 
     // 지출 내역 삭제

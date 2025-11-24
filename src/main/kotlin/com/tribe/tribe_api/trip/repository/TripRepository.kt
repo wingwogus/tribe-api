@@ -14,13 +14,14 @@ interface TripRepository : JpaRepository<Trip, Long> {
             FROM Trip t
             JOIN t.members tm
             WHERE tm.member.id = :memberId
+            AND tm.role not in ('KICKED', 'EXITED')
             """)
     fun findTripsByMemberId(@Param("memberId") memberId: Long, pageable: Pageable): Page<Trip>
 
     @Query("""
             SELECT DISTINCT t FROM Trip t 
             JOIN FETCH t.members m 
-            JOIN FETCH m.member 
+            LEFT JOIN FETCH m.member 
             WHERE t.id = :tripId
             """)
     fun findTripWithMembersById(@Param("tripId") tripId: Long): Trip?

@@ -7,11 +7,13 @@ import jakarta.validation.constraints.NotNull
 
 object TripMemberDto {
     data class AddGuestRequest(
-        @field:NotNull(message = "tripId는 필수입니다.")
-        val tripId: Long,
-
         @field:NotBlank(message = "게스트 이름은 비워둘 수 없습니다.")
         val name: String
+    )
+
+    data class AssignRoleRequest(
+        @field:NotNull(message = "role은 필수입니다.")
+        val requestRole: TripRole
     )
 
     data class Simple(
