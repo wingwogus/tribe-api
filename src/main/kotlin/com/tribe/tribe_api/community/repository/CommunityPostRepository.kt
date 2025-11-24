@@ -10,23 +10,31 @@ import org.springframework.data.repository.query.Param
 
 interface CommunityPostRepository : JpaRepository<CommunityPost, Long> {
 
-    /**
-     * N+1 방지를 위해 JOIN FETCH로 author와 trip을 함께 조회
-     */
+    // 국가별 필터링 N+1 문제 해결 (author, trip JOIN FETCH)
     @Query(
-        value = "SELECT cp FROM CommunityPost cp JOIN FETCH cp.author JOIN FETCH cp.trip WHERE cp.trip.country = :country",
-        countQuery = "SELECT COUNT(cp) FROM CommunityPost cp WHERE cp.trip.country = :country" // Pageable을 위한 카운트 쿼리
+        value = "SELECT DISTINCT cp FROM CommunityPost cp JOIN FETCH cp.author JOIN FETCH cp.trip WHERE cp.trip.country = :country",
+        countQuery = "SELECT COUNT(cp) FROM CommunityPost cp WHERE cp.trip.country = :country"
     )
     fun findByTripCountry(@Param("country") country: Country, pageable: Pageable): Page<CommunityPost>
 
+    // 전체 조회 N+1 문제 해결 (author, trip JOIN FETCH)
     @Query(
-        value = "SELECT cp FROM CommunityPost cp JOIN FETCH cp.author JOIN FETCH cp.trip",
+        value = "SELECT DISTINCT cp FROM CommunityPost cp JOIN FETCH cp.author JOIN FETCH cp.trip",
         countQuery = "SELECT COUNT(cp) FROM CommunityPost cp"
     )
     override fun findAll(pageable: Pageable): Page<CommunityPost>
 
+    /**
+     * [수정!] 상세 조회 시 N+1 문제를 방지하기 위해 모든 연관 엔티티를 JOIN FETCH
+     * (Post -> Author, Trip, Days, Photos)
+     */
 
-    @Query("SELECT cp FROM CommunityPost cp JOIN FETCH cp.author JOIN FETCH cp.trip WHERE cp.id = :postId")
+    @Query(
+        "SELECT DISTINCT cp FROM CommunityPost cp " +
+                "JOIN FETCH cp.author " +
+                "JOIN FETCH cp.trip t " +
+                "WHERE cp.id = :postId"
+    )
     fun findByIdWithDetails(@Param("postId") postId: Long): CommunityPost?
 
     @Query(
