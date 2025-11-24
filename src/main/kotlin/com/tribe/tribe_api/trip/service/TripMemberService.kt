@@ -157,7 +157,7 @@ class TripMemberService(
         tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
-        val participantTripMember = tripMemberRepository.findByTripIdAndMemberId(tripId, tripMemberId)
+        val participantTripMember = tripMemberRepository.findByIdAndTripId(tripMemberId, tripId)
             ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
 
         if (participantTripMember.member?.id == SecurityUtil.getCurrentMemberId()) {
