@@ -1,37 +1,46 @@
 package com.tribe.tribe_api.community.dto
 
 import com.tribe.tribe_api.community.entity.CommunityPost
-import com.tribe.tribe_api.itinerary.dto.ItineraryResponse.ItineraryDetail.LocationInfo
+import com.tribe.tribe_api.community.entity.CommunityPostDay
+import com.tribe.tribe_api.community.entity.CommunityPostDayPhoto
+import com.tribe.tribe_api.itinerary.dto.ItineraryResponse
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.trip.entity.Trip
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
-import java.time.LocalDate
 import java.time.LocalDateTime
 
 
-sealed class CommunityPostDto {
+object CommunityPostDto {
 
     data class CreateRequest(
         @field:NotNull(message = "공유할 여행 ID는 필수입니다.")
         val tripId: Long,
-
         @field:NotBlank(message = "게시글 제목은 필수입니다.")
         val title: String,
+        @field:NotBlank(message = "게시글 소개 내용은 필수입니다.")
+        val content: String, // 소개글
+        val representativeImageUrl: String?, // 대표 이미지 URL
+        val days: List<DayCreateRequest> = emptyList() // Day별 컨텐츠 목록
+    )
 
-        @field:NotBlank(message = "게시글 내용은 필수입니다.")
+    data class DayCreateRequest(
+        @field:NotNull
+        val day: Int,
+        @field:NotBlank
         val content: String,
+        val photoUrls: List<String> = emptyList() // 해당 Day의 이미지 URL 목록
     )
 
     data class UpdateRequest(
         @field:NotBlank(message = "게시글 제목은 필수입니다.")
         val title: String,
-
         @field:NotBlank(message = "게시글 내용은 필수입니다.")
         val content: String,
+        val representativeImageUrl: String?,
+        val days: List<DayCreateRequest> = emptyList()
     )
-
 
     data class SimpleResponse(
         val postId: Long,
@@ -57,17 +66,18 @@ sealed class CommunityPostDto {
 
     /**
      * 게시글 상세 조회 시 사용되는 응답
-     * 요구사항대로 정산, 멤버 등 민감 정보가 제외된 'SharedTripDetail'을 포함
      */
     data class DetailResponse(
         val postId: Long,
         val title: String,
-        val content: String,
+        val content: String, // 소개글
         val authorId: Long,
         val authorNickname: String,
         val country: String,
         val representativeImageUrl: String?,
-        val trip: SharedTripDetail // 정산, 리뷰 등이 제외된 공유용 여행 DTO
+        val createdAt: LocalDateTime,
+        val tripMapData: SharedTripMapData,
+        val days: List<DayDetailResponse>
     ) {
         companion object {
             fun from(post: CommunityPost): DetailResponse {
@@ -79,92 +89,91 @@ sealed class CommunityPostDto {
                     authorNickname = post.author.nickname,
                     country = post.trip.country.koreanName,
                     representativeImageUrl = post.representativeImageUrl,
-                    trip = SharedTripDetail.from(post.trip)
+                    createdAt = post.createdAt!!,
+                    tripMapData = SharedTripMapData.from(post.trip),
+                    days = post.days?.sortedBy { it.day }?.map { DayDetailResponse.from(it) } ?: emptyList()
+                )
+            }
+        }
+    }
+
+    data class DayDetailResponse(
+        val dayId: Long,
+        val day: Int,
+        val content: String,
+        val photos: List<PhotoDetailResponse>
+    ) {
+        companion object {
+            fun from(postDay: CommunityPostDay): DayDetailResponse {
+                return DayDetailResponse(
+                    dayId = postDay.id!!,
+                    day = postDay.day,
+                    content = postDay.content,
+                    photos = postDay.photos?.map { PhotoDetailResponse.from(it) } ?: emptyList()
+                )
+            }
+        }
+    }
+
+    data class PhotoDetailResponse(
+        val photoId: Long,
+        val imageUrl: String
+    ) {
+        companion object {
+            fun from(photo: CommunityPostDayPhoto): PhotoDetailResponse {
+                return PhotoDetailResponse(
+                    photoId = photo.id!!,
+                    imageUrl = photo.imageUrl
                 )
             }
         }
     }
 }
 
-
-/**
- * 공유용 여행 상세 정보 DTO (정산, 멤버 목록, 리뷰 등 민감 정보 제외)
- */
-data class SharedTripDetail(
+data class SharedTripMapData(
     val tripId: Long,
     val title: String,
-    val startDate: LocalDate,
-    val endDate: LocalDate,
-    val categories: List<SharedCategory>
+    // [제거!] country 필드는 DetailResponse 최상위로 올렸습니다.
+    val categories: List<SharedCategoryMapData>
 ) {
     companion object {
-        fun from(trip: Trip): SharedTripDetail {
-            return SharedTripDetail(
+        fun from(trip: Trip): SharedTripMapData {
+            return SharedTripMapData(
                 tripId = trip.id!!,
                 title = trip.title,
-                startDate = trip.startDate,
-                endDate = trip.endDate,
-                // [중요] 엔티티를 그대로 반환하지 않고, 공유용 DTO로 변환하여 반환
                 categories = trip.categories
                     .sortedBy { it.day }
-                    .map { SharedCategory.from(it) }
+                    .map { SharedCategoryMapData.from(it) }
             )
         }
     }
 }
 
-/**
- * 공유용 카테고리 DTO
- */
-data class SharedCategory(
-    val categoryId: Long,
-    val name: String,
+data class SharedCategoryMapData(
     val day: Int,
-    val itineraries: List<SharedItineraryItem>
+    val itineraries: List<SharedItineraryMapData>
 ) {
     companion object {
-        fun from(category: Category): SharedCategory {
-            return SharedCategory(
-                categoryId = category.id!!,
-                name = category.name,
+        fun from(category: Category): SharedCategoryMapData {
+            return SharedCategoryMapData(
                 day = category.day,
-                // 일정 또한 공유용 DTO로 변환
                 itineraries = category.itineraryItems
                     .sortedBy { it.order }
-                    .map { SharedItineraryItem.from(it) }
+                    .map { SharedItineraryMapData.from(it) }
             )
         }
     }
 }
 
-/**
- * 공유용 일정 아이템 DTO (정산 정보 제외)
- */
-data class SharedItineraryItem(
-    val itineraryId: Long,
+data class SharedItineraryMapData(
     val name: String,
-    val time: LocalDateTime?,
-    val order: Int,
-    val memo: String?,
-    val location: LocationInfo?
+    val location: ItineraryResponse.ItineraryDetail.LocationInfo? // 지도에 마커를 찍기 위한 핵심 정보
 ) {
     companion object {
-        fun from(item: ItineraryItem): SharedItineraryItem {
-            return SharedItineraryItem(
-                itineraryId = item.id!!,
-                // 장소/텍스트 기반 일정을 하나의 이름으로 통일
+        fun from(item: ItineraryItem): SharedItineraryMapData {
+            return SharedItineraryMapData(
                 name = item.place?.name ?: item.title!!,
-                time = item.time,
-                order = item.order,
-                memo = item.memo,
-                // 장소가 있을 때만 location 정보를 생성
-                location = item.place?.let {
-                    LocationInfo(
-                        it.latitude.toDouble(),
-                        it.longitude.toDouble(),
-                        it.address
-                    )
-                }
+                location = item.place?.let { ItineraryResponse.ItineraryDetail.LocationInfo.from(it) }
             )
         }
     }
