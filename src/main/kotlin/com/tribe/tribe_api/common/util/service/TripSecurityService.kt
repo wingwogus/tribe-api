@@ -27,7 +27,7 @@ class TripSecurityService(
         if (tripMember == null ||
             tripMember.role == TripRole.EXITED ||
             tripMember.role == TripRole.KICKED) {
-            throw BusinessException(ErrorCode.NO_AUTHORITY_TRIP)
+            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
         }
         return true
     }
