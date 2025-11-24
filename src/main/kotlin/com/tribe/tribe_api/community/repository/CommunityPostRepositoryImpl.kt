@@ -52,7 +52,11 @@ class CommunityPostRepositoryImpl(
     private fun countryEq(country: String?): BooleanExpression? {
         return country
             ?.takeIf { it.isNotBlank() }
-            ?.let { communityPost.trip.country.eq(Country.valueOf(it.uppercase())) }
+            ?.let {
+                runCatching { Country.valueOf(it.uppercase()) }
+                    .getOrNull()
+                    ?.let { validCountry -> communityPost.trip.country.eq(validCountry) }
+            }
     }
 
 

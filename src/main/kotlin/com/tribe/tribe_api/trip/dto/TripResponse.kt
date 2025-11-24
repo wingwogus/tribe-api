@@ -27,7 +27,8 @@ sealed class TripResponse {
                     endDate = trip.endDate,
                     country = trip.country.koreanName,
                     memberCount = trip.members
-                        .filterNot({ it.isGuest }).size
+                        .filter {it.role != TripRole.KICKED && it.role != TripRole.EXITED && !it.isGuest}
+                        .size
                 )
             }
         }
