@@ -25,6 +25,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     CANNOT_CHANGE_MEMBER_TO_OWNER(HttpStatus.BAD_REQUEST, "멤버를 오너로 변경할 수 없습니다."),
     EQUAL_ROLE(HttpStatus.BAD_REQUEST, "이미 동일한 권한을 가지고 있습니다."),
     CANNOT_CHANGE_MEMBER_TO_GUEST(HttpStatus.BAD_REQUEST, "멤버를 게스트로 변경할 수 없습니다."),
+    CANNOT_CHANGE_MEMBER_TO_KICKED_OR_EXITED(HttpStatus.BAD_REQUEST, "멤버를 강퇴, 나감 상태로 변경할 수 없습니다."),
 
     // 401 UNAUTHORIZED,
     UNAUTHORIZED_ACCESS(HttpStatus.UNAUTHORIZED, "인증이 필요한 접근입니다."),

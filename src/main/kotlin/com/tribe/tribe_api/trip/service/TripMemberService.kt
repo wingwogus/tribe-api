@@ -173,6 +173,10 @@ class TripMemberService(
         if (request.requestRole == TripRole.GUEST) {
             throw BusinessException(ErrorCode.CANNOT_CHANGE_MEMBER_TO_GUEST)
         }
+        if (request.requestRole == TripRole.KICKED || request.requestRole == TripRole.EXITED) {
+            throw BusinessException(ErrorCode.CANNOT_CHANGE_MEMBER_TO_KICKED_OR_EXITED)
+        }
+
         val oldRole = participantTripMember.role
 
         participantTripMember.role = request.requestRole
