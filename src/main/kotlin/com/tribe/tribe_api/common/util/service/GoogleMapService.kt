@@ -135,7 +135,7 @@ class GoogleMapService(
         if (response != null) {
             redisService.setValues(cacheKey, objectMapper.writeValueAsString(response), Duration.ofDays(30))
 
-            logger.info("Cached directions response for key=$cacheKey for 30days")
+            logger.info("Cached directions response for key=$cacheKey for 30 days")
         }
 
         return response
