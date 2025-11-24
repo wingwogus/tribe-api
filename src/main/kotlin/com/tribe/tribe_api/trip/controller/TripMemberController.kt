@@ -19,7 +19,6 @@ class TripMemberController(
         @PathVariable("tripId") tripId: Long,
         @Valid @RequestBody request: TripMemberDto.AddGuestRequest
     ): ResponseEntity<ApiResponse<TripMemberDto.Simple>> {
-        // DTO에 포함된 tripId를 서비스 메서드로 전달
         val response = tripMemberService.addGuest(tripId, request)
         return ResponseEntity
             .status(HttpStatus.CREATED)
@@ -38,7 +37,7 @@ class TripMemberController(
     }
 
     // 멤버 권한 수정
-    @PatchMapping("{tripMemberId}/role")
+    @PatchMapping("/{tripMemberId}/role")
     fun assignRole(
         @PathVariable("tripId") tripId: Long,
         @PathVariable("tripMemberId") tripMemberId: Long,
