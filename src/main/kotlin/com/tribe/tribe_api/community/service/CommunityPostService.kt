@@ -8,7 +8,7 @@ import com.tribe.tribe_api.community.dto.CommunityPostDto
 import com.tribe.tribe_api.community.dto.PostSearchCondition
 import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.community.entity.CommunityPostDay
-import com.tribe.tribe_api.community.entity.CommunityPostDayPhoto
+import com.tribe.tribe_api.community.entity.CommunityPostItineraryPhoto
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.community.repository.CommunityPostRepositoryCustom
 import com.tribe.tribe_api.member.repository.MemberRepository
@@ -29,27 +29,43 @@ class CommunityPostService(
     private val tripRepository: TripRepository,
     private val tripMemberRepository: TripMemberRepository,
     private val communityPostRepositoryCustom: CommunityPostRepositoryCustom,
-    private val cloudinaryUploadService: CloudinaryUploadService, // 이미지 업로드 서비스
+    private val cloudinaryUploadService: CloudinaryUploadService,
+    private val placeRepository: com.tribe.tribe_api.itinerary.repository.PlaceRepository, // Place 조회를 위해 추가
 ) {
 
     /**
-     * Day별 컨텐츠(Days and Photos)를 생성하고 부모 Post에 연결하는 공통 로직
+     * Day, Itinerary, Photo 등 상세 컨텐츠를 생성하고 부모 Post에 연결하는 공통 로직
      */
-    private fun mapDaysAndPhotos(post: CommunityPost, daysRequest: List<CommunityPostDto.DayCreateRequest>) {
+    private fun mapCommunityPostDetails(post: CommunityPost, daysRequest: List<CommunityPostDto.DayCreateRequest>) {
         daysRequest.forEach { dayRequest ->
+            // 1. Day 엔티티 생성
             val newDay = CommunityPostDay(
                 communityPost = post,
                 day = dayRequest.day,
                 content = dayRequest.content
             )
 
-            // 3. Day별 사진 (손자) 엔티티 생성 및 연결
-            dayRequest.photoUrls.forEach { imageUrl ->
-                val newPhoto = CommunityPostDayPhoto(
+            // 2. Day별 Itinerary 엔티티 생성
+            dayRequest.itineraries.forEach { itineraryRequest ->
+                val place = itineraryRequest.placeId?.let {
+                    placeRepository.findById(it).orElse(null)
+                }
+                val newItinerary = com.tribe.tribe_api.community.entity.CommunityPostItinerary(
                     communityPostDay = newDay,
-                    imageUrl = imageUrl
+                    place = place,
+                    order = itineraryRequest.order,
+                    content = itineraryRequest.content
                 )
-                newDay.photos.add(newPhoto) // Day에 사진 연결
+
+                // 3. Itinerary별 Photo 엔티티 생성
+                itineraryRequest.photoUrls.forEach { imageUrl ->
+                    val newPhoto = CommunityPostItineraryPhoto(
+                        communityPostItinerary = newItinerary,
+                        imageUrl = imageUrl
+                    )
+                    newItinerary.photos.add(newPhoto) // Itinerary에 사진 연결
+                }
+                newDay.itineraries.add(newItinerary) // Day에 Itinerary 연결
             }
             post.days.add(newDay) // Post에 Day 연결
         }
@@ -66,7 +82,7 @@ class CommunityPostService(
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
         tripMemberRepository.findByTripAndMember(trip, author)
-            ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER) //member가 해당 Trip에 존재하는지만 확인
+            ?: throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
 
 
         val newPost = CommunityPost(
@@ -77,11 +93,12 @@ class CommunityPostService(
             representativeImageUrl = request.representativeImageUrl,
         )
 
-        mapDaysAndPhotos(newPost, request.days)
+        mapCommunityPostDetails(newPost, request.days) // 새로운 매핑 함수 사용
 
         val savedPost = communityPostRepository.save(newPost)
-        // 상세 조회 DTO를 반환하여 생성된 내용을 바로 확인
-        return CommunityPostDto.DetailResponse.from(savedPost)
+        return communityPostRepository.findByIdWithDetails(savedPost.id!!)
+            ?.let { CommunityPostDto.DetailResponse.from(it) }
+            ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
     }
 
     // 2. 게시글 조회 (국가별 필터링)
@@ -98,11 +115,9 @@ class CommunityPostService(
     // 게시글 상세 조회
     @Transactional(readOnly = true)
     fun getPostDetail(postId: Long): CommunityPostDto.DetailResponse {
-        // N+1 방지를 위해 Fetch Join 쿼리 사용
         val post = communityPostRepository.findByIdWithDetails(postId)
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
 
-        // 보여줄 정보만 가져온 표시되는 dto로 반환
         return CommunityPostDto.DetailResponse.from(post)
     }
 
@@ -112,61 +127,66 @@ class CommunityPostService(
         val post = communityPostRepository.findByIdWithDetails(postId)
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
 
+        // Cloudinary에서 삭제할 이미지 URL 수집 (기존 로직)
+        val imageUrlsToDelete = mutableListOf<String>()
+        post.days.forEach { day ->
+            day.itineraries.forEach { itinerary ->
+                itinerary.photos.forEach { photo ->
+                    imageUrlsToDelete.add(photo.imageUrl)
+                }
+            }
+        }
+        if (post.representativeImageUrl != null && post.representativeImageUrl != request.representativeImageUrl) {
+            imageUrlsToDelete.add(post.representativeImageUrl!!)
+        }
 
-        // 기존 이미지 url 저장 및 메타데이터 업데이트
-        val oldImageUrl = post.representativeImageUrl
+        // 메타데이터 업데이트
         post.title = request.title
         post.content = request.content
         post.representativeImageUrl = request.representativeImageUrl
 
+        // 기존 Day, Itinerary, Photo 모두 삭제 (orphanRemoval=true 옵션으로 DB에서 자동 삭제됨)
+        post.days.clear()
 
-        // 기존 day별 컨텐츠및 사진 모두 삭제
-        post.days.forEach { postDay->
-            postDay.photos.forEach { photo ->
-                cloudinaryUploadService.delete(photo.imageUrl)
-            }
-        }
-        post.days.clear() // 고아제거로 인해 기존 day, photo 모두 제거
-
-        mapDaysAndPhotos(post, request.days)
-
-        //대표 이미지 변경시 cloudinary 이미지 삭제
-        if(oldImageUrl != null && oldImageUrl != post.representativeImageUrl){
-            cloudinaryUploadService.delete(oldImageUrl)
-        }
+        // 새로운 내용으로 다시 채우기
+        mapCommunityPostDetails(post, request.days)
 
         val savedPost = communityPostRepository.save(post)
-        return CommunityPostDto.DetailResponse.from(savedPost)
+
+        // Cloudinary 이미지 삭제 실행 (DB 트랜잭션과 분리)
+        imageUrlsToDelete.forEach { cloudinaryUploadService.delete(it) }
+
+        return communityPostRepository.findByIdWithDetails(savedPost.id!!)
+            ?.let { CommunityPostDto.DetailResponse.from(it) }
+            ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
     }
+
 
     // 5. 게시글 삭제
     @PreAuthorize("@tripSecurityService.isTripOwnerByPostId(#postId)")
     fun deletePost(postId: Long) {
-
         val post = communityPostRepository.findByIdWithDetails(postId)
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
 
-        // 모든 day별 사진과 대표 이미지 삭제
+        // 모든 Day, Itinerary, Photo 및 대표 이미지 URL 수집 (리팩토링됨)
         val imageUrlsToDelete = mutableListOf<String>()
-        if (post.representativeImageUrl != null) {
-            imageUrlsToDelete.add(post.representativeImageUrl!!)
-        }
+        post.representativeImageUrl?.let { imageUrlsToDelete.add(it) }
 
-        // Day별 첨부된 모든 사진 URL 수집
-        post.days.forEach { postDay ->
-            postDay.photos.forEach { photo ->
-                imageUrlsToDelete.add(photo.imageUrl)
+        post.days.forEach { day ->
+            day.itineraries.forEach { itinerary ->
+                itinerary.photos.forEach { photo ->
+                    imageUrlsToDelete.add(photo.imageUrl)
+                }
             }
         }
 
-        // 1. DB에서 게시글 삭제 (Days와 Photos는 Cascade와 orphanRemoval로 자동 삭제됨)
+        // 1. DB에서 게시글 삭제 (Days, Itineraries, Photos는 Cascade와 orphanRemoval로 자동 삭제됨)
         communityPostRepository.delete(post)
 
         // 2. Cloudinary에서 이미지 삭제 (DB 트랜잭션과 분리)
         imageUrlsToDelete.forEach { url ->
             cloudinaryUploadService.delete(url)
         }
-
     }
 
     // 6. 특정 MemberId가 작성한 모든 게시글 목록 조회
@@ -187,4 +207,5 @@ class CommunityPostService(
         return searchPost.map { CommunityPostDto.SimpleResponse.from(it) }
     }
 }
+
 
