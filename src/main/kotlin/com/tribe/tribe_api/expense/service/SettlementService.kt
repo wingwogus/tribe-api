@@ -18,9 +18,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit // 날짜 차이 계산을 위해 추가
+import java.time.temporal.ChronoUnit
 
 @Service
 @Transactional(readOnly = true)
@@ -119,15 +118,12 @@ class SettlementService(
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
-        val allExpensesWithDetails: List<Expense> = expenseRepository.findAllWithDetailsByTripId(tripId)
+        // 1. 날짜(date)를 기반으로 여행의 '일차(day)'를 계산합니다.
+        // 일차 = (조회 날짜 - 여행 시작일) + 1
+        val dayToFilter = ChronoUnit.DAYS.between(trip.startDate, date).toInt() + 1
 
-        val dailyExpenses: List<Expense> = allExpensesWithDetails.filter { expense ->
-            val tripStartDate = expense.trip.startDate
-            val categoryDay = expense.itineraryItem.category.day
-            // 실시간 날짜 계산: (여행 시작일) + (일차 - 1)
-            val expenseDate = tripStartDate.plusDays(categoryDay.toLong() - 1)
-            expenseDate == date
-        }
+        // 2. 여행의 모든 지출을 가져오는 대신, 해당 일차(day)에 해당하는 지출만 DB에서 필터링하여 가져옵니다.
+        val dailyExpenses: List<Expense> = expenseRepository.findDailyExpensesWithDetailsByTripIdAndDay(tripId, dayToFilter)
 
         // 총 지출액을 KRW로 변환하여 합산
         val dailyTotalAmountKrw = dailyExpenses.sumOf { expense ->
