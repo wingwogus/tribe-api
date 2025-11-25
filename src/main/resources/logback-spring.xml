@@ -30,14 +30,47 @@
         </encoder>
     </appender>
 
-    <logger name="com.tribe" level="INFO" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-    </logger>
+    <springProfile name="prod">
+        <appender name="DISCORD" class="com.github.napstr.logback.DiscordAppender">
+            <webhookUri>${DISCORD_ERROR_WEBHOOK_URL}</webhookUri>
+            <layout class="ch.qos.logback.classic.PatternLayout">
+                <pattern>
+                    ============🚨 삐용삐용 레전드 버그 발생!!!!!!!!!!============
+                    ${COMMON_LOG_PATTERN}
+                </pattern>
+                <charset>UTF-8</charset>
+            </layout>
+            <username>🚨TRI-BE 서버 에러 알림</username>
+            <tts>false</tts> </appender>
 
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-    </root>
+        <appender name="ASYNC_DISCORD" class="ch.qos.logback.classic.AsyncAppender">
+            <appender-ref ref="DISCORD" />
+
+            <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                <level>ERROR</level>
+            </filter>
+        </appender>
+
+        <logger name="com.tribe" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/> <appender-ref ref="FILE"/>    <appender-ref ref="ASYNC_DISCORD"/> </logger>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+            <appender-ref ref="ASYNC_DISCORD"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="!prod">
+        <logger name="com.tribe" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </logger>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </root>
+    </springProfile>
 
 </configuration>

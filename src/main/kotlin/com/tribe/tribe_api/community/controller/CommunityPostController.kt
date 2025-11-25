@@ -2,6 +2,7 @@ package com.tribe.tribe_api.community.controller
 
 import com.tribe.tribe_api.common.util.ApiResponse
 import com.tribe.tribe_api.community.dto.CommunityPostDto
+import com.tribe.tribe_api.community.dto.PostSearchCondition
 import com.tribe.tribe_api.community.service.CommunityPostService
 import com.tribe.tribe_api.trip.entity.Country
 import jakarta.validation.Valid
@@ -93,6 +94,15 @@ class CommunityPostController(
     ): ResponseEntity<ApiResponse<Page<CommunityPostDto.SimpleResponse>>> {
         val postsPage = communityPostService.getPostsByMemberId(memberId, pageable)
         return ResponseEntity.ok(ApiResponse.success("회원 작성 게시글 목록 조회 성공", postsPage))
+    }
+
+    @GetMapping("/search")
+    fun searchPosts(
+        condition: PostSearchCondition,
+        @PageableDefault(size = 10, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable
+    ): ResponseEntity<ApiResponse<Page<CommunityPostDto.SimpleResponse>>> {
+        val searchPosts = communityPostService.searchPosts(condition, pageable)
+        return ResponseEntity.ok(ApiResponse.success("게시글 목록 조회 성공", searchPosts))
     }
 }
 

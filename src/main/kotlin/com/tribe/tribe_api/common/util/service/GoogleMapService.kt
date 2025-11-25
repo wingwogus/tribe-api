@@ -87,7 +87,19 @@ class GoogleMapService(
         // 출발지ID:도착지ID:이동방식 으로 키 저장
         val mode = travelMode.name.lowercase(Locale.ROOT)
 
-        val cacheKey = "directions_cache:$originPlaceId:$destinationPlaceId:$mode"
+        var cacheKey = "directions_cache:$originPlaceId:$destinationPlaceId:$mode"
+
+        if (travelMode == TravelMode.TRANSIT) {
+            val now = LocalTime.now(ZoneId.of("Asia/Seoul"))
+            val endOfDawn = LocalTime.of(6, 0)
+
+            cacheKey = if (now.isBefore(endOfDawn)) {
+                "$cacheKey:dawn"
+            } else {
+                "$cacheKey:day"
+            }
+        }
+
         val cachedData = redisService.getValues(cacheKey)
 
         // 캐싱 성공 시
@@ -121,25 +133,9 @@ class GoogleMapService(
         val response = responseMono.block()
 
         if (response != null) {
-            val duration = when (travelMode) {
-                TravelMode.TRANSIT -> {
-                    val now = LocalTime.now(ZoneId.of("Asia/Seoul"))
-                    val endOfDawn = LocalTime.of(6, 0)
+            redisService.setValues(cacheKey, objectMapper.writeValueAsString(response), Duration.ofDays(30))
 
-                    if (now.isBefore(endOfDawn)) {
-                        // 새벽 시간 (00:00 ~ 05:59): 오전 6시까지 캐시
-                        Duration.between(now, endOfDawn)
-                    } else {
-                        // 주간 시간 (06:00 ~ 23:59): 자정까지 캐시
-                        Duration.between(now, LocalTime.MAX)
-                    }
-                }
-                else -> Duration.ofDays(30)
-            }
-
-            redisService.setValues(cacheKey, objectMapper.writeValueAsString(response), duration)
-
-            logger.info("Cached directions response for key=$cacheKey for $duration")
+            logger.info("Cached directions response for key=$cacheKey for 30 days")
         }
 
         return response

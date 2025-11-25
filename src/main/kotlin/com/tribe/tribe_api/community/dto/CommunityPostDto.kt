@@ -36,6 +36,7 @@ sealed class CommunityPostDto {
     data class SimpleResponse(
         val postId: Long,
         val title: String,
+        val authorId: Long,
         val authorNickname: String,
         val country: String,
         val representativeImageUrl: String?
@@ -45,6 +46,7 @@ sealed class CommunityPostDto {
                 return SimpleResponse(
                     postId = post.id!!,
                     title = post.title,
+                    authorId = post.author.id!!,
                     authorNickname = post.author.nickname,
                     country = post.trip.country.koreanName,
                     representativeImageUrl = post.representativeImageUrl
@@ -61,6 +63,7 @@ sealed class CommunityPostDto {
         val postId: Long,
         val title: String,
         val content: String,
+        val authorId: Long,
         val authorNickname: String,
         val country: String,
         val representativeImageUrl: String?,
@@ -72,6 +75,7 @@ sealed class CommunityPostDto {
                     postId = post.id!!,
                     title = post.title,
                     content = post.content,
+                    authorId = post.author.id!!,
                     authorNickname = post.author.nickname,
                     country = post.trip.country.koreanName,
                     representativeImageUrl = post.representativeImageUrl,

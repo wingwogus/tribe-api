@@ -46,9 +46,7 @@ class TripService(
     val logger = LoggerFactory.getLogger(javaClass)
 
     fun createTrip(request: TripRequest.Create): TripResponse.TripDetail {
-        val currentMemberId = SecurityUtil.getCurrentMemberId()
-
-        val member = findMember(currentMemberId)
+        val member = findMember(SecurityUtil.getCurrentMemberId())
 
         return request.toEntity()
             .apply { addMember(member, TripRole.OWNER) }
@@ -99,7 +97,7 @@ class TripService(
         return trips.map { TripResponse.SimpleTrip.from(it) }
     }
 
-    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
+    @PreAuthorize("@tripSecurityService.isTripAdmin(#tripId)")
     fun createInvitation(tripId: Long): TripResponse.Invitation {
         tripRepository.existsById(tripId).takeIf { it }
             ?: throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
@@ -116,24 +114,37 @@ class TripService(
             ?: throw BusinessException(ErrorCode.INVALID_INVITE_TOKEN))
             .toLong()
 
-        if (tripMemberRepository.existsByTripIdAndMemberId(tripId, currentMemberId)) {
-            throw BusinessException(ErrorCode.ALREADY_JOINED_TRIP)
-        }
-
-        val member = findMember(currentMemberId)
+        val existingMember = tripMemberRepository.findByTripIdAndMemberId(tripId, currentMemberId)
 
         val trip = findTripWithMembers(tripId)
 
-        trip.addMember(member, TripRole.MEMBER)
-
-        logger.info("Trip joined successfully, Trip Id: {}, Member Id: {}", trip.id, currentMemberId)
-
+        if (existingMember != null) {
+            when (existingMember.role) {
+                TripRole.MEMBER, TripRole.OWNER -> {
+                    throw BusinessException(ErrorCode.ALREADY_JOINED_TRIP)
+                }
+                TripRole.KICKED -> {
+                    // 강퇴된 회원은 재참여 불가
+                    throw BusinessException(ErrorCode.BANNED_MEMBER)
+                }
+                TripRole.EXITED -> {
+                    // 자발적 탈퇴자는 역할 복구 (재가입 허용)
+                    existingMember.role = TripRole.MEMBER
+                    logger.info("Exited member rejoined. TripId: {}, MemberId: {}", tripId, currentMemberId)
+                }
+                else -> {}
+            }
+        } else {
+            // 신규 가입
+            val member = findMember(currentMemberId)
+            trip.addMember(member, TripRole.MEMBER)
+            logger.info("New member joined. TripId: {}, MemberId: {}", tripId, currentMemberId)
+        }
         return TripResponse.TripDetail.from(trip)
     }
 
     fun importTripFromPost(request: TripRequest.Import):TripResponse.TripDetail {
-        val member = memberRepository.findByIdOrNull(SecurityUtil.getCurrentMemberId())
-            ?: throw BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+        val member = findMember(SecurityUtil.getCurrentMemberId())
 
         val post = (communityPostRepository.findByIdOrNull(request.postId)
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND))

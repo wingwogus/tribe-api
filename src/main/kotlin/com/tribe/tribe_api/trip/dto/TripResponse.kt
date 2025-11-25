@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.trip.dto
 
 import com.tribe.tribe_api.trip.entity.Trip
+import com.tribe.tribe_api.trip.entity.TripRole
 import java.time.LocalDate
 
 sealed class TripResponse {
@@ -25,7 +26,9 @@ sealed class TripResponse {
                     startDate = trip.startDate,
                     endDate = trip.endDate,
                     country = trip.country.koreanName,
-                    memberCount = trip.members.size
+                    memberCount = trip.members
+                        .filter {it.role != TripRole.KICKED && it.role != TripRole.EXITED && !it.isGuest}
+                        .size
                 )
             }
         }
@@ -47,7 +50,9 @@ sealed class TripResponse {
                     startDate = trip.startDate,
                     endDate = trip.endDate,
                     country = trip.country.code,
-                    members = trip.members.map { TripMemberDto.Details.from(it) }
+                    members = trip.members
+                        .filter {it.role != TripRole.KICKED && it.role != TripRole.EXITED}
+                        .map { TripMemberDto.Details.from(it) }
                 )
             }
         }
