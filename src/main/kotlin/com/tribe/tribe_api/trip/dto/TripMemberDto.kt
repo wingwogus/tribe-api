@@ -34,6 +34,7 @@ object TripMemberDto {
 
     data class Details(
         val memberId: Long?,
+        val tripMemberId: Long?,
         val nickname: String,
         val avatar: String?,
         val role: TripRole
@@ -41,11 +42,11 @@ object TripMemberDto {
         companion object {
             fun from(tripMember: TripMember): Details {
                 val displayName = tripMember.member?.nickname ?: tripMember.guestNickname ?: "게스트"
-                val memberId = tripMember.id
                 val avatar = tripMember.member?.avatar
 
                 return Details(
-                    memberId,
+                    tripMember.member?.id,
+                    tripMember.id,
                     displayName,
                     avatar,
                     tripMember.role
