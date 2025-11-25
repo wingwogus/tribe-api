@@ -16,12 +16,11 @@ class AppConfig {
 
     @Bean
     fun webClient(builder: WebClient.Builder): WebClient {
-        // 1. 메모리 사이즈를 10MB로 늘린 전략 설정
+        // 메모리 사이즈를 10MB
         val strategies = ExchangeStrategies.builder()
             .codecs { configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024) }
             .build()
 
-        // 2. 설정한 전략을 builder에 적용하여 build
         return builder
             .exchangeStrategies(strategies)
             .build()

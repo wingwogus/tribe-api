@@ -213,7 +213,7 @@ class SettlementService(
         val totalAssignedSum = memberBalanceDtos.sumOf { it.balance.negate().max(BigDecimal.ZERO) }
 
         val difference = totalPaidSum.subtract(totalAssignedSum).abs()
-        if (difference.compareTo(EPSILON) > 0) {
+        if (difference > EPSILON) {
             log.error(
                 "[전체 정산 금액 불일치] Trip ID: {}. 총 Paid(KRW): {}, 총 Assigned(KRW): {}",
                 tripId, totalPaidSum, totalAssignedSum
