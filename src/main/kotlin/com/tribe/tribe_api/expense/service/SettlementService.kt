@@ -238,7 +238,6 @@ class SettlementService(
             val assignedAmountKrw = expenses
                 .flatMap { it.expenseItems }
                 .flatMap { it.assignments }
-                .distinct()
                 .filter { it.tripMember.id == member.id }
                 .sumOf { assignment ->
                     val expense = assignment.expenseItem.expense
