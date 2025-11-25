@@ -20,10 +20,12 @@ class CommunityPostDay(
     val day: Int,
 
     @Lob
-    var content: String,
+    var content: String, // Day 전체에 대한 요약 설명
 
     @OneToMany(mappedBy = "communityPostDay", cascade = [CascadeType.ALL], orphanRemoval = true)
-    var photos: MutableList<CommunityPostDayPhoto> = mutableListOf()
+    @OrderBy("order ASC")
+    var itineraries: MutableList<CommunityPostItinerary> = mutableListOf()
+
 
 ) : BaseTimeEntity() {
     @Id
