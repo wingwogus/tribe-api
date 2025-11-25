@@ -4,8 +4,6 @@ import com.tribe.tribe_api.expense.entity.Expense
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import org.springframework.data.jpa.repository.Modifying
-import org.springframework.transaction.annotation.Transactional
 
 interface ExpenseRepository : JpaRepository<Expense, Long> {
 
@@ -21,6 +19,10 @@ interface ExpenseRepository : JpaRepository<Expense, Long> {
         WHERE e.trip.id = :tripId
     """)
     fun findAllWithDetailsByTripId(tripId: Long): List<Expense>
+
+    // 나가는 멤버가 Payer인 모든 Expense 찾기
+    @Query("SELECT e FROM Expense e WHERE e.payer.id = :payerId")
+    fun findByPayerId(payerId: Long): List<Expense>
 
     /**
      * 특정 일차(day)에 해당하는 지출만 DB에서 필터링하여 조회합니다.

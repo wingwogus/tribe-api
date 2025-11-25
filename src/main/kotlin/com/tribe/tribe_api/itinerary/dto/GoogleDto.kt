@@ -22,7 +22,7 @@ object GoogleDto {
 
         data class DisplayName(
             val text: String,
-            val languageCode: String
+            val languageCode: String?
         )
     }
 
