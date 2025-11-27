@@ -3,9 +3,14 @@ package com.tribe.tribe_api.itinerary.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
+import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
+import com.tribe.tribe_api.expense.repository.ExpenseItemRepository
+import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.dto.WishlistDto
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
+import com.tribe.tribe_api.itinerary.repository.CategoryRepository
+import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.itinerary.repository.WishlistItemRepository
 import com.tribe.tribe_api.member.entity.Member
@@ -39,7 +44,14 @@ class WishlistServiceTest @Autowired constructor(
     private val tripMemberRepository: TripMemberRepository,
     private val tripRepository: TripRepository,
     private val memberRepository: MemberRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+
+    private val itineraryItemRepository: ItineraryItemRepository,
+    private val categoryRepository: CategoryRepository,
+
+    private val expenseRepository: ExpenseRepository,
+    private val expenseItemRepository: ExpenseItemRepository,
+    private val expenseAssignmentRepository: ExpenseAssignmentRepository
 ) {
     private lateinit var member: Member
     private lateinit var nonMember: Member
@@ -50,8 +62,16 @@ class WishlistServiceTest @Autowired constructor(
 
     @BeforeEach
     fun setUp() {
+        expenseAssignmentRepository.deleteAll()
+        expenseItemRepository
+        expenseRepository.deleteAll()
+
         wishlistItemRepository.deleteAll()
+        itineraryItemRepository.deleteAll()
+
+        categoryRepository.deleteAll()
         tripMemberRepository.deleteAll()
+
         tripRepository.deleteAll()
         memberRepository.deleteAll()
         placeRepository.deleteAll()
@@ -116,7 +136,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(placeRepository.findByExternalPlaceId("new_google_place_1")).isNotNull
 
             // 'member'('위시리스트멤버')가 추가했는지 확인
-            assertThat(result.adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
         @Test
@@ -144,7 +164,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(placeRepository.count()).isEqualTo(initialPlaceCount)
             assertThat(wishlistItemRepository.count()).isEqualTo(initialWishlistCount + 1)
 
-            assertThat(result.adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
 
@@ -211,7 +231,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(result.content[0].name).isEqualTo("오사카성")
 
 
-            assertThat(result.content[0].adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.content[0].adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
         @Test
@@ -228,7 +248,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(result.content).hasSize(1)
             assertThat(result.content[0].name).isEqualTo("오사카성")
 
-            assertThat(result.content[0].adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.content[0].adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
         @Test

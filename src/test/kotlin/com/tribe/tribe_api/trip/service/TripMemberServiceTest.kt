@@ -257,7 +257,7 @@ class TripMemberServiceTest @Autowired constructor(
             val tripId = trip.id!!
             val title = "레전드 일본 여행"
             val content = "시부야 사변 한번 훑어주고 신주쿠가서 장어먹고 산책 좀 하다가 레전드 마트가서 와규 산다음에 숙소가서 양주까고 먹었습니다."
-            val createPost = CommunityPostDto.CreateRequest(tripId, title, content,"http://mock.cdn/img.jpg", emptyList())
+            val createPost = CommunityPostDto.CreateRequest(tripId, title, content,"http://mock.cdn/img.jpg")
             //when
             val response = communityPostService.createPost(createPost)
             //then
@@ -278,7 +278,8 @@ class TripMemberServiceTest @Autowired constructor(
             val title = "레전드 일본 여행"
             val content = "시부야 사변 한번 훑어주고 신주쿠가서 장어먹고 산책 좀 하다가 레전드 마트가서 와규 산다음에 숙소가서 양주까고 먹었습니다."
             val imageFile = null
-            val createPost = CommunityPostDto.CreateRequest(tripId, title, content,"http://mock.cdn/img.jpg",emptyList())
+            val createPost = CommunityPostDto.CreateRequest(
+                tripId, title, content,"http://mock.cdn/img.jpg")
             //when
             val response = communityPostService.createPost(createPost)
             //then
@@ -296,7 +297,7 @@ class TripMemberServiceTest @Autowired constructor(
             //given
             setAuthentication(member1)
             val tripId = trip.id!!
-            val createPost = CommunityPostDto.CreateRequest(tripId, "title", "content", null,emptyList())
+            val createPost = CommunityPostDto.CreateRequest(tripId, "title", "content", null)
             // when & then
             val exception = assertThrows<BusinessException> {
                 communityPostService.createPost(createPost)
@@ -309,7 +310,7 @@ class TripMemberServiceTest @Autowired constructor(
             //given
             setAuthentication(nonMember)
             val tripId = trip.id!!
-            val createPost = CommunityPostDto.CreateRequest(tripId, "title", "content", null,emptyList())
+            val createPost = CommunityPostDto.CreateRequest(tripId, "title", "content", null)
             // when & then
             val exception = assertThrows<BusinessException> {
                 communityPostService.createPost(createPost)
