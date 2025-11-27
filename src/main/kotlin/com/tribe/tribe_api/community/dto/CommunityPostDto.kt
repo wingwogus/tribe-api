@@ -23,7 +23,6 @@ object CommunityPostDto {
         @field:NotBlank(message = "게시글 소개 내용은 필수입니다.")
         val content: String, // 게시글 전체 소개글
         val representativeImageUrl: String?,
-        val days: List<DayCreateRequest> = emptyList() // Day별 컨텐츠 목록
     )
 
     data class DayCreateRequest(
@@ -42,13 +41,40 @@ object CommunityPostDto {
         val photoUrls: List<String> = emptyList()
     )
 
+    // --- 수정 요청 DTOs ---
     data class UpdateRequest(
         @field:NotBlank(message = "게시글 제목은 필수입니다.")
         val title: String,
         @field:NotBlank(message = "게시글 내용은 필수입니다.")
         val content: String,
         val representativeImageUrl: String?,
-        val days: List<DayCreateRequest> = emptyList()
+        val days: List<DayUpdateRequest> = emptyList(),
+        val dayIdsToDelete: List<Long> = emptyList()
+    )
+
+    data class DayUpdateRequest(
+        val id: Long?, // 기존 Day의 ID (새로 추가 시 null)
+        @field:NotNull
+        val day: Int,
+        val content: String?,
+        val itineraries: List<ItineraryUpdateRequest> = emptyList(),
+        val itineraryIdsToDelete: List<Long> = emptyList()
+    )
+
+    data class ItineraryUpdateRequest(
+        val id: Long?, // 기존 Itinerary의 ID (새로 추가 시 null)
+        val placeId: Long?, // 새로운 Itinerary를 추가할 때만 필요
+        @field:NotNull
+        val order: Int,
+        @field:NotBlank
+        val content: String,
+        val photos: List<PhotoUpdateRequest> = emptyList(),
+        val photoIdsToDelete: List<Long> = emptyList()
+    )
+
+    data class PhotoUpdateRequest(
+        val id: Long?, // 기존 Photo의 ID (새로 추가 시 null)
+        val imageUrl: String
     )
 
     // --- 응답(Response) DTOs ---
