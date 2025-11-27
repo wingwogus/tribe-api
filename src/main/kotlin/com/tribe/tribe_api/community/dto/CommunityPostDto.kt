@@ -123,7 +123,7 @@ object CommunityPostDto {
                     authorNickname = post.author.nickname,
                     country = post.trip.country.koreanName,
                     representativeImageUrl = post.representativeImageUrl,
-                    createdAt = post.createdAt!!,
+                    createdAt = post.createdAt,
                     tripMapData = SharedTripMapData.from(post.trip),
                     days = post.days.map { DayDetailResponse.from(it) }
                 )
