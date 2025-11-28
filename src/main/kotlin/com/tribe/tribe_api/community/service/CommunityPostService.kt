@@ -44,21 +44,44 @@ class CommunityPostService(
             author = author,
             trip = trip,
             title = request.title,
-            content = request.content,
-            representativeImageUrl = request.representativeImageUrl
+            content = request.content, // post 전체 설명글
+            representativeImageUrl = request.representativeImageUrl //post 대표 이미지
         )
 
+
+        val dayContentMap = request.days.associateBy { it.categoryId }
+        val itineraryContentMap = request.days.flatMap { it.itineraries }.associateBy { it.itineraryItemId }
+
         trip.categories.sortedBy { it.day }.forEach { category ->
-            val postDay = CommunityPostDay(newPost, category.day, "")
+
+            val dayRequest = dayContentMap[category.id]
+            val dayContent = dayRequest?.content ?: ""
+
+            val postDay = CommunityPostDay(newPost, category.day, dayContent)
             newPost.days.add(postDay)
 
             category.itineraryItems.sortedBy { it.order }.forEach { itineraryItem ->
+
+                val itineraryRequest = itineraryContentMap[itineraryItem.id]
+
+                val newContent = itineraryRequest?.content ?: "" // 일정별 설명글
+
+                val originalMemo = itineraryItem.memo // 원래 trip 메모
+
                 val postItinerary = CommunityPostItinerary(
-                    postDay,
-                    itineraryItem.place,
-                    itineraryItem.order,
-                    itineraryItem.memo ?: ""
+                    communityPostDay = postDay,
+                    place = itineraryItem.place,
+                    order = itineraryItem.order,
+                    memo = originalMemo,
+                    content = newContent
                 )
+
+                // 사진 추가
+                itineraryRequest?.imageUrls?.forEach { imageUrl ->
+                    val photo = CommunityPostItineraryPhoto(postItinerary, imageUrl)
+                    postItinerary.photos.add(photo)
+                }
+
                 postDay.itineraries.add(postItinerary)
             }
         }
