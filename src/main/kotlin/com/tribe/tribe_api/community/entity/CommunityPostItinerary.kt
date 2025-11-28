@@ -28,6 +28,9 @@ class CommunityPostItinerary(
     val order: Int,
 
     @Lob
+    var memo: String?,
+
+    @Lob
     var content: String,
 
     @OneToMany(mappedBy = "communityPostItinerary", cascade = [CascadeType.ALL], orphanRemoval = true)
