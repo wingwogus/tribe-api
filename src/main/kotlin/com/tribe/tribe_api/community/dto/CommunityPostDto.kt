@@ -19,7 +19,20 @@ object CommunityPostDto {
         val title: String,
         @field:NotBlank(message = "게시글 소개 내용은 필수입니다.")
         val content: String, // 게시글 전체 소개글
-        val representativeImageUrl: String?,
+        val representativeImageUrl: String?, //대표 사진
+        val days: List<DayContentCreateRequest> = emptyList()
+    )
+
+    data class DayContentCreateRequest(
+        val categoryId: Long,
+        val content: String,
+        val itineraries: List<ItineraryContentCreateRequest> = emptyList()
+    )
+
+    data class ItineraryContentCreateRequest(
+        val itineraryItemId: Long,
+        val content: String,
+        val imageUrls: List<String> = emptyList() //일정별 사진
     )
 
     // --- 수정 요청 DTOs ---
@@ -131,6 +144,7 @@ object CommunityPostDto {
     data class ItineraryDetailResponse(
         val itineraryId: Long,
         val order: Int,
+        val memo: String?,
         val content: String,
         val place: ItineraryResponse.ItineraryDetail.LocationInfo?, // 지도 마커 정보
         val photos: List<ItineraryPhotoDetailResponse>
@@ -140,6 +154,7 @@ object CommunityPostDto {
                 return ItineraryDetailResponse(
                     itineraryId = postItinerary.id!!,
                     order = postItinerary.order,
+                    memo = postItinerary.memo,
                     content = postItinerary.content,
                     place = postItinerary.place?.let { ItineraryResponse.ItineraryDetail.LocationInfo.from(it) },
                     photos = postItinerary.photos.map { ItineraryPhotoDetailResponse.from(it) }
