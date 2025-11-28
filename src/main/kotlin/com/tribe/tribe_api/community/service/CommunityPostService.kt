@@ -12,7 +12,6 @@ import com.tribe.tribe_api.community.entity.CommunityPostItinerary
 import com.tribe.tribe_api.community.entity.CommunityPostItineraryPhoto
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.community.repository.CommunityPostRepositoryCustom
-import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.repository.TripRepository
@@ -30,7 +29,6 @@ class CommunityPostService(
     private val tripRepository: TripRepository,
     private val communityPostRepositoryCustom: CommunityPostRepositoryCustom,
     private val cloudinaryUploadService: CloudinaryUploadService,
-    private val placeRepository: PlaceRepository
 ) {
 
     @PreAuthorize("@tripSecurityService.isTripAdmin(#request.tripId)")
