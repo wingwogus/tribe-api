@@ -23,12 +23,14 @@ import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import jakarta.annotation.PostConstruct
+import org.springframework.context.annotation.Profile
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.time.LocalDate
 
 
+@Profile("!test")
 @Component
 class InitDataService(
     private val memberRepository: MemberRepository,

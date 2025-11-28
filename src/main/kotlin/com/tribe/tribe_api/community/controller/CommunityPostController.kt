@@ -14,7 +14,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import org.springframework.web.multipart.MultipartFile
 
 @RestController
 @RequestMapping("/api/v1/community/posts") // Base URL
@@ -24,14 +23,13 @@ class CommunityPostController(
 
     /**
      * 1. 게시글 생성 (여행 공유)
-     * JSON(request)과 Image(imageFile)를 함께 받기 위해 multipart/form-data 사용
+     * JSON(request) image url도 request body에 포함
      */
-    @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    @PostMapping(consumes = [MediaType.APPLICATION_JSON_VALUE])
     fun createPost(
-        @Valid @RequestPart("request") request: CommunityPostDto.CreateRequest,
-        @RequestPart(value = "image", required = false) imageFile: MultipartFile?
+        @Valid @RequestBody request: CommunityPostDto.CreateRequest
     ): ResponseEntity<ApiResponse<CommunityPostDto.DetailResponse>> {
-        val response = communityPostService.createPost(request.tripId, request, imageFile)
+        val response = communityPostService.createPost(request)
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse.success("게시글이 성공적으로 공유되었습니다.", response))
@@ -61,15 +59,14 @@ class CommunityPostController(
     }
 
     /**
-     * 4. 게시글 수정
+     * 4. 게시글 수정 (json만 받도록, 마찬가지로 iamge url이 request body에 포함
      */
-    @PatchMapping("/{postId}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    @PatchMapping("/{postId}", consumes = [MediaType.APPLICATION_JSON_VALUE])
     fun updatePost(
         @PathVariable postId: Long,
-        @Valid @RequestPart("request") request: CommunityPostDto.UpdateRequest,
-        @RequestPart(value = "image", required = false) imageFile: MultipartFile?
+        @Valid @RequestBody request: CommunityPostDto.UpdateRequest
     ): ResponseEntity<ApiResponse<CommunityPostDto.DetailResponse>> {
-        val response = communityPostService.updatePost(postId, request, imageFile)
+        val response = communityPostService.updatePost(postId, request)
         return ResponseEntity.ok(ApiResponse.success("게시글 수정 성공", response))
     }
 
