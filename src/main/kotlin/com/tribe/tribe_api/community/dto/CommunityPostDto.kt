@@ -43,21 +43,18 @@ object CommunityPostDto {
         val content: String,
         val representativeImageUrl: String?,
         val days: List<DayUpdateRequest> = emptyList(),
-        val dayIdsToDelete: List<Long> = emptyList()
     )
 
     data class DayUpdateRequest(
-        val id: Long?, // 기존 Day의 ID (새로 추가 시 null)
+        val id: Long, // 기존 Day의 ID (새로 추가 시 null)
         @field:NotNull
         val day: Int,
         val content: String?,
         val itineraries: List<ItineraryUpdateRequest> = emptyList(),
-        val itineraryIdsToDelete: List<Long> = emptyList()
     )
 
     data class ItineraryUpdateRequest(
-        val id: Long?, // 기존 Itinerary의 ID (새로 추가 시 null)
-        val placeId: Long?, // 새로운 Itinerary를 추가할 때만 필요
+        val id: Long, // 기존 Itinerary의 ID
         @field:NotNull
         val order: Int,
         @field:NotBlank
