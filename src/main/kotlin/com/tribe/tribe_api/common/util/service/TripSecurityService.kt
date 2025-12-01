@@ -70,7 +70,7 @@ class TripSecurityService(
     }
 
     @Transactional(readOnly = true)
-    fun isTripOwnerByPostId(postId: Long): Boolean {
+    fun isTripAdminByPostId(postId: Long): Boolean {
         val post = communityPostRepository.findByIdOrNull(postId)
             ?: throw BusinessException(ErrorCode.POST_NOT_FOUND)
 

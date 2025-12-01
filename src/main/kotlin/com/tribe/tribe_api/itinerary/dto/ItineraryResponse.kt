@@ -8,12 +8,10 @@ sealed class ItineraryResponse {
     data class ItineraryDetail(
         val itineraryId: Long,
         val categoryId: Long,
-        //  placeName과 title을 name 하나로 통일
         val name: String,
         val time: LocalDateTime?,
         val order: Int,
         val memo: String?,
-        // location은 장소가 있을 때만 값이 있어서 nullable로 변경
         val location: LocationInfo?
     ) {
         companion object {
@@ -21,36 +19,34 @@ sealed class ItineraryResponse {
                 return ItineraryDetail(
                     itineraryId = item.id!!,
                     categoryId = item.category.id!!,
-                    // place가 있으면 place.name을, 없으면 title을 이름으로 사용
                     name = item.place?.name ?: item.title!!,
                     time = item.time,
                     order = item.order,
                     memo = item.memo,
-                    // place가 있을 때만 location 정보를 생성하고, 없으면 null을 보냄
                     location = item.place?.let { LocationInfo.from(it) }
                 )
             }
         }
-
+                                                                                                                                                
         data class LocationInfo(
             val lat: Double,
             val lng: Double,
-            val address: String?
+            val address: String?,
+            val externalPlaceId: String // Place 엔티티의 externalPlaceId 매핑
         ) {
             companion object {
-
-                // Place 엔티티를 LocationInfo DTO로 변환
                 fun from(place: Place): LocationInfo {
                     return LocationInfo(
                         lat = place.latitude.toDouble(),
                         lng = place.longitude.toDouble(),
-                        address = place.address
+                        address = place.address,
+                        externalPlaceId = place.externalPlaceId // externalPlaceId 매핑 (마커 클릭시 photo, content보여주기 위함)
                     )
                 }
             }
         }
     }
-
+                                                                                                                                                
     /**
      * 전체 경로 응답을 담는 메인 DTO
      */
@@ -71,11 +67,11 @@ sealed class ItineraryResponse {
             val instructions: String,       // 이동 방식 설명, 예: "Walk to Eung-Am" (html_instructions)
             val duration: String,           // 스텝 당 걸리는 시간, 예: "2 mins"
             val distance: String,           // 스텝 당 거리, 예: "0.1 km"
-
-            // 'TRANSIT' 모드일 때만 값이 존재, 'WALKING'일 때는 null
+                                            
+            // TRANSIT 모드일 때만 값이 존재, WALKING일 때는 null
             val transitDetails: TransitDetails?
         )
-
+                                                                                                                                                
         /**
          * 대중교통(TRANSIT) 단계일시 상세 정보를 담는 DTO
          */
@@ -89,4 +85,3 @@ sealed class ItineraryResponse {
         )
     }
 }
-
