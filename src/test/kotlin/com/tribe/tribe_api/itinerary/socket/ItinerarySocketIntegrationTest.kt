@@ -117,17 +117,15 @@ class ItinerarySocketIntegrationTest {
             ) {
                 println("[STOMP] 예외 발생: ${exception.message}")
                 exception.printStackTrace()
-                if (future is CompletableFuture<*>) {
-                    (future as CompletableFuture<Any?>).completeExceptionally(exception)
-                }
+                future.completeExceptionally(exception)
+
             }
 
             override fun handleTransportError(session: StompSession, exception: Throwable) {
                 println("전송 에러 발생: ${exception.message}")
                 exception.printStackTrace()
-                if (future is CompletableFuture<*>) {
-                    (future as CompletableFuture<Any?>).completeExceptionally(exception)
-                }
+                future.completeExceptionally(exception)
+
             }
         }
     }

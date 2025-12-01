@@ -14,11 +14,7 @@ import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.PageRequest
@@ -31,7 +27,7 @@ import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
-class TripServiceIntegrationTest @Autowired constructor(
+class TripServiceTest @Autowired constructor(
     private val tripService: TripService,
     private val tripRepository: TripRepository,
     private val memberRepository: MemberRepository,
