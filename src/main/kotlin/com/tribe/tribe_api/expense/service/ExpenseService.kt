@@ -365,4 +365,14 @@ class ExpenseService(
         logger.info("Expense assignments cleared for expense ID: {}. Number of items cleared: {}", expenseId, request.itemIds.size)
         return ExpenseDto.DetailResponse.from(expense)
     }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
+    fun getAllExpensesByTripId(tripId: Long): List<ExpenseDto.SimpleResponse> {
+        if (!tripRepository.existsById(tripId)) {
+            throw BusinessException(ErrorCode.TRIP_NOT_FOUND)
+        }
+        val expenses = expenseRepository.findAllWithDetailsByTripId(tripId)
+        return expenses.map { ExpenseDto.SimpleResponse.from(it) }
+    }
 }

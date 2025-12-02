@@ -114,6 +114,26 @@ object ExpenseDto {
         }
     }
 
+    data class SimpleResponse(
+        val expenseId: Long,
+        val itineraryItemId: Long,
+        val totalAmount: BigDecimal,
+        val currency: String?,
+        val payer: String
+    ) {
+        companion object {
+            fun from(expense: Expense): SimpleResponse {
+                return SimpleResponse(
+                    expenseId = expense.id!!,
+                    itineraryItemId = expense.itineraryItem.id!!,
+                    totalAmount = expense.totalAmount,
+                    currency = expense.currency,
+                    payer = expense.payer.name
+                )
+            }
+        }
+    }
+
     data class ItemSimpleResponse(
         val itemId: Long,
         val itemName: String,
