@@ -46,7 +46,7 @@ import java.time.LocalDateTime
 @SpringBootTest
 @Transactional
 @ExtendWith(MockKExtension::class)
-class TripReviewServiceIntegrationTest @Autowired constructor(
+class TripReviewServiceTest @Autowired constructor(
     private var tripReviewService: TripReviewService,
     private val tripRepository: TripRepository,
     private val tripReviewRepository: TripReviewRepository,

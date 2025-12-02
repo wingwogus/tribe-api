@@ -26,7 +26,7 @@ import java.time.LocalDate
 
 @SpringBootTest
 @Transactional
-class CategoryServiceIntegrationTest @Autowired constructor(
+class CategoryServiceTest @Autowired constructor(
     private val categoryService: CategoryService,
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,

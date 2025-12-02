@@ -5,11 +5,10 @@ import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.service.ExpenseService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import org.springframework.http.MediaType
 import org.springframework.web.multipart.MultipartFile
-import org.springframework.web.bind.annotation.RequestPart
 
 @RestController
 @RequestMapping("/api/v1/expenses")
@@ -21,7 +20,7 @@ class ExpenseController(
     fun createExpense(
         @Valid @RequestPart("request") request: ExpenseDto.CreateRequest,
         @RequestPart("image", required = false) imageFile: MultipartFile?
-    ): ResponseEntity<ApiResponse<ExpenseDto.CreateResponse>> {
+    ): ResponseEntity<ApiResponse<ExpenseDto.DetailResponse>> {
 
         val response = expenseService.createExpense(request.tripId, request.itineraryItemId, request, imageFile)
         return ResponseEntity

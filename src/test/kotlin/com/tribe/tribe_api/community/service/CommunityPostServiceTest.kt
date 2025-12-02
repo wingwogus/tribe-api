@@ -15,15 +15,11 @@ import com.tribe.tribe_api.member.repository.MemberRepository
 import com.tribe.tribe_api.trip.entity.Country
 import com.tribe.tribe_api.trip.entity.Trip
 import com.tribe.tribe_api.trip.entity.TripRole
-import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import io.mockk.every
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.PageRequest
@@ -34,16 +30,13 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-import java.util.*
-import org.junit.jupiter.api.Nested
 
 @SpringBootTest
 @Transactional
-class CommunityPostServiceIntegrationTest @Autowired constructor(
+class CommunityPostServiceTest @Autowired constructor(
     private val communityPostService: CommunityPostService,
     private val memberRepository: MemberRepository,
     private val tripRepository: TripRepository,
-    private val tripMemberRepository: TripMemberRepository,
     private val communityPostRepository: CommunityPostRepository,
     private val passwordEncoder: PasswordEncoder
 ) {

@@ -9,10 +9,8 @@ import com.tribe.tribe_api.expense.repository.ExpenseItemRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
-import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
 import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
-import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.entity.Provider
 import com.tribe.tribe_api.member.entity.Role
@@ -34,7 +32,6 @@ class InitDataService(
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
     private val tripRepository: TripRepository,
-    private val placeRepository: PlaceRepository,
     private val categoryRepository: CategoryRepository,
     private val itineraryItemRepository: ItineraryItemRepository,
     private val tripMemberRepository: TripMemberRepository,
@@ -82,18 +79,14 @@ class InitDataService(
         val tripMemberA = tripMemberRepository.findByTripIdAndRole(trip.id!!, TripRole.OWNER).first()
         val tripMemberB = tripMemberRepository.findByTripIdAndRole(trip.id!!, TripRole.MEMBER).first()
 
-        val dotonbori = placeRepository.save(Place("dotonbori_id", "도톤보리", "일본 오사카시", BigDecimal("34.6688"), BigDecimal("135.5013")))
-        val osakaCastle = placeRepository.save(Place("osaka_castle_id", "오사카성", "일본 오사카시", BigDecimal("34.6873"), BigDecimal("135.5262")))
-        val usj = placeRepository.save(Place("usj_id", "유니버설 스튜디오 재팬", "일본 오사카시", BigDecimal("34.6654"), BigDecimal("135.4323")))
-
 
         val day1Category = categoryRepository.save(Category(trip, 1, "1일차: 오사카 도착", 1))
 
         itineraryItemRepository.save(
             ItineraryItem(
                 category = day1Category,
-                place = usj,
-                title = null,
+                place = null,
+                title = "오사카 성",
                 time = trip.startDate.atTime(14, 0),
                 order = 1,
                 memo = "익스프레스 티켓 구매하기"
@@ -103,8 +96,8 @@ class InitDataService(
         val dinnerItinerary = itineraryItemRepository.save(
             ItineraryItem(
                 category = day1Category,
-                place = dotonbori,
-                title = null,
+                place = null,
+                title = "도톤보리",
                 time = trip.startDate.atTime(19, 30),
                 order = 2,
                 memo = "글리코상 앞에서 사진찍기"
@@ -116,8 +109,8 @@ class InitDataService(
         itineraryItemRepository.save(
             ItineraryItem(
                 category = day2Category,
-                place = osakaCastle,
-                title = null,
+                place = null,
+                title = "천수각",
                 time = trip.startDate.plusDays(1).atTime(10, 0),
                 order = 1,
                 memo = "천수각 입장"

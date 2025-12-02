@@ -1,6 +1,8 @@
 package com.tribe.tribe_api.trip.controller
 
 import com.tribe.tribe_api.common.util.ApiResponse
+import com.tribe.tribe_api.expense.dto.ExpenseDto
+import com.tribe.tribe_api.expense.service.ExpenseService
 import com.tribe.tribe_api.trip.dto.TripRequest
 import com.tribe.tribe_api.trip.dto.TripResponse
 import com.tribe.tribe_api.trip.service.TripService
@@ -15,7 +17,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/v1/trips")
 class TripController(
-    private val tripService: TripService // 주 생성자를 통한 의존성 주입
+    private val tripService: TripService, // 주 생성자를 통한 의존성 주입
+    private val expenseService: ExpenseService
 ) {
 
     /**
@@ -53,6 +56,17 @@ class TripController(
 
         val response = tripService.getTripDetails(tripId)
         return ResponseEntity.ok(ApiResponse.success("특정 여행 조회 성공", response))
+    }
+
+    /**
+     * 특정 여행의 전체 지출 내역 조회
+     */
+    @GetMapping("/{tripId}/expenses")
+    fun getAllExpensesForTrip(
+        @PathVariable tripId: Long
+    ): ResponseEntity<ApiResponse<List<ExpenseDto.SimpleResponse>>> {
+        val response = expenseService.getAllExpensesByTripId(tripId)
+        return ResponseEntity.ok(ApiResponse.success("여행의 전체 지출 내역 조회 성공", response))
     }
 
     /**

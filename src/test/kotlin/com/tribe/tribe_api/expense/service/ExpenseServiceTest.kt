@@ -7,7 +7,6 @@ import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.CustomUserDetails
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
 import com.tribe.tribe_api.common.util.service.GeminiApiClient
-import com.tribe.tribe_api.common.util.service.TripSecurityService
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
 import com.tribe.tribe_api.itinerary.entity.Category
@@ -39,12 +38,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.multipart.MultipartFile // 👈 import 추가
 import java.math.BigDecimal
 
 @SpringBootTest
 @Transactional
-class ExpenseServiceIntegrationTest @Autowired constructor(
+class ExpenseServiceTest @Autowired constructor(
     private val expenseService: ExpenseService,
     private val expenseRepository: ExpenseRepository,
     private val memberRepository: MemberRepository,
@@ -55,15 +53,11 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
     private val categoryRepository: CategoryRepository,
     private val itineraryItemRepository: ItineraryItemRepository,
     private val objectMapper: ObjectMapper,
-    // [수정] MockkBean이 아닌 실제 TripSecurityService를 주입받습니다.
-    private val tripSecurityService: TripSecurityService
 ){
     @MockkBean
     private lateinit var geminiApiClient: GeminiApiClient
     @MockkBean
     private lateinit var cloudinaryUploadService: CloudinaryUploadService
-    // [수정] TripSecurityService에 대한 MockkBean 선언을 제거합니다.
-
     private lateinit var owner: Member
     private lateinit var member1: Member
     private lateinit var trip: Trip
@@ -322,7 +316,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
         setAuthentication(owner)
         val expenseResponse = createTestExpense()
         setupNonMember()
-        val updateRequest = ExpenseDto.UpdateRequest("타이틀", BigDecimal.ONE, ownerTripMember.id!!, emptyList())
+        val updateRequest = ExpenseDto.UpdateRequest("타이틀", BigDecimal.ONE, ownerTripMember.id!!, "KRW", emptyList())
 
         // when & then: 실제 보안 검증 로직이 BusinessException을 던지는지 확인
         val exception = assertThrows<BusinessException> {
@@ -377,7 +371,7 @@ class ExpenseServiceIntegrationTest @Autowired constructor(
 
 
     // 테스트용 헬퍼 메서드
-    private fun createTestExpense(totalAmount: BigDecimal = BigDecimal("15000")): ExpenseDto.CreateResponse {
+    private fun createTestExpense(totalAmount: BigDecimal = BigDecimal("15000")): ExpenseDto.DetailResponse {
         // 헬퍼 메서수는 테스트의 일부이므로, 여기서도 실제 보안 검증을 통과해야 함
         // createTestExpense를 호출하기 전에 setAuthentication이 먼저 호출되므로,
         // 이 메서수는 항상 권한이 있는 상태에서 실행됨.

@@ -116,7 +116,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(placeRepository.findByExternalPlaceId("new_google_place_1")).isNotNull
 
             // 'member'('위시리스트멤버')가 추가했는지 확인
-            assertThat(result.adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
         @Test
@@ -144,7 +144,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(placeRepository.count()).isEqualTo(initialPlaceCount)
             assertThat(wishlistItemRepository.count()).isEqualTo(initialWishlistCount + 1)
 
-            assertThat(result.adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
 
@@ -211,7 +211,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(result.content[0].name).isEqualTo("오사카성")
 
 
-            assertThat(result.content[0].adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.content[0].adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
         @Test
@@ -228,7 +228,7 @@ class WishlistServiceTest @Autowired constructor(
             assertThat(result.content).hasSize(1)
             assertThat(result.content[0].name).isEqualTo("오사카성")
 
-            assertThat(result.content[0].adder.memberId).isEqualTo(tripMember.id)
+            assertThat(result.content[0].adder.tripMemberId).isEqualTo(tripMember.id)
         }
 
         @Test
