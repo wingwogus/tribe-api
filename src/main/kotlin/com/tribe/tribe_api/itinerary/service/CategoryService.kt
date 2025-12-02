@@ -2,12 +2,15 @@ package com.tribe.tribe_api.itinerary.service
 
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.common.util.security.SecurityUtil
+import com.tribe.tribe_api.common.util.socket.SocketDto
 import com.tribe.tribe_api.itinerary.dto.CategoryDto
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -17,11 +20,14 @@ import org.springframework.transaction.annotation.Transactional
 class CategoryService (
     private val categoryRepository: CategoryRepository,
     private val tripRepository: TripRepository,
+    private val messagingTemplate: SimpMessagingTemplate
 ){
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun createCategory(tripId: Long, request: CategoryDto.CreateRequest): CategoryDto.CategoryResponse {
+        val memberId = SecurityUtil.getCurrentMemberId()
+
         val trip = tripRepository.findById(tripId).orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
         val category = Category(
             trip = trip,
@@ -30,8 +36,21 @@ class CategoryService (
             order = request.order
         )
         val savedCategory = categoryRepository.save(category)
+
+        val createdItem = CategoryDto.CategoryResponse.from(savedCategory)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.ADD_CATEGORY,
+            tripId,
+            memberId,
+            createdItem
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
+
         logger.info("Category created. Category ID: {}, Trip ID: {}", savedCategory.id, tripId)
-        return CategoryDto.CategoryResponse.from(savedCategory)
+        return createdItem
     }
 
     @Transactional(readOnly = true)
@@ -63,6 +82,8 @@ class CategoryService (
         categoryId: Long,
         request: CategoryDto.UpdateRequest
     ): CategoryDto.CategoryResponse {
+        val memberId = SecurityUtil.getCurrentMemberId()
+
         val category = categoryRepository.findByIdOrNull(categoryId)
             ?: throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
 
@@ -75,22 +96,46 @@ class CategoryService (
         request.order?.let { category.order = it }
         request.memo?.let { category.memo = it }
 
+        val updatedItem = CategoryDto.CategoryResponse.from(category)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.EDIT_CATEGORY,
+            tripId,
+            memberId,
+            updatedItem
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Category updated. Category ID: {}, Trip ID: {}", categoryId, tripId)
-        return CategoryDto.CategoryResponse.from(category)
+        return updatedItem
     }
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun deleteCategory(tripId : Long ,categoryId: Long) {
+        val memberId = SecurityUtil.getCurrentMemberId()
 
         if (!categoryRepository.existsById(categoryId)) {
             throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
         }
         categoryRepository.deleteById(categoryId)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.DELETE_CATEGORY,
+            tripId,
+            memberId,
+            categoryId
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Category deleted. Category ID: {}, Trip ID: {}", categoryId, tripId)
     }
 
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun orderUpdateCategory(tripId: Long, request : CategoryDto.OrderUpdate) : List<CategoryDto.CategoryResponse> {
+        val memberId = SecurityUtil.getCurrentMemberId()
+
         val requestItems = request.items
 
         val categoryIds = request.items.map { it.categoryId }
@@ -128,10 +173,22 @@ class CategoryService (
             val newOrder = newOrderMap[category.id]!!
             category.updateOrder(newOrder)
         }
-        //순서가 변경된 카테고리 목록을 다시 조회하여 반환
-        logger.info("Category order updated for tripId: {}. Number of categories updated: {}", tripId, categoriesToUpdate.size)
-        return categoriesToUpdate
+
+        val updatedItems = categoriesToUpdate
             .sortedBy { it.order }
             .map { CategoryDto.CategoryResponse.from(it) }
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.MOVE_CATEGORY,
+            tripId,
+            memberId,
+            updatedItems
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
+        //순서가 변경된 카테고리 목록을 다시 조회하여 반환
+        logger.info("Category order updated for tripId: {}. Number of categories updated: {}", tripId, categoriesToUpdate.size)
+        return updatedItems
     }
 }

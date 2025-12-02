@@ -4,6 +4,7 @@ package com.tribe.tribe_api.itinerary.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
+import com.tribe.tribe_api.common.util.socket.SocketDto
 import com.tribe.tribe_api.itinerary.dto.WishlistDto
 import com.tribe.tribe_api.itinerary.entity.Place
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
@@ -15,6 +16,7 @@ import com.tribe.tribe_api.trip.repository.TripRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -27,6 +29,7 @@ class WishlistService(
     private val tripMemberRepository: TripMemberRepository,
     private val tripRepository: TripRepository,
     private val memberRepository: MemberRepository,
+    private val messagingTemplate: SimpMessagingTemplate
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -73,8 +76,20 @@ class WishlistService(
         trip.wishlistItems.add(savedWishlistItem)
         tripMember.wishlistItems.add(savedWishlistItem)
 
+        val savedItem = WishlistDto.WishlistItemDto.from(savedWishlistItem)
+
         logger.info("Wishlist item added. Item ID: {}, Trip ID: {}, Place Name: {}", savedWishlistItem.id, tripId, request.placeName)
-        return WishlistDto.WishlistItemDto.from(savedWishlistItem)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.ADD_WISHLIST,
+            tripId,
+            memberId,
+            savedItem
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
+        return savedItem
     }
 
     // 위시리스트 내에서 장소 검색
@@ -138,6 +153,16 @@ class WishlistService(
         }
 
         wishlistItemRepository.deleteAllByIdInBatch(existingIdsInTrip)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.DELETE_WISHLIST,
+            tripId,
+            memberId,
+            existingIdsInTrip
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Wishlist items deleted. Trip ID: {}, Deleted Item IDs: {}", tripId, existingIdsInTrip)
     }
 }

@@ -21,7 +21,7 @@ import java.time.Duration
 
 @SpringBootTest
 @Transactional
-class AuthServiceIntegrationTest @Autowired constructor(
+class AuthServiceTest @Autowired constructor(
     private val authService: AuthService,
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
@@ -35,8 +35,8 @@ class AuthServiceIntegrationTest @Autowired constructor(
 
     @AfterEach
     fun tearDown() {
-        redisService.deleteValues("$AUTH_CODE_PREFIX" + "test@tribe.com")
-        redisService.deleteValues("$VERIFIED_EMAIL_PREFIX" + "test@tribe.com")
+        redisService.deleteValues(AUTH_CODE_PREFIX + "test@tribe.com")
+        redisService.deleteValues(VERIFIED_EMAIL_PREFIX + "test@tribe.com")
     }
 
     @Test

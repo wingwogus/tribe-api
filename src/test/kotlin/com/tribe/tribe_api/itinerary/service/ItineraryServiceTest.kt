@@ -35,7 +35,7 @@ import java.time.LocalDateTime
 
 @SpringBootTest
 @Transactional
-class ItineraryServiceIntegrationTest @Autowired constructor(
+class ItineraryServiceTest @Autowired constructor(
     private val itineraryService: ItineraryService,
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,

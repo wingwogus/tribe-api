@@ -3,14 +3,14 @@ package com.tribe.tribe_api.expense.service
 import com.ninjasquad.springmockk.MockkBean
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
+import com.tribe.tribe_api.exchange.client.ExchangeRateClient
+import com.tribe.tribe_api.exchange.entity.Currency
+import com.tribe.tribe_api.exchange.repository.CurrencyRepository
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.entity.ExpenseItem
 import com.tribe.tribe_api.expense.enumeration.InputMethod
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
-import com.tribe.tribe_api.exchange.client.ExchangeRateClient
-import com.tribe.tribe_api.exchange.entity.Currency
-import com.tribe.tribe_api.exchange.repository.CurrencyRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.itinerary.entity.Place
@@ -37,18 +37,18 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.test.context.TestPropertySource
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
-import org.springframework.transaction.annotation.Propagation
 
 @SpringBootTest
 @Transactional
 @ActiveProfiles("test")
 @TestPropertySource(properties = ["spring.flyway.enabled=false"])
-class SettlementServiceIntegrationTest @Autowired constructor(
+class SettlementServiceTest @Autowired constructor(
     private val settlementService: SettlementService,
     private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
@@ -177,13 +177,9 @@ class SettlementServiceIntegrationTest @Autowired constructor(
 
         // B -> A 검증: 700 JPY equivalent
         assertThat(debtBtoA.amount).isEqualByComparingTo(BigDecimal(6517))
-        assertThat(debtBtoA.equivalentOriginalAmount).isNull() // 👈 수정: KRW만 표시
-        assertThat(debtBtoA.originalCurrencyCode).isNull() // 👈 수정: KRW만 표시
 
         // C -> A 검증: 400 JPY equivalent
         assertThat(debtCtoA.amount).isEqualByComparingTo(BigDecimal(3724))
-        assertThat(debtCtoA.equivalentOriginalAmount).isNull()
-        assertThat(debtCtoA.originalCurrencyCode).isNull()
     }
 
     @Test

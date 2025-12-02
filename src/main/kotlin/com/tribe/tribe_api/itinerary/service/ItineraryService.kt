@@ -4,6 +4,7 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GoogleMapService
+import com.tribe.tribe_api.common.util.socket.SocketDto
 import com.tribe.tribe_api.itinerary.dto.ItineraryRequest
 import com.tribe.tribe_api.itinerary.dto.ItineraryResponse
 import com.tribe.tribe_api.itinerary.dto.PlaceDto
@@ -15,6 +16,7 @@ import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import org.slf4j.LoggerFactory
+import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -26,6 +28,7 @@ class ItineraryService(
     private val placeRepository: PlaceRepository,
     private val tripMemberRepository: TripMemberRepository,
     private val googleMapService: GoogleMapService,
+    private val messagingTemplate: SimpMessagingTemplate
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -36,7 +39,9 @@ class ItineraryService(
         val category = categoryRepository.findById(categoryId)
             .orElseThrow { BusinessException(ErrorCode.CATEGORY_NOT_FOUND) }
 
-        validateTripMember(category.trip.id!!, memberId)
+        val tripId = category.trip.id!!
+
+        validateTripMember(tripId, memberId)
 
         var place: Place?
         var title: String?
@@ -67,9 +72,20 @@ class ItineraryService(
         )
 
         val savedItem = itineraryItemRepository.save(newItem)
+        val createdItem = ItineraryResponse.ItineraryDetail.from(savedItem)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.ADD_ITINERARY,
+            tripId,
+            memberId,
+            createdItem
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Itinerary item created. Item ID: {}", savedItem.id)
 
-        return ItineraryResponse.ItineraryDetail.from(savedItem)
+        return createdItem
     }
 
     // 카테고리별 모든 일정 조회
@@ -98,25 +114,49 @@ class ItineraryService(
         val memberId = SecurityUtil.getCurrentMemberId()
         val item = findItemById(itemId)
 
-        validateTripMember(item.category.trip.id!!, memberId)
+        val tripId = item.category.trip.id!!
+        validateTripMember(tripId, memberId)
 
         item.apply {
             this.time = request.time
             this.memo = request.memo
         }
+
+        val updatedItem = ItineraryResponse.ItineraryDetail.from(item)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.EDIT_ITINERARY,
+            tripId,
+            memberId,
+            updatedItem
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Itinerary item updated. Item ID: {}", item.id)
-        return ItineraryResponse.ItineraryDetail.from(item)
+        return updatedItem
     }
 
     // 특정 일정 삭제
-
     fun deleteItinerary(itemId: Long) {
         val memberId = SecurityUtil.getCurrentMemberId()
         val item = findItemById(itemId)
 
-        validateTripMember(item.category.trip.id!!, memberId)
+        val tripId = item.category.trip.id!!
+
+        validateTripMember(tripId, memberId)
 
         itineraryItemRepository.delete(item)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.DELETE_ITINERARY,
+            tripId,
+            memberId,
+            itemId
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Itinerary item deleted. Item ID: {}", itemId)
     }
 
@@ -164,8 +204,19 @@ class ItineraryService(
             item.category = newCategory
         }
 
+        val updatedItems = itemsToUpdate.sortedBy { it.order }.map { ItineraryResponse.ItineraryDetail.from(it) }
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.MOVE_ITINERARY,
+            tripId,
+            memberId,
+            updatedItems
+        )
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Itinerary order updated for tripId: {}. Number of items updated: {}", tripId, itemsToUpdate.size)
-        return itemsToUpdate.sortedBy { it.order }.map { ItineraryResponse.ItineraryDetail.from(it) }
+
+        return updatedItems
     }
 
     private fun findItemById(itemId: Long): ItineraryItem {
