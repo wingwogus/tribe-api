@@ -19,6 +19,8 @@ sealed class SocketDto {
         MOVE_CATEGORY,
         EDIT_CATEGORY,
         DELETE_CATEGORY,
-        JOIN_MEMBER
+        JOIN_MEMBER,
+        LEAVE_MEMBER,
+        CHANGE_ROLE
     }
 }

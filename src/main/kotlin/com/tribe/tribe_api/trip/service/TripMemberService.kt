@@ -4,6 +4,7 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.ExpenseCalculator
+import com.tribe.tribe_api.common.util.socket.SocketDto
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
@@ -14,6 +15,7 @@ import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.slf4j.LoggerFactory
+import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,12 +26,13 @@ class TripMemberService(
     private val tripMemberRepository: TripMemberRepository,
     private val expenseRepository: ExpenseRepository,
     private val wishlistItemRepository: WishlistItemRepository,
-    private val expenseAssignmentRepository: ExpenseAssignmentRepository
+    private val expenseAssignmentRepository: ExpenseAssignmentRepository,
+    private val messagingTemplate: SimpMessagingTemplate
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private fun handleMemberExit(exitingMemberId: Long, targetRole: TripRole) {
+    private fun handleMemberExit(tripId: Long, exitingMemberId: Long, targetRole: TripRole) {
 
         val targetTripMember = tripMemberRepository.findById(exitingMemberId)
             .orElseThrow { BusinessException(ErrorCode.MEMBER_NOT_FOUND) }
@@ -39,12 +42,23 @@ class TripMemberService(
 
         // 연관관계는 유지하되 Role만 변경
         targetTripMember.role = targetRole
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.LEAVE_MEMBER,
+            tripId,
+            exitingMemberId,
+            TripMemberDto.Details.from(targetTripMember)
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
     }
 
     //특정 여행에 임시 참여자(게스트)를 추가
     @Transactional
     @PreAuthorize("@tripSecurityService.isTripMember(#tripId)")
     fun addGuest(tripId: Long, request: TripMemberDto.AddGuestRequest): TripMemberDto.Simple {
+        val memberId = SecurityUtil.getCurrentMemberId()
+
         val trip = tripRepository.findById(tripId)
             .orElseThrow { BusinessException(ErrorCode.TRIP_NOT_FOUND) }
 
@@ -56,9 +70,19 @@ class TripMemberService(
         )
         trip.members.add(newGuest)
 
-        val savedGuest = tripMemberRepository.save(newGuest)
+        val joinedGuest = TripMemberDto.Simple.from(tripMemberRepository.save(newGuest))
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.JOIN_MEMBER,
+            tripId,
+            memberId,
+            joinedGuest
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Guest added to trip. Trip ID: {}, Guest Nickname: {}", tripId, request.name)
-        return TripMemberDto.Simple.from(savedGuest)
+        return joinedGuest
     }
 
     //임시참여자 삭제 (지출 재분배)
@@ -118,6 +142,16 @@ class TripMemberService(
 
         // 게스트 엔티티 삭제
         tripMemberRepository.delete(targetGuest)
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.LEAVE_MEMBER,
+            tripId,
+            guestTripMemberId,
+            TripMemberDto.Simple.from(targetGuest)
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("Guest deleted logic completed. TripId: {}, GuestId: {}", tripId, guestTripMemberId)
     }
 
@@ -132,7 +166,7 @@ class TripMemberService(
             throw BusinessException(ErrorCode.CANNOT_KICK_OWNER)
         }
 
-        handleMemberExit(targetTripMember.id!!, TripRole.KICKED)
+        handleMemberExit(tripId, targetTripMember.id!!, TripRole.KICKED)
     }
 
     //여행 탈퇴
@@ -148,7 +182,7 @@ class TripMemberService(
             throw BusinessException(ErrorCode.CANNOT_LEAVE_AS_OWNER)
         }
 
-        handleMemberExit(tripMember.id!!, TripRole.EXITED)
+        handleMemberExit(tripId, tripMember.id!!, TripRole.EXITED)
     }
 
     @Transactional
@@ -182,6 +216,16 @@ class TripMemberService(
         participantTripMember.role = request.requestRole
 
         val newRole = request.requestRole
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.CHANGE_ROLE,
+            tripId,
+            tripMemberId,
+            TripMemberDto.Details.from(participantTripMember)
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         logger.info("TripMember Role Changed.: [TripMemberID: {}, TripID: {}] -> [ Role : {} -> {}]", tripMemberId, tripId, oldRole, newRole)
 
         return TripMemberDto.Simple.from(participantTripMember)
