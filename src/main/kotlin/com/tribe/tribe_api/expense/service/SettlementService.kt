@@ -162,7 +162,7 @@ class SettlementService(
 
         val difference = dailyTotalAmountKrw.subtract(totalAssignedKrw).abs()
         if (difference > EPSILON) {
-            log.error(
+            log.warn(
                 "[정산 금액 불일치] Trip ID: {}, 날짜: {}. 총 지출액(KRW): {}, 총 분배액(KRW): {}",
                 tripId, date, dailyTotalAmountKrw, totalAssignedKrw
             )
@@ -214,7 +214,7 @@ class SettlementService(
 
         val difference = totalPaidSum.subtract(totalAssignedSum).abs()
         if (difference > EPSILON) {
-            log.error(
+            log.warn(
                 "[전체 정산 금액 불일치] Trip ID: {}. 총 Paid(KRW): {}, 총 Assigned(KRW): {}",
                 tripId, totalPaidSum, totalAssignedSum
             )
