@@ -18,6 +18,7 @@ sealed class SocketDto {
         ADD_CATEGORY,
         MOVE_CATEGORY,
         EDIT_CATEGORY,
-        DELETE_CATEGORY
+        DELETE_CATEGORY,
+        JOIN_MEMBER
     }
 }

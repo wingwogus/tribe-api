@@ -4,14 +4,17 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.RedisService
+import com.tribe.tribe_api.common.util.socket.SocketDto
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
 import com.tribe.tribe_api.member.entity.Member
 import com.tribe.tribe_api.member.repository.MemberRepository
+import com.tribe.tribe_api.trip.dto.TripMemberDto
 import com.tribe.tribe_api.trip.dto.TripRequest
 import com.tribe.tribe_api.trip.dto.TripResponse
 import com.tribe.tribe_api.trip.entity.Trip
+import com.tribe.tribe_api.trip.entity.TripMember
 import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
@@ -20,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -35,6 +39,7 @@ class TripService(
     private val redisService: RedisService,
     private val tripMemberRepository: TripMemberRepository,
     private val communityPostRepository: CommunityPostRepository,
+    private val messagingTemplate: SimpMessagingTemplate,
     @Value("\${app.url}") private val appUrl: String
 ) {
     companion object {
@@ -115,8 +120,8 @@ class TripService(
             .toLong()
 
         val existingMember = tripMemberRepository.findByTripIdAndMemberId(tripId, currentMemberId)
-
         val trip = findTripWithMembers(tripId)
+        val joinedMember: TripMember
 
         if (existingMember != null) {
             when (existingMember.role) {
@@ -134,12 +139,23 @@ class TripService(
                 }
                 else -> {}
             }
+            joinedMember = existingMember
         } else {
             // 신규 가입
             val member = findMember(currentMemberId)
-            trip.addMember(member, TripRole.MEMBER)
+            joinedMember = trip.addMember(member, TripRole.MEMBER)
             logger.info("New member joined. TripId: {}, MemberId: {}", tripId, currentMemberId)
         }
+
+        val socketMessage = SocketDto.TripEditMessage(
+            SocketDto.EditType.JOIN_MEMBER,
+            tripId,
+            currentMemberId,
+            TripMemberDto.Details.from(joinedMember)
+        )
+
+        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
+
         return TripResponse.TripDetail.from(trip)
     }
 

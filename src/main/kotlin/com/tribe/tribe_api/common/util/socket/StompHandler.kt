@@ -20,6 +20,7 @@ class StompHandler(
         // 연결 요청 시 토큰 검증
         if (accessor.command == StompCommand.CONNECT) {
             val token = accessor.getFirstNativeHeader("Authorization")
+                ?.takeIf { it.startsWith("Bearer ") }
                 ?.substring(7)
                 ?: throw BusinessException(ErrorCode.INVALID_TOKEN)
 

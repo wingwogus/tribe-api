@@ -50,8 +50,8 @@ class Trip(
     }
 
     //== 연관관계 편의 메소드 ==//
-    fun addMember(member: Member, role: TripRole) {
-        TripMember(
+    fun addMember(member: Member, role: TripRole):TripMember {
+        return TripMember(
             member = member,
             trip = this,
             role = role
