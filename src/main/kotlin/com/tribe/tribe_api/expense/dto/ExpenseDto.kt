@@ -58,6 +58,9 @@ object ExpenseDto {
         @field:NotNull(message = "결제자 ID는 필수입니다.")
         val payerId: Long,
 
+        @field:NotBlank(message = "통화 정보는 필수입니다.")
+        val currency: String = "KRW",
+
         @field:Valid
         val items: List<ItemUpdate> = emptyList()
     )
@@ -87,35 +90,14 @@ object ExpenseDto {
         val participantIds: List<Long> = emptyList()
     )
 
-    data class CreateResponse(
-        val expenseId: Long,
-        val expenseTitle: String,
-        val totalAmount: BigDecimal,
-        val payer: ParticipantInfo,
-        val items: List<ItemSimpleResponse>,
-        val currency: String
-    ) {
-        companion object {
-            fun from(expense: Expense): CreateResponse {
-                return CreateResponse(
-                    expenseId = expense.id!!,
-                    expenseTitle = expense.title,
-                    totalAmount = expense.totalAmount,
-                    payer = ParticipantInfo.from(expense.payer),
-                    items = expense.expenseItems.map { ItemSimpleResponse.from(it) },
-                    currency = expense.currency ?: "KRW"
-                )
-            }
-        }
-    }
-
     data class DetailResponse(
         val expenseId: Long,
         val expenseTitle: String,
         val totalAmount: BigDecimal,
         val payer: ParticipantInfo,
         val items: List<ItemDetailResponse>,
-        val currency: String
+        val currency: String,
+        val receiptImageUrl: String?
     ) {
         companion object {
             fun from(expense: Expense): DetailResponse {
@@ -125,7 +107,8 @@ object ExpenseDto {
                     totalAmount = expense.totalAmount,
                     payer = ParticipantInfo.from(expense.payer),
                     items = expense.expenseItems.map { ItemDetailResponse.from(it) },
-                    currency = expense.currency ?: "KRW"
+                    currency = expense.currency ?: "KRW",
+                    receiptImageUrl = expense.receiptImageUrl
                 )
             }
         }

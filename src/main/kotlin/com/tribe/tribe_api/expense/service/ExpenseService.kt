@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
-import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.common.util.service.ExpenseCalculator
+import com.tribe.tribe_api.common.util.service.GeminiApiClient
 import com.tribe.tribe_api.expense.dto.ExpenseDto
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
@@ -60,7 +60,7 @@ class ExpenseService(
         itineraryItemId: Long,
         request: ExpenseDto.CreateRequest,
         imageFile: MultipartFile?
-    ): ExpenseDto.CreateResponse {
+    ): ExpenseDto.DetailResponse {
 
 
         val trip = tripRepository.findById(tripId)
@@ -147,7 +147,7 @@ class ExpenseService(
 
         val savedExpense = expenseRepository.save(expense)
         logger.info("Expense created. Expense ID: {}, Trip ID: {}", savedExpense.id, tripId)
-        return ExpenseDto.CreateResponse.from(savedExpense)
+        return ExpenseDto.DetailResponse.from(savedExpense)
     }
 
     private fun processReceipt(imageFile: MultipartFile): ExpenseDto.OcrResponse {
@@ -232,6 +232,7 @@ class ExpenseService(
         expense.title = request.expenseTitle
         expense.totalAmount = request.totalAmount
         expense.payer = payer
+        expense.currency = request.currency
 
         updateExpenseItems(expense, request.items)
 

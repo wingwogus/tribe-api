@@ -316,7 +316,7 @@ class ExpenseServiceTest @Autowired constructor(
         setAuthentication(owner)
         val expenseResponse = createTestExpense()
         setupNonMember()
-        val updateRequest = ExpenseDto.UpdateRequest("타이틀", BigDecimal.ONE, ownerTripMember.id!!, emptyList())
+        val updateRequest = ExpenseDto.UpdateRequest("타이틀", BigDecimal.ONE, ownerTripMember.id!!, "KRW", emptyList())
 
         // when & then: 실제 보안 검증 로직이 BusinessException을 던지는지 확인
         val exception = assertThrows<BusinessException> {
@@ -371,7 +371,7 @@ class ExpenseServiceTest @Autowired constructor(
 
 
     // 테스트용 헬퍼 메서드
-    private fun createTestExpense(totalAmount: BigDecimal = BigDecimal("15000")): ExpenseDto.CreateResponse {
+    private fun createTestExpense(totalAmount: BigDecimal = BigDecimal("15000")): ExpenseDto.DetailResponse {
         // 헬퍼 메서수는 테스트의 일부이므로, 여기서도 실제 보안 검증을 통과해야 함
         // createTestExpense를 호출하기 전에 setAuthentication이 먼저 호출되므로,
         // 이 메서수는 항상 권한이 있는 상태에서 실행됨.
