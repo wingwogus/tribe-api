@@ -4,7 +4,8 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.GoogleMapService
-import com.tribe.tribe_api.common.util.socket.SocketDto
+import com.tribe.tribe_api.common.util.socket.SocketDto.EditType
+import com.tribe.tribe_api.common.util.socket.SocketDto.TripEvent
 import com.tribe.tribe_api.itinerary.dto.ItineraryRequest
 import com.tribe.tribe_api.itinerary.dto.ItineraryResponse
 import com.tribe.tribe_api.itinerary.dto.PlaceDto
@@ -16,7 +17,7 @@ import com.tribe.tribe_api.itinerary.repository.ItineraryItemRepository
 import com.tribe.tribe_api.itinerary.repository.PlaceRepository
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import org.slf4j.LoggerFactory
-import org.springframework.messaging.simp.SimpMessagingTemplate
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -28,7 +29,7 @@ class ItineraryService(
     private val placeRepository: PlaceRepository,
     private val tripMemberRepository: TripMemberRepository,
     private val googleMapService: GoogleMapService,
-    private val messagingTemplate: SimpMessagingTemplate
+    private val eventPublisher: ApplicationEventPublisher
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -74,14 +75,14 @@ class ItineraryService(
         val savedItem = itineraryItemRepository.save(newItem)
         val createdItem = ItineraryResponse.ItineraryDetail.from(savedItem)
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.ADD_ITINERARY,
-            tripId,
-            memberId,
-            createdItem
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.ADD_ITINERARY,
+                tripId,
+                memberId,
+                createdItem
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Itinerary item created. Item ID: {}", savedItem.id)
 
@@ -124,14 +125,14 @@ class ItineraryService(
 
         val updatedItem = ItineraryResponse.ItineraryDetail.from(item)
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.EDIT_ITINERARY,
-            tripId,
-            memberId,
-            updatedItem
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.EDIT_ITINERARY,
+                tripId,
+                memberId,
+                updatedItem
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Itinerary item updated. Item ID: {}", item.id)
         return updatedItem
@@ -148,14 +149,14 @@ class ItineraryService(
 
         itineraryItemRepository.delete(item)
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.DELETE_ITINERARY,
-            tripId,
-            memberId,
-            itemId
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.DELETE_ITINERARY,
+                tripId,
+                memberId,
+                itemId
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Itinerary item deleted. Item ID: {}", itemId)
     }
@@ -206,13 +207,14 @@ class ItineraryService(
 
         val updatedItems = itemsToUpdate.sortedBy { it.order }.map { ItineraryResponse.ItineraryDetail.from(it) }
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.MOVE_ITINERARY,
-            tripId,
-            memberId,
-            updatedItems
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.MOVE_ITINERARY,
+                tripId,
+                memberId,
+                updatedItems
+            )
         )
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Itinerary order updated for tripId: {}. Number of items updated: {}", tripId, itemsToUpdate.size)
 

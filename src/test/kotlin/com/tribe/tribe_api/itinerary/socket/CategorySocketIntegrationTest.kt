@@ -122,7 +122,7 @@ class CategorySocketIntegrationTest {
         }
     }
 
-    private fun createWebSocketSession(future: CompletableFuture<SocketDto.TripEditMessage>): StompSession {
+    private fun createWebSocketSession(future: CompletableFuture<SocketDto.TripEvent>): StompSession {
         val sessionHandler = createSessionHandler(future)
 
         val session: StompSession = stompClient.connectAsync(
@@ -134,11 +134,11 @@ class CategorySocketIntegrationTest {
 
         session.subscribe("/topic/trips/${trip.id}", object : StompFrameHandler {
             override fun getPayloadType(headers: StompHeaders): Type {
-                return SocketDto.TripEditMessage::class.java
+                return SocketDto.TripEvent::class.java
             }
 
             override fun handleFrame(headers: StompHeaders, payload: Any?) {
-                future.complete(payload as SocketDto.TripEditMessage)
+                future.complete(payload as SocketDto.TripEvent)
             }
         })
         Thread.sleep(500) // Small delay for subscription to take effect
@@ -149,7 +149,7 @@ class CategorySocketIntegrationTest {
     @DisplayName("카테고리 생성 시 웹소켓 메시지 전송")
     fun createCategory_ShouldBroadcastMessage() {
         // given
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
         val request = CategoryDto.CreateRequest(name = "새 카테고리", day = 1, order = 2)
 
@@ -178,7 +178,7 @@ class CategorySocketIntegrationTest {
     @DisplayName("카테고리 수정 시 웹소켓 메시지 전송")
     fun updateCategory_ShouldBroadcastMessage() {
         // given
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
         val request = CategoryDto.UpdateRequest(name = "수정된 카테고리 이름", day = 2, order = 3, memo = "메모 추가")
 
@@ -207,7 +207,7 @@ class CategorySocketIntegrationTest {
     @DisplayName("카테고리 삭제 시 웹소켓 메시지 전송")
     fun deleteCategory_ShouldBroadcastMessage() {
         // given
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
         val categoryId = category.id!!
 
@@ -230,7 +230,7 @@ class CategorySocketIntegrationTest {
     fun orderUpdateCategory_ShouldBroadcastMessage() {
         // given
         val category2 = categoryRepository.save(Category(trip, 1, "Day 1 - Cat 2", 2))
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
         val request = CategoryDto.OrderUpdate(
             items = listOf(

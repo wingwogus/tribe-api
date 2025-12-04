@@ -133,7 +133,7 @@ class WishlistSocketIntegrationTest {
         }
     }
 
-    private fun createWebSocketSession(future: CompletableFuture<SocketDto.TripEditMessage>): StompSession {
+    private fun createWebSocketSession(future: CompletableFuture<SocketDto.TripEvent>): StompSession {
         val sessionHandler = createSessionHandler(future)
 
         val session: StompSession = stompClient.connectAsync(
@@ -145,11 +145,11 @@ class WishlistSocketIntegrationTest {
 
         session.subscribe("/topic/trips/${trip.id}", object : StompFrameHandler {
             override fun getPayloadType(headers: StompHeaders): Type {
-                return SocketDto.TripEditMessage::class.java
+                return SocketDto.TripEvent::class.java
             }
 
             override fun handleFrame(headers: StompHeaders, payload: Any?) {
-                future.complete(payload as SocketDto.TripEditMessage)
+                future.complete(payload as SocketDto.TripEvent)
             }
         })
         Thread.sleep(500) // Small delay for subscription to take effect
@@ -160,7 +160,7 @@ class WishlistSocketIntegrationTest {
     @DisplayName("위시리스트 추가 시 웹소켓 메시지 전송")
     fun addWishList_ShouldBroadcastMessage() {
         // given
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
         val request = WishlistDto.WishListAddRequest(
             externalPlaceId = "place-123",
@@ -194,7 +194,7 @@ class WishlistSocketIntegrationTest {
         val place = placeRepository.save(Place("place-to-delete", "삭제될 장소", "주소", BigDecimal.valueOf(1.0), BigDecimal.valueOf(1.0)))
         val itemToDelete = wishlistItemRepository.save(WishlistItem(trip, place, tripMember))
 
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
 
         // when
