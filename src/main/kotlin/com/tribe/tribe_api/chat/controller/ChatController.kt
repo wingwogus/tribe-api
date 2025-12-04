@@ -15,9 +15,9 @@ class ChatController(
     fun sendChat(
         @PathVariable tripId: Long,
         @RequestBody request: ChatMessageDto.Request
-    ): ResponseEntity<ApiResponse<Unit>> {
-        chatService.sendChat(tripId, request.content)
-        return ResponseEntity.ok(ApiResponse.success("메시지 전송 성공", null))
+    ): ResponseEntity<ApiResponse<ChatMessageDto.Response>> {
+        val chatMessage = chatService.sendChat(tripId, request.content)
+        return ResponseEntity.ok(ApiResponse.success("메시지 전송 성공", chatMessage))
     }
 
     // 채팅 기록 조회 (무한 스크롤)

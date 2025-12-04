@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.chat.dto
 
 import com.tribe.tribe_api.chat.entity.ChatMessage
+import com.tribe.tribe_api.trip.dto.TripMemberDto
 
 sealed class ChatMessageDto {
     data class Request(
@@ -9,21 +10,17 @@ sealed class ChatMessageDto {
 
     data class Response(
         val messageId: Long,
-        val senderId: Long,
-        val nickname: String,
-        val avatar: String?,
+        val sender: TripMemberDto.Details,
         val content: String,
         val timestamp: String
     ) {
         companion object {
             fun from(chatMessage: ChatMessage): Response {
-                val sender = chatMessage.sender
+                val sender = TripMemberDto.Details.from(chatMessage.sender)
 
                 return Response(
                     messageId = chatMessage.id!!,
-                    senderId = sender.id!!,
-                    nickname = sender.name,
-                    avatar = sender.member?.avatar,
+                    sender = sender,
                     content = chatMessage.content,
                     timestamp = chatMessage.createdAt.toString()
                 )
