@@ -130,7 +130,7 @@ class ItinerarySocketIntegrationTest {
         }
     }
 
-    private fun createWebSocketSession(future: CompletableFuture<SocketDto.TripEditMessage>): StompSession {
+    private fun createWebSocketSession(future: CompletableFuture<SocketDto.TripEvent>): StompSession {
         val sessionHandler = createSessionHandler(future)
 
         val session: StompSession = stompClient.connectAsync(
@@ -142,11 +142,11 @@ class ItinerarySocketIntegrationTest {
 
         session.subscribe("/topic/trips/${trip.id}", object : StompFrameHandler {
             override fun getPayloadType(headers: StompHeaders): Type {
-                return SocketDto.TripEditMessage::class.java
+                return SocketDto.TripEvent::class.java
             }
 
             override fun handleFrame(headers: StompHeaders, payload: Any?) {
-                future.complete(payload as SocketDto.TripEditMessage)
+                future.complete(payload as SocketDto.TripEvent)
             }
         })
         Thread.sleep(500) // Small delay for subscription to take effect
@@ -157,7 +157,7 @@ class ItinerarySocketIntegrationTest {
     @DisplayName("일정 생성 시 SockJS로 웹소켓 메시지 전송")
     fun createItinerary_ShouldBroadcastMessage() {
         // given
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
 
         // when
@@ -203,7 +203,7 @@ class ItinerarySocketIntegrationTest {
             )
         )
 
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
 
         // when
@@ -244,7 +244,7 @@ class ItinerarySocketIntegrationTest {
         )
         val itemId = item.id!!
 
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
 
         // when
@@ -268,7 +268,7 @@ class ItinerarySocketIntegrationTest {
         val item1 = itineraryItemRepository.save(ItineraryItem(category, null, "일정1", null, 1, null))
         val item2 = itineraryItemRepository.save(ItineraryItem(category, null, "일정2", null, 2, null))
 
-        val future = CompletableFuture<SocketDto.TripEditMessage>()
+        val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
 
         // when

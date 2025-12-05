@@ -4,7 +4,8 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.ExpenseCalculator
-import com.tribe.tribe_api.common.util.socket.SocketDto
+import com.tribe.tribe_api.common.util.socket.SocketDto.EditType
+import com.tribe.tribe_api.common.util.socket.SocketDto.TripEvent
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.expense.repository.ExpenseAssignmentRepository
 import com.tribe.tribe_api.expense.repository.ExpenseRepository
@@ -15,7 +16,7 @@ import com.tribe.tribe_api.trip.entity.TripRole
 import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.slf4j.LoggerFactory
-import org.springframework.messaging.simp.SimpMessagingTemplate
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -27,7 +28,7 @@ class TripMemberService(
     private val expenseRepository: ExpenseRepository,
     private val wishlistItemRepository: WishlistItemRepository,
     private val expenseAssignmentRepository: ExpenseAssignmentRepository,
-    private val messagingTemplate: SimpMessagingTemplate
+    private val eventPublisher: ApplicationEventPublisher
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -43,14 +44,14 @@ class TripMemberService(
         // 연관관계는 유지하되 Role만 변경
         targetTripMember.role = targetRole
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.LEAVE_MEMBER,
-            tripId,
-            exitingMemberId,
-            TripMemberDto.Details.from(targetTripMember)
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.LEAVE_MEMBER,
+                tripId,
+                exitingMemberId,
+                TripMemberDto.Details.from(targetTripMember)
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
     }
 
     //특정 여행에 임시 참여자(게스트)를 추가
@@ -72,14 +73,14 @@ class TripMemberService(
 
         val joinedGuest = TripMemberDto.Simple.from(tripMemberRepository.save(newGuest))
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.JOIN_MEMBER,
-            tripId,
-            memberId,
-            joinedGuest
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.JOIN_MEMBER,
+                tripId,
+                memberId,
+                joinedGuest
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Guest added to trip. Trip ID: {}, Guest Nickname: {}", tripId, request.name)
         return joinedGuest
@@ -143,14 +144,14 @@ class TripMemberService(
         // 게스트 엔티티 삭제
         tripMemberRepository.delete(targetGuest)
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.LEAVE_MEMBER,
-            tripId,
-            guestTripMemberId,
-            TripMemberDto.Simple.from(targetGuest)
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.LEAVE_MEMBER,
+                tripId,
+                guestTripMemberId,
+                TripMemberDto.Simple.from(targetGuest)
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Guest deleted logic completed. TripId: {}, GuestId: {}", tripId, guestTripMemberId)
     }
@@ -217,14 +218,14 @@ class TripMemberService(
 
         val newRole = request.requestRole
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.CHANGE_ROLE,
-            tripId,
-            tripMemberId,
-            TripMemberDto.Details.from(participantTripMember)
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.CHANGE_ROLE,
+                tripId,
+                tripMemberId,
+                TripMemberDto.Details.from(participantTripMember)
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("TripMember Role Changed.: [TripMemberID: {}, TripID: {}] -> [ Role : {} -> {}]", tripMemberId, tripId, oldRole, newRole)
 
