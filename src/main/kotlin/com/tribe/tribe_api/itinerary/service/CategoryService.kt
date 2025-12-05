@@ -3,14 +3,15 @@ package com.tribe.tribe_api.itinerary.service
 import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
-import com.tribe.tribe_api.common.util.socket.SocketDto
+import com.tribe.tribe_api.common.util.socket.SocketDto.EditType
+import com.tribe.tribe_api.common.util.socket.SocketDto.TripEvent
 import com.tribe.tribe_api.itinerary.dto.CategoryDto
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.repository.CategoryRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.slf4j.LoggerFactory
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -20,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional
 class CategoryService (
     private val categoryRepository: CategoryRepository,
     private val tripRepository: TripRepository,
-    private val messagingTemplate: SimpMessagingTemplate
+    private val eventPublisher: ApplicationEventPublisher
+
 ){
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -39,15 +41,15 @@ class CategoryService (
 
         val createdItem = CategoryDto.CategoryResponse.from(savedCategory)
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.ADD_CATEGORY,
-            tripId,
-            memberId,
-            createdItem
+
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.ADD_CATEGORY,
+                tripId,
+                memberId,
+                createdItem
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
-
 
         logger.info("Category created. Category ID: {}, Trip ID: {}", savedCategory.id, tripId)
         return createdItem
@@ -98,14 +100,14 @@ class CategoryService (
 
         val updatedItem = CategoryDto.CategoryResponse.from(category)
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.EDIT_CATEGORY,
-            tripId,
-            memberId,
-            updatedItem
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.EDIT_CATEGORY,
+                tripId,
+                memberId,
+                updatedItem
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Category updated. Category ID: {}, Trip ID: {}", categoryId, tripId)
         return updatedItem
@@ -115,19 +117,23 @@ class CategoryService (
     fun deleteCategory(tripId : Long ,categoryId: Long) {
         val memberId = SecurityUtil.getCurrentMemberId()
 
-        if (!categoryRepository.existsById(categoryId)) {
+        val category = (categoryRepository.findByIdOrNull(categoryId)
+            ?: throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND))
+
+        if (category.trip.id != tripId) {
             throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
         }
+
         categoryRepository.deleteById(categoryId)
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.DELETE_CATEGORY,
-            tripId,
-            memberId,
-            categoryId
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.DELETE_CATEGORY,
+                tripId,
+                memberId,
+                categoryId
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         logger.info("Category deleted. Category ID: {}, Trip ID: {}", categoryId, tripId)
     }
@@ -178,14 +184,14 @@ class CategoryService (
             .sortedBy { it.order }
             .map { CategoryDto.CategoryResponse.from(it) }
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.MOVE_CATEGORY,
-            tripId,
-            memberId,
-            updatedItems
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.MOVE_CATEGORY,
+                tripId,
+                memberId,
+                updatedItems
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         //순서가 변경된 카테고리 목록을 다시 조회하여 반환
         logger.info("Category order updated for tripId: {}. Number of categories updated: {}", tripId, categoriesToUpdate.size)

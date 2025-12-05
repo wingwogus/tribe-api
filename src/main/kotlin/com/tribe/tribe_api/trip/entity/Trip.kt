@@ -1,5 +1,6 @@
 package com.tribe.tribe_api.trip.entity
 
+import com.tribe.tribe_api.chat.entity.ChatMessage
 import com.tribe.tribe_api.common.util.BaseTimeEntity
 import com.tribe.tribe_api.community.entity.CommunityPost
 import com.tribe.tribe_api.expense.entity.Expense
@@ -40,6 +41,9 @@ class Trip(
 
     @OneToMany(mappedBy = "trip", cascade = [CascadeType.ALL], orphanRemoval = true)
     val communityPosts: MutableList<CommunityPost> = mutableListOf()
+
+    @OneToMany(mappedBy = "trip", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var chatMessages: MutableList<ChatMessage> = mutableListOf()
 
     //== 비즈니스 로직 ==//
     fun update(title: String, startDate: LocalDate, endDate: LocalDate, country: Country) {

@@ -1,5 +1,6 @@
 package com.tribe.tribe_api.trip.entity
 
+import com.tribe.tribe_api.chat.entity.ChatMessage
 import com.tribe.tribe_api.expense.entity.Expense
 import com.tribe.tribe_api.expense.entity.ExpenseAssignment
 import com.tribe.tribe_api.itinerary.entity.WishlistItem
@@ -35,6 +36,9 @@ class TripMember(
 
     @OneToMany(mappedBy = "tripMember", cascade = [CascadeType.ALL])
     var assignments: MutableList<ExpenseAssignment> = mutableListOf()
+
+    @OneToMany(mappedBy = "sender", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var chatMessages: MutableList<ChatMessage> = mutableListOf()
 
     val name: String
         get() = this.member?.nickname ?: this.guestNickname ?: "unknown" //이름 받아오기

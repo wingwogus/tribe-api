@@ -4,7 +4,8 @@ import com.tribe.tribe_api.common.exception.BusinessException
 import com.tribe.tribe_api.common.exception.ErrorCode
 import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.RedisService
-import com.tribe.tribe_api.common.util.socket.SocketDto
+import com.tribe.tribe_api.common.util.socket.SocketDto.EditType
+import com.tribe.tribe_api.common.util.socket.SocketDto.TripEvent
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.itinerary.entity.Category
 import com.tribe.tribe_api.itinerary.entity.ItineraryItem
@@ -20,10 +21,10 @@ import com.tribe.tribe_api.trip.repository.TripMemberRepository
 import com.tribe.tribe_api.trip.repository.TripRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -39,7 +40,7 @@ class TripService(
     private val redisService: RedisService,
     private val tripMemberRepository: TripMemberRepository,
     private val communityPostRepository: CommunityPostRepository,
-    private val messagingTemplate: SimpMessagingTemplate,
+    private val eventPublisher: ApplicationEventPublisher,
     @Value("\${app.url}") private val appUrl: String
 ) {
     companion object {
@@ -147,14 +148,14 @@ class TripService(
             logger.info("New member joined. TripId: {}, MemberId: {}", tripId, currentMemberId)
         }
 
-        val socketMessage = SocketDto.TripEditMessage(
-            SocketDto.EditType.JOIN_MEMBER,
-            tripId,
-            currentMemberId,
-            TripMemberDto.Details.from(joinedMember)
+        eventPublisher.publishEvent(
+            TripEvent(
+                EditType.JOIN_MEMBER,
+                tripId,
+                currentMemberId,
+                TripMemberDto.Details.from(joinedMember)
+            )
         )
-
-        messagingTemplate.convertAndSend("/topic/trips/$tripId", socketMessage)
 
         return TripResponse.TripDetail.from(trip)
     }

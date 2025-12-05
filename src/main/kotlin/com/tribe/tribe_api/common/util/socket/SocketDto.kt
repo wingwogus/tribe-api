@@ -1,7 +1,7 @@
 package com.tribe.tribe_api.common.util.socket
 
 sealed class SocketDto {
-    data class TripEditMessage(
+    data class TripEvent(
         val type: EditType,
         val tripId: Long,
         val senderId: Long,
@@ -21,6 +21,7 @@ sealed class SocketDto {
         DELETE_CATEGORY,
         JOIN_MEMBER,
         LEAVE_MEMBER,
-        CHANGE_ROLE
+        CHANGE_ROLE,
+        CHAT
     }
 }
