@@ -1,6 +1,7 @@
 package com.tribe.tribe_api.community.dto
 
 import com.tribe.tribe_api.community.entity.CommunityPost
+import com.tribe.tribe_api.community.entity.CommunityPostCategory
 import com.tribe.tribe_api.community.entity.CommunityPostDay
 import com.tribe.tribe_api.itinerary.dto.ItineraryResponse
 import jakarta.validation.constraints.NotBlank
@@ -25,7 +26,6 @@ object CommunityPostDto {
 
     data class DayContentCreateRequest(
         val categoryId: Long,
-        val content: String,
         val itineraries: List<ItineraryContentCreateRequest> = emptyList()
     )
 
@@ -46,17 +46,17 @@ object CommunityPostDto {
     )
 
     data class DayUpdateRequest(
-        val id: Long, // 기존 Day의 ID (새로 추가 시 null)
-        @field:NotNull
-        val day: Int,
-        val content: String?,
+        val id: Long, // 기존 Day의 ID
+        val categories: List<CategoryUpdateRequest> = emptyList(),
+    )
+
+    data class CategoryUpdateRequest(
+        val id: Long, // 기존 Category의 ID
         val itineraries: List<ItineraryUpdateRequest> = emptyList(),
     )
 
     data class ItineraryUpdateRequest(
         val id: Long, // 기존 Itinerary의 ID
-        @field:NotNull
-        val order: Int,
         @field:NotBlank
         val content: String,
         val photos: List<PhotoUpdateRequest> = emptyList(),
@@ -123,16 +123,30 @@ object CommunityPostDto {
     data class DayDetailResponse(
         val dayId: Long,
         val day: Int,
-        val content: String, // Day 요약 설명
-        val itineraries: List<ItineraryDetailResponse>
+        val categories: List<CategoryDetailResponse>
     ) {
         companion object {
             fun from(postDay: CommunityPostDay): DayDetailResponse {
                 return DayDetailResponse(
                     dayId = postDay.id!!,
                     day = postDay.day,
-                    content = postDay.content,
-                    itineraries = postDay.itineraries.map { ItineraryDetailResponse.from(it) }
+                    categories = postDay.categories.map { CategoryDetailResponse.from(it) }
+                )
+            }
+        }
+    }
+
+    data class CategoryDetailResponse(
+        val categoryId: Long,
+        val name: String,
+        val itineraries: List<ItineraryDetailResponse>
+    ) {
+        companion object {
+            fun from(postCategory: CommunityPostCategory): CategoryDetailResponse {
+                return CategoryDetailResponse(
+                    categoryId = postCategory.id!!,
+                    name = postCategory.name,
+                    itineraries = postCategory.itineraries.map { ItineraryDetailResponse.from(it) }
                 )
             }
         }

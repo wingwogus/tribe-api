@@ -5,10 +5,10 @@ import com.tribe.tribe_api.itinerary.entity.Place
 import jakarta.persistence.*
 
 /**
- * 커뮤니티 게시글의 Day에 속한 개별 일정(itinerary) 아이템 엔티티
- * 예: Day 1의 '에펠탑 방문'
+ * 커뮤니티 게시글의 카테고리에 속한 개별 일정(itinerary) 아이템 엔티티
+ * 예: Day 1 '식당' 카테고리의 '에펠탑 근처 맛집'
  *
- * @property communityPostDay 이 일정이 속한 부모 Day
+ * @property communityPostCategory 이 일정이 속한 부모 카테고리
  * @property place 이 일정과 연결된 장소 정보 (지도 마커 표시용)
  * @property order Day 내에서의 일정 순서
  * @property content 이 일정에 대한 사용자 작성 소개글
@@ -17,14 +17,14 @@ import jakarta.persistence.*
 @Entity
 class CommunityPostItinerary(
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "day_id", nullable = false)
-    val communityPostDay: CommunityPostDay,
+    @JoinColumn(name = "post_category_id", nullable = false)
+    val communityPostCategory: CommunityPostCategory,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "place_id") // 장소 정보는 선택적일 수 있음 ('호텔에서 휴식' 등)
+    @JoinColumn(name = "post_place_id") // 장소 정보는 선택적일 수 있음 ('호텔에서 휴식' 등)
     val place: Place?,
 
-    @Column(name = "item_order", nullable = false)
+    @Column(name = "post_item_order", nullable = false)
     val order: Int,
 
     @Lob

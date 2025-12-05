@@ -7,8 +7,6 @@ import jakarta.persistence.*
  *
  * @property communityPost 이 Day가 속한 부모 게시글
  * @property day 몇 일차인지 (예: 1, 2, 3)
- * @property content 해당 Day에 대한 사용자의 설명 (블로그 글)
- * @property photos 해당 Day에 첨부된 사진 목록
  */
 @Entity
 class CommunityPostDay(
@@ -19,17 +17,14 @@ class CommunityPostDay(
     @Column(nullable = false)
     val day: Int,
 
-    @Lob
-    var content: String, // Day 전체에 대한 요약 설명
-
     @OneToMany(mappedBy = "communityPostDay", cascade = [CascadeType.ALL], orphanRemoval = true)
-    @OrderBy("order ASC")
-    var itineraries: MutableList<CommunityPostItinerary> = mutableListOf()
+    @OrderBy("id ASC")
+    var categories: MutableList<CommunityPostCategory> = mutableListOf()
 
 
 ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "day_id")
+    @Column(name = "post_day_id")
     val id: Long? = null
 }

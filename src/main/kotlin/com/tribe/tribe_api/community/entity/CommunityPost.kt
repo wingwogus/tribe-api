@@ -23,20 +23,19 @@ class CommunityPost(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id", nullable = false)
-    val trip: Trip,
+    val trip: Trip, //원본 여행
 
     @Column(nullable = false)
-    var title: String,
+    var title: String, // post 제목
 
     @Lob
-    var content: String,
+    var content: String, // post 전체 설명
 
-    var representativeImageUrl: String? = null, // 사진 (선택 사항)
+    var representativeImageUrl: String? = null, // 대표 사진 (선택 사항)
 
     @OneToMany(mappedBy = "communityPost" , cascade = [CascadeType.ALL] , orphanRemoval = true)
     @OrderBy("day ASC") // Day N의 순서를 보장하기 위해 day 필드 기준으로 오름차순 정렬
-    var days : MutableList<CommunityPostDay> = mutableListOf()
-
+    var days : MutableList<CommunityPostDay> = mutableListOf() // 자식
 
 
 ) : BaseTimeEntity() {

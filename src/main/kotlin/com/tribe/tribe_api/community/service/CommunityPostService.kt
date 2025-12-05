@@ -6,10 +6,7 @@ import com.tribe.tribe_api.common.util.security.SecurityUtil
 import com.tribe.tribe_api.common.util.service.CloudinaryUploadService
 import com.tribe.tribe_api.community.dto.CommunityPostDto
 import com.tribe.tribe_api.community.dto.PostSearchCondition
-import com.tribe.tribe_api.community.entity.CommunityPost
-import com.tribe.tribe_api.community.entity.CommunityPostDay
-import com.tribe.tribe_api.community.entity.CommunityPostItinerary
-import com.tribe.tribe_api.community.entity.CommunityPostItineraryPhoto
+import com.tribe.tribe_api.community.entity.*
 import com.tribe.tribe_api.community.repository.CommunityPostRepository
 import com.tribe.tribe_api.community.repository.CommunityPostRepositoryCustom
 import com.tribe.tribe_api.member.repository.MemberRepository
@@ -44,45 +41,59 @@ class CommunityPostService(
             author = author,
             trip = trip,
             title = request.title,
-            content = request.content, // post 전체 설명글
-            representativeImageUrl = request.representativeImageUrl //post 대표 이미지
+            content = request.content,
+            representativeImageUrl = request.representativeImageUrl
         )
 
 
-        val dayContentMap = request.days.associateBy { it.categoryId }
+        val tripCategoriesByDay = trip.categories.groupBy { it.day }
+        val categoryContentMap = request.days.associateBy { it.categoryId }
         val itineraryContentMap = request.days.flatMap { it.itineraries }.associateBy { it.itineraryItemId }
 
-        trip.categories.sortedBy { it.day }.forEach { category ->
+        // For each -> Day
+        tripCategoriesByDay.keys.sorted().forEach { dayNum ->
 
-            val dayRequest = dayContentMap[category.id]
-            val dayContent = dayRequest?.content ?: ""
-
-            val postDay = CommunityPostDay(newPost, category.day, dayContent)
+            val postDay = CommunityPostDay(newPost, dayNum)
             newPost.days.add(postDay)
 
-            category.itineraryItems.sortedBy { it.order }.forEach { itineraryItem ->
+            // For each -> day 안에있는 category
+            val categoriesForDay = tripCategoriesByDay[dayNum] ?: emptyList()
+            categoriesForDay.sortedBy { it.order }.forEach { tripCategory ->
 
-                val itineraryRequest = itineraryContentMap[itineraryItem.id]
+                // request 요청으로 들어온 cateory의 content찾기
+                val categoryRequest = categoryContentMap[tripCategory.id]
 
-                val newContent = itineraryRequest?.content ?: "" // 일정별 설명글
-
-                val originalMemo = itineraryItem.memo // 원래 trip 메모
-
-                val postItinerary = CommunityPostItinerary(
+                // 새로운 CommunityPostCategory 엔티티 생성
+                val postCategory = CommunityPostCategory(
                     communityPostDay = postDay,
-                    place = itineraryItem.place,
-                    order = itineraryItem.order,
-                    memo = originalMemo,
-                    content = newContent
+                    name = tripCategory.name
                 )
+                postDay.categories.add(postCategory)
 
-                // 사진 추가
-                itineraryRequest?.imageUrls?.forEach { imageUrl ->
-                    val photo = CommunityPostItineraryPhoto(postItinerary, imageUrl)
-                    postItinerary.photos.add(photo)
+
+                // For each -> category 안에 있는 itinerary
+                tripCategory.itineraryItems.sortedBy { it.order }.forEach { itineraryItem ->
+
+                    val itineraryRequest = itineraryContentMap[itineraryItem.id]
+                    val newContent = itineraryRequest?.content ?: ""
+                    val originalMemo = itineraryItem.memo
+
+                    val postItinerary = CommunityPostItinerary(
+                        communityPostCategory = postCategory, // 새로운 category 엔티티와 연결
+                        place = itineraryItem.place,
+                        order = itineraryItem.order,
+                        memo = originalMemo, // 원본 메모
+                        content = newContent
+                    )
+
+                    // 일정에 사진 추가
+                    itineraryRequest?.imageUrls?.forEach { imageUrl ->
+                        val photo = CommunityPostItineraryPhoto(postItinerary, imageUrl)
+                        postItinerary.photos.add(photo)
+                    }
+
+                    postCategory.itineraries.add(postItinerary)
                 }
-
-                postDay.itineraries.add(postItinerary)
             }
         }
 
@@ -92,6 +103,7 @@ class CommunityPostService(
 
     @Transactional(readOnly = true)
     fun getPosts(country: Country?, pageable: Pageable): Page<CommunityPostDto.SimpleResponse> {
+
         val posts = if (country != null) {
             communityPostRepository.findByTripCountry(country, pageable)
         } else {
@@ -125,52 +137,52 @@ class CommunityPostService(
         // 삭제할 이미지 URL들을 담을 그릇 (나중에 한 번에 지움)
         val imageUrlsToDelete = mutableSetOf<String>()
 
-        // 3. Day 순회 (구조 변경 없이 내용만 수정)
-        // DB에 있는 Day들을 ID로 빠르게 찾기 위해 Map으로 변환
+        // 3. 전체 엔티티를 Map으로 변환하여 빠른 조회를 위함
         val existingDays = post.days.associateBy { it.id }
+        val existingCategories = post.days.flatMap { it.categories }.associateBy { it.id }
+        val existingItineraries = post.days.flatMap { it.categories }.flatMap { it.itineraries }.associateBy { it.id }
 
+        // 4. Day 순회
         request.days.forEach { dayUpdate ->
-            // Request로 들어온 ID에 해당하는 Day가 없으면 건너뜀 (혹은 에러 처리)
             val dayEntity = existingDays[dayUpdate.id] ?: return@forEach
 
-            // Day 내용(Content) 수정
-            dayEntity.content = dayUpdate.content ?: ""
+            // 5. Category 순회
+            dayUpdate.categories.forEach { categoryUpdate ->
+                val categoryEntity = existingCategories[categoryUpdate.id] ?: return@forEach
 
-            // 4. Itinerary 순회 (구조 변경 없이 내용만 수정)
-            val existingItineraries = dayEntity.itineraries.associateBy { it.id }
+                // 6. Itinerary 순회
+                categoryUpdate.itineraries.forEach { itineraryUpdate ->
+                    val itineraryEntity = existingItineraries[itineraryUpdate.id] ?: return@forEach
 
-            dayUpdate.itineraries.forEach { itineraryUpdate ->
-                val itineraryEntity = existingItineraries[itineraryUpdate.id] ?: return@forEach
+                    // Itinerary 내용(Content) 수정
+                    itineraryEntity.content = itineraryUpdate.content
 
-                // Itinerary 내용(Content) 수정
-                itineraryEntity.content = itineraryUpdate.content
+                    // 7. 사진(Photo) 처리
+                    val existingPhotos = itineraryEntity.photos.associateBy { it.id }.toMutableMap()
 
-                // 5. 사진(Photo) 처리 - 사진은 '컨텐츠'이므로 추가/삭제 가능해야 함
-                val existingPhotos = itineraryEntity.photos.associateBy { it.id }.toMutableMap()
-
-                // 5-1. 사진 삭제
-                itineraryUpdate.photoIdsToDelete.forEach { photoId ->
-                    existingPhotos.remove(photoId)?.also { photoToDelete ->
-                        imageUrlsToDelete.add(photoToDelete.imageUrl) // Cloudinary 삭제 대기열 추가
-                        itineraryEntity.photos.remove(photoToDelete)  // DB 관계 끊기 (orphanRemoval 동작)
+                    // 7-1. 사진 삭제
+                    itineraryUpdate.photoIdsToDelete.forEach { photoId ->
+                        existingPhotos.remove(photoId)?.also { photoToDelete ->
+                            imageUrlsToDelete.add(photoToDelete.imageUrl) // Cloudinary 삭제 대기열 추가
+                            itineraryEntity.photos.remove(photoToDelete)  // DB 관계 끊기 (orphanRemoval 동작)
+                        }
                     }
-                }
 
-                // 5-2. 사진 추가 (새로 업로드된 사진)
-                itineraryUpdate.photos.forEach { photoUpdate ->
-                    if (photoUpdate.id == null) {
-                        itineraryEntity.photos.add(
-                            CommunityPostItineraryPhoto(itineraryEntity, photoUpdate.imageUrl)
-                        )
+                    // 7-2. 사진 추가 (새로 업로드된 사진)
+                    itineraryUpdate.photos.forEach { photoUpdate ->
+                        if (photoUpdate.id == null) {
+                            itineraryEntity.photos.add(
+                                CommunityPostItineraryPhoto(itineraryEntity, photoUpdate.imageUrl)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // 6. 변경된 포스트 저장 및 실제 이미지 파일 삭제
+        // 8. 변경된 포스트 저장 및 실제 이미지 파일 삭제
         val savedPost = communityPostRepository.save(post)
 
-        // 트랜잭션이 성공적으로 거의 끝났을 때 외부 스토리지 파일 삭제
         imageUrlsToDelete.forEach { cloudinaryUploadService.delete(it) }
 
         return CommunityPostDto.DetailResponse.from(savedPost)
@@ -184,8 +196,10 @@ class CommunityPostService(
         val imageUrlsToDelete = mutableListOf<String>()
         post.representativeImageUrl?.let { imageUrlsToDelete.add(it) }
         post.days.forEach { day ->
-            day.itineraries.forEach { itinerary ->
-                itinerary.photos.forEach { photo -> imageUrlsToDelete.add(photo.imageUrl) }
+            day.categories.forEach { category ->
+                category.itineraries.forEach { itinerary ->
+                    itinerary.photos.forEach { photo -> imageUrlsToDelete.add(photo.imageUrl) }
+                }
             }
         }
 

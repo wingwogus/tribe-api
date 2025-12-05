@@ -31,8 +31,8 @@ interface CommunityPostRepository : JpaRepository<CommunityPost, Long> {
 
     @Query(
         "SELECT DISTINCT cp FROM CommunityPost cp " +
-                "JOIN FETCH cp.author " +
-                "JOIN FETCH cp.trip t " +
+                "LEFT JOIN FETCH cp.author " +
+                "LEFT JOIN FETCH cp.trip " +
                 "WHERE cp.id = :postId"
     )
     fun findByIdWithDetails(@Param("postId") postId: Long): CommunityPost?

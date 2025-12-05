@@ -25,7 +25,7 @@ class CommunityPostController(
      * 1. 게시글 생성 (여행 공유)
      * JSON(request) image url도 request body에 포함
      */
-    @PostMapping(consumes = [MediaType.APPLICATION_JSON_VALUE])
+    @PostMapping
     fun createPost(
         @Valid @RequestBody request: CommunityPostDto.CreateRequest
     ): ResponseEntity<ApiResponse<CommunityPostDto.DetailResponse>> {
