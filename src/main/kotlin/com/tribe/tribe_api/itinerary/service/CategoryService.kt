@@ -121,7 +121,7 @@ class CategoryService (
             ?: throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND))
 
         if (category.trip.id != tripId) {
-            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
+            throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
         }
 
         categoryRepository.deleteById(categoryId)

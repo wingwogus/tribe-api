@@ -139,7 +139,7 @@ class ChatSocketIntegrationTest {
 
     @Test
     @DisplayName("채팅 전송 시 웹소켓 메시지 전송")
-    fun createCategory_ShouldBroadcastMessage() {
+    fun sendChat_ShouldBroadcastMessage() {
         // given
         val future = CompletableFuture<SocketDto.TripEvent>()
         val session = createWebSocketSession(future)
