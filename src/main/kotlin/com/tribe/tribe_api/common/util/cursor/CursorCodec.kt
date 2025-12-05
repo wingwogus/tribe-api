@@ -16,18 +16,22 @@ object CursorCodec {
 
     fun decode(cursor: String?): Parsed? {
         if (cursor == null || cursor.isBlank()) return null
-        val raw = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
-        val p = raw.split(":".toRegex()).dropLastWhile { it.isEmpty() }
-        val epochMilli = p[0].toLong()
 
-        return Parsed(
-            Instant.ofEpochMilli(epochMilli).atZone(ZoneOffset.UTC).toLocalDateTime(),
-            p[1].toLong()
-        )
+        return runCatching {
+            val raw = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
+            val p = raw.split(":".toRegex()).dropLastWhile { it.isEmpty() }
+            val epochMilli = p[0].toLong()
+
+            Parsed(
+                Instant.ofEpochMilli(epochMilli).atZone(ZoneOffset.UTC).toLocalDateTime(),
+                p[1].toLong()
+            )
+        }.getOrNull()
+
     }
 
     data class Parsed(
-        val createdAt: LocalDateTime?,
-        val id: Long?
+        val createdAt: LocalDateTime,
+        val id: Long
     )
 }

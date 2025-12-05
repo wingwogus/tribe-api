@@ -117,9 +117,13 @@ class CategoryService (
     fun deleteCategory(tripId : Long ,categoryId: Long) {
         val memberId = SecurityUtil.getCurrentMemberId()
 
-        if (!categoryRepository.existsById(categoryId)) {
-            throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND)
+        val category = (categoryRepository.findByIdOrNull(categoryId)
+            ?: throw BusinessException(ErrorCode.CATEGORY_NOT_FOUND))
+
+        if (category.trip.id != tripId) {
+            throw BusinessException(ErrorCode.NOT_A_TRIP_MEMBER)
         }
+
         categoryRepository.deleteById(categoryId)
 
         eventPublisher.publishEvent(
