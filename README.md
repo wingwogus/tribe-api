@@ -2,16 +2,17 @@
 <img width="500" height="400" alt="tribe-main" src="https://github.com/user-attachments/assets/793d1dc9-d765-445b-817a-006a9bcf40d3" />
 
 # 🌏 Tribe Backend Server
-## 개발 환경
+## 🛠 Tech Stack
 
+### Development Environment
 | Category | Stack |
-| --- | --- |
-| **Language** | Kotlin (JDK 17) |
-| **Framework & Runtime** | Spring Boot 3.x, Spring Data JPA |
-| **Database** | MySQL, Redis (Invitation & Token Management) |
-| **Infra & Messaging** | WebSocket (STOMP), ApplicationEventPublisher, Cloudinary |
-| **LLM & AI Framework** | Google Gemini AI (Vertex AI/API) |
-| **DevOps & CI/CD** | Docker, GitHub Actions |
+| :--- | :--- |
+| **Language** | ![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white) ![Java](https://img.shields.io/badge/java-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white) |
+| **Framework** | ![Spring Boot](https://img.shields.io/badge/spring-%236DB33F.svg?style=for-the-badge&logo=springboot&logoColor=white) ![Spring Security](https://img.shields.io/badge/Spring%20Security-6DB33F?style=for-the-badge&logo=Spring%20Security&logoColor=white) |
+| **Database** | ![MySQL](https://img.shields.io/badge/mysql-%2300f.svg?style=for-the-badge&logo=mysql&logoColor=white) ![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white) |
+| **Infra & Messaging** | ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white) ![WebSocket](https://img.shields.io/badge/WebSocket-010101?style=for-the-badge&logo=socket.io&logoColor=white) |
+| **DevOps & CI/CD** | ![GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white) |
+| **AI & External API** | ![Google Gemini](https://img.shields.io/badge/google%20gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white) ![Google Maps](https://img.shields.io/badge/google%20maps-4285F4?style=for-the-badge&logo=googlemaps&logoColor=white) |
 
 ## Key Dependencies and Features
 
